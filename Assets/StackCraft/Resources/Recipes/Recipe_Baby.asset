@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Baby
+  m_EditorClassIdentifier: 
+  id: 3380f848b699406c9fb7f8b7f769d813
+  category: 6
+  displayName: Making Love
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 7f7cbdd5fe023044abc18e6793bcd4b4, type: 2}
+    count: 1
+    consumptionMode: 1
+  - card: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+    count: 2
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: 625e3b3240f9d314dbc421d433d16542, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 20
+  randomWeight: 1

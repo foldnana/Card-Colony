@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b17a23ab2a9de94439194fb708c57e9a, type: 3}
+  m_Name: Card_Research_Library
+  m_EditorClassIdentifier: 
+  id: be227bbf964143ae9994c6c6447223e5
+  displayName: Library
+  description: Gather a team of villagers (3) to study new recipes.
+  artTexture: {fileID: 2800000, guid: 3c41a3958d5cf444d805024885d13d71, type: 3}
+  category: 6
+  faction: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
+  sourcePacks:
+  - {fileID: 11400000, guid: 698b3b4edf76314489a111931de35a35, type: 2}
+  - {fileID: 11400000, guid: 1359a9c5afb900e4a9fc3072a0f643c9, type: 2}

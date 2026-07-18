@@ -1,0 +1,42 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Chainmail
+  m_EditorClassIdentifier: 
+  id: 1953140219454a36b01dfd40191e22c5
+  displayName: Chainmail
+  description: An armor made from chains linked together.
+  artTexture: {fileID: 2800000, guid: b26451825f4bbcd4782cdea4f786aebe, type: 3}
+  category: 5
+  faction: 0
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 1
+  statModifiers:
+  - Stat: 2
+    value: 5
+  classChangeResult: {fileID: 0}

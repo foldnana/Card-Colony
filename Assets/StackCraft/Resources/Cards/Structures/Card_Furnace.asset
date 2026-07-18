@@ -1,0 +1,39 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Furnace
+  m_EditorClassIdentifier: 
+  id: bf0872866bf0413585f8b1deadfa8467
+  displayName: Furnace
+  description: Smelting ores into ingot.
+  artTexture: {fileID: 2800000, guid: 6be9375c247eed943816df2f27742faa, type: 3}
+  category: 6
+  faction: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

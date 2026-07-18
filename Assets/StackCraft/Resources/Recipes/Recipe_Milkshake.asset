@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Milkshake
+  m_EditorClassIdentifier: 
+  id: a859539ef3e74bebb00e8a981fd2805b
+  category: 3
+  displayName: Shaking Milk
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: c91a5c6773f466941a0d4ae2ff3cf4a2, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 2ac53164cb5efa24c857c2d32d1057c1, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: cf063240ff0f03d45868d30eeea780a7, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 10
+  randomWeight: 1

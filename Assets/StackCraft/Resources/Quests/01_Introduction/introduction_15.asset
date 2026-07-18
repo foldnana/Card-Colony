@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_15
+  m_EditorClassIdentifier: 
+  id: 09f9198abe3742f79243ca38883b1df1
+  title: Into Manhood
+  description: Place a Baby on a House to raise it into a Villager.
+  type: 4
+  targetCard: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: ebde28f181cf0014db7bd96dfaacf1c2, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 8ab80445d25e0e7439e78094e4fe0d98, type: 2}
+  - {fileID: 11400000, guid: fd389a5ba424cca4ca1e0660a286ced5, type: 2}
+  - {fileID: 11400000, guid: d85c15ae205110c4398377d54c592dd9, type: 2}
+  - {fileID: 11400000, guid: 39352155b026ccd41a9ec12cacd9bb95, type: 2}
+  - {fileID: 11400000, guid: 88853149afe2d1d45a987fa1048d3460, type: 2}
+  - {fileID: 11400000, guid: f3888a306bcf63547b39c3e5006da2c2, type: 2}
+  - {fileID: 11400000, guid: 881f594802178af46948717c2793d3ab, type: 2}
+  - {fileID: 11400000, guid: dec073a3b9a41bf419381b25a440aeea, type: 2}

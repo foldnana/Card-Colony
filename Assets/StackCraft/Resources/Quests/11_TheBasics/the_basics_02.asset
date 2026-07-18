@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: the_basics_02
+  m_EditorClassIdentifier: 
+  id: ed3a33820eda4076bbd69edcc18e5753
+  title: Food Source
+  description: Have a Coconut. It occasionally drops from palm trees.
+  type: 0
+  targetCard: {fileID: 11400000, guid: dd2693ebe3b7fbc46a8825052c06d4a1, type: 2}
+  targetRecipe: {fileID: 11400000, guid: ca3d374621c4e8c4f9c076e7cd302a56, type: 2}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 974294b8014fd654e92a9b34ea8c7109, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 15d8407c002880c41b7300e6e02464b5, type: 2}

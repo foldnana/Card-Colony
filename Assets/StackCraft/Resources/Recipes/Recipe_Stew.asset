@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Stew
+  m_EditorClassIdentifier: 
+  id: 109c4b4cc0534159843b82a3bbaba8b9
+  category: 3
+  displayName: Cooking Stew
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: e8ac81eea747f3e4793f2930a3cb1246, type: 2}
+    count: 1
+    consumptionMode: 1
+  - card: {fileID: 11400000, guid: 3bc7882b9caf7cb48bb45e25da615ed2, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 9cc9900ae3f8a544abec849bb392bf73, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: 4ae04b2f1fe4901419711bc926b45eac, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 30
+  randomWeight: 1

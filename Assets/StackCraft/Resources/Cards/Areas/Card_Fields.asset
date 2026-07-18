@@ -1,0 +1,59 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Fields
+  m_EditorClassIdentifier: 
+  id: ac684ad21b8d4fe583a98e59a26a4117
+  displayName: Fields
+  description: Open, grassy areas with basic wildlife.
+  artTexture: {fileID: 2800000, guid: 9df6dcd4d5b974449a431ea103e58f82, type: 3}
+  category: 10
+  faction: 0
+  combatType: 0
+  loot:
+  - Card: {fileID: 11400000, guid: 8323f8054f4ded345bb9822395094b0b, type: 2}
+    Weight: 15
+  - Card: {fileID: 11400000, guid: d5849cf3a6819a946bfe8c7d7f6d737d, type: 2}
+    Weight: 15
+  - Card: {fileID: 11400000, guid: ab518c0794a7c9f4db0ff8fcd4e6dfd5, type: 2}
+    Weight: 15
+  - Card: {fileID: 11400000, guid: 06b45747ae3922147809ae68228f5063, type: 2}
+    Weight: 7
+  - Card: {fileID: 11400000, guid: 9cc9900ae3f8a544abec849bb392bf73, type: 2}
+    Weight: 14
+  - Card: {fileID: 11400000, guid: 3bc7882b9caf7cb48bb45e25da615ed2, type: 2}
+    Weight: 7
+  - Card: {fileID: 11400000, guid: c91a5c6773f466941a0d4ae2ff3cf4a2, type: 2}
+    Weight: 7
+  - Card: {fileID: 11400000, guid: f0816f0dc611c524c94410abbd34628c, type: 2}
+    Weight: 7
+  - Card: {fileID: 11400000, guid: a731e6eacd5ff85408bc7bc72c109143, type: 2}
+    Weight: 13
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

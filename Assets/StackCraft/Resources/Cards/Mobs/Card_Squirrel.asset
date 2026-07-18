@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Squirrel
+  m_EditorClassIdentifier: 
+  id: fa3ad55715804a598282d4a74a9a1c39
+  displayName: Squirrel
+  description: A nimble forager that darts between trees in search of snacks.
+  artTexture: {fileID: 2800000, guid: 28033e1bade2e2545b486e583088eb54, type: 3}
+  category: 9
+  faction: 2
+  loot:
+  - Card: {fileID: 11400000, guid: 49a058e7baba5da45b6e267a0d563cc1, type: 2}
+    Weight: 70
+  - Card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    Weight: 20
+  - Card: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
+    Weight: 10
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 0
+  sellPrice: 1
+  isInfinite: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 5
+  attack: 1
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 10
+  criticalChance: 1
+  criticalMultiplier: 120
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

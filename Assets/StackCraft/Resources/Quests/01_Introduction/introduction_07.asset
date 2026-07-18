@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_07
+  m_EditorClassIdentifier: 
+  id: 11ccb846cf494092b08c299303cad2b8
+  title: Get Timber
+  description: Drag Villager onto a Wood to craft Timber.
+  type: 4
+  targetCard: {fileID: 11400000, guid: 4b320b3fabc742a4a89385926b5a51d5, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetDays: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 2578eab45c7a6c84e8c3fc367f0b269f, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 561ea49ae2ff9de47943328025e03059, type: 2}

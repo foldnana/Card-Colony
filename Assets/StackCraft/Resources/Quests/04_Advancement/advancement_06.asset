@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: advancement_06
+  m_EditorClassIdentifier: 
+  id: a0b32a38ba85422d874f9175a0f5d66d
+  title: Arm the Ranger
+  description: Equip your Ranger with a Quiver to ready them for tougher encounters.
+  type: 7
+  targetCard: {fileID: 11400000, guid: 6eb790b82ebb38c4b846faa559603641, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 4f8bc3fbeab15924eb23dce964444c0e, type: 2}
+  questsToUnlock: []

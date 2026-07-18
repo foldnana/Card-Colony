@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Crab
+  m_EditorClassIdentifier: 
+  id: a1a3f8d510c14806802d25310f6fcd8a
+  displayName: Crab
+  description: Oh crab!
+  artTexture: {fileID: 2800000, guid: f93975edd3a4f4f4c9763f3410e41f76, type: 3}
+  category: 9
+  faction: 2
+  combatType: 1
+  loot:
+  - Card: {fileID: 11400000, guid: b7527f3f9c42230439cc0a9d39494bb6, type: 2}
+    Weight: 50
+  - Card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    Weight: 50
+  isAggressive: 1
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 5
+  attack: 3
+  defense: 0
+  attackSpeed: 120
+  accuracy: 85
+  dodge: 8
+  criticalChance: 7
+  criticalMultiplier: 130
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

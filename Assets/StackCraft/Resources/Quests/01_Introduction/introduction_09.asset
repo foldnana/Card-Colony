@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_09
+  m_EditorClassIdentifier: 
+  id: 7b812b6257914db5ad0911f6452ab25e
+  title: Pause the Game
+  description: Click the play icon (top-left) twice to cycle the time pace and pause
+    the game.
+  type: 9
+  targetCard: {fileID: 0}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 0
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 561ea49ae2ff9de47943328025e03059, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 9d1932d13cffa814eadd492d8b28ab48, type: 2}

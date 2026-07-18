@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_04
+  m_EditorClassIdentifier: 
+  id: 5e143bb2c68d4e2baa19c609af7ca4e4
+  title: Sell a Card
+  description: Drag a card into the Card Buyer to sell it for coins.
+  type: 5
+  targetCard: {fileID: 0}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetDays: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 8070dafa458f3c140a1b6de340683154, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: bf960f47088b35f428b59500b2b4dacd, type: 2}

@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Chicken
+  m_EditorClassIdentifier: 
+  id: 4649fd43af5e45c0b800dd47854f4023
+  displayName: Chicken
+  description: A healthy chicken.
+  artTexture: {fileID: 2800000, guid: 4dcb94efa5b47ca43ad953f6bde73238, type: 3}
+  category: 9
+  faction: 2
+  combatType: 0
+  loot:
+  - Card: {fileID: 11400000, guid: f0816f0dc611c524c94410abbd34628c, type: 2}
+    Weight: 60
+  - Card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    Weight: 30
+  - Card: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
+    Weight: 10
+  produceCard: {fileID: 11400000, guid: f0816f0dc611c524c94410abbd34628c, type: 2}
+  produceInterval: 30
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 0.5
+  isSellable: 0
+  sellPrice: 0
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 5
+  attack: 1
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 20
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_DemonLord
+  m_EditorClassIdentifier: 
+  id: 88d9abf097cc4f2aa517bda11cb09b2b
+  category: 0
+  displayName: Summoning Evil
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 509c3447d5c156345955810e5c6a32f1, type: 2}
+    count: 1
+    consumptionMode: 1
+  - card: {fileID: 11400000, guid: f8e9a3afb1a655a439f3b7bdf13299bb, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: e16d248f60801ef4d821a119adc4d92c, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 5
+  randomWeight: 1

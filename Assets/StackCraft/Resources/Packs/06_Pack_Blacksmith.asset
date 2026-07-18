@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd09011e80313714da9d2d5e5b22a2e5, type: 3}
+  m_Name: 06_Pack_Blacksmith
+  m_EditorClassIdentifier: 
+  id: c49d9b2f9ef041bdbd77506f42dd846e
+  displayName: Blacksmith
+  description: A Blacksmith card pack.
+  artTexture: {fileID: 2800000, guid: 2561bd8f0054aac458178647b32084ea, type: 3}
+  category: 0
+  faction: 0
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
+  buyPrice: 15
+  minQuests: 26
+  slots:
+  - Entries:
+    - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+      Weight: 22
+    - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+      Weight: 22
+    - Card: {fileID: 11400000, guid: 4a5dc3b171013e847960209c993ad6bf, type: 2}
+      Weight: 22
+    - Card: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+      Weight: 22
+    - Card: {fileID: 11400000, guid: c79e3830e1a920f40a0f507d3b31b7b2, type: 2}
+      Weight: 12
+    PossibleRecipes:
+    - {fileID: 11400000, guid: 2bfeb346ae6b1cb4a861d38735715a61, type: 2}
+    - {fileID: 11400000, guid: 752a69439b40e824180a725ea362ade4, type: 2}
+    - {fileID: 11400000, guid: 55bedb789b5a5d24688024dfc3b09383, type: 2}
+    - {fileID: 11400000, guid: 689efba382ee14742b79a8880d2d52aa, type: 2}
+    - {fileID: 11400000, guid: bff1d63ba29bea045abfa79060fd2b30, type: 2}
+    - {fileID: 11400000, guid: 01619a5821c9e514aa5a1b14109944cd, type: 2}
+    - {fileID: 11400000, guid: 69f699d567f8b22419273f3850a19e34, type: 2}
+    RecipeChance: 0.7
+  - Entries:
+    - Card: {fileID: 11400000, guid: ab518c0794a7c9f4db0ff8fcd4e6dfd5, type: 2}
+      Weight: 23
+    - Card: {fileID: 11400000, guid: 06b45747ae3922147809ae68228f5063, type: 2}
+      Weight: 23
+    - Card: {fileID: 11400000, guid: 44912e2c757985949a2be7659e7a5492, type: 2}
+      Weight: 23
+    - Card: {fileID: 11400000, guid: 36190ed2af8260946bd2b37970d56d76, type: 2}
+      Weight: 23
+    - Card: {fileID: 11400000, guid: b625f849c2653d643869269c3b431c68, type: 2}
+      Weight: 8
+    PossibleRecipes: []
+    RecipeChance: 0
+  - Entries:
+    - Card: {fileID: 11400000, guid: 71995e795738a0849a04d5c6f0f6804f, type: 2}
+      Weight: 33
+    - Card: {fileID: 11400000, guid: 2756aa51cb0a746459632482b91cc0d5, type: 2}
+      Weight: 33
+    - Card: {fileID: 11400000, guid: ff958ed6e79eda44baff0c3862d262e9, type: 2}
+      Weight: 33
+    PossibleRecipes: []
+    RecipeChance: 0

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: hoarder_04
+  m_EditorClassIdentifier: 
+  id: e5ff59fc42244e3fb745a6a070a8c911
+  title: Provision Check I
+  description: Collect consumable cards whose combined Nutrition reaches 10 or more.
+  type: 11
+  targetCard: {fileID: 0}
+  targetRecipe: {fileID: 0}
+  targetAmount: 10
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 2e417fe0fcfeb3c4c8790cf0561ab6c3, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: b948035524e9eb841854380343ca73e6, type: 2}

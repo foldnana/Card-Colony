@@ -1,0 +1,67 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Forest
+  m_EditorClassIdentifier: 
+  id: 286a68ab3cb1468b9f50829ac068ca23
+  displayName: Forest
+  description: A thick forest.
+  artTexture: {fileID: 2800000, guid: 9e509f27d7edaf242a5fd0f4311d673f, type: 3}
+  category: 10
+  faction: 0
+  combatType: 0
+  loot:
+  - Card: {fileID: 11400000, guid: fae3864d00d3b5b4ba96e1c85f54874b, type: 2}
+    Weight: 10
+  - Card: {fileID: 11400000, guid: 06b45747ae3922147809ae68228f5063, type: 2}
+    Weight: 5
+  - Card: {fileID: 11400000, guid: 44912e2c757985949a2be7659e7a5492, type: 2}
+    Weight: 5
+  - Card: {fileID: 11400000, guid: ab518c0794a7c9f4db0ff8fcd4e6dfd5, type: 2}
+    Weight: 5
+  - Card: {fileID: 11400000, guid: 36190ed2af8260946bd2b37970d56d76, type: 2}
+    Weight: 5
+  - Card: {fileID: 11400000, guid: 9cc9900ae3f8a544abec849bb392bf73, type: 2}
+    Weight: 10
+  - Card: {fileID: 11400000, guid: 4b2c6f2b0cdae81459db75add07cc727, type: 2}
+    Weight: 6
+  - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+    Weight: 12
+  - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+    Weight: 10
+  - Card: {fileID: 11400000, guid: 1c16fb1c7cf7f8f4ba0b71b39dfcabf8, type: 2}
+    Weight: 6
+  - Card: {fileID: 11400000, guid: 8ac674a56ad01e64fb1f8c9bddb2b50e, type: 2}
+    Weight: 16
+  - Card: {fileID: 11400000, guid: 307bdecb7ce88ed46b2ff9764df7be27, type: 2}
+    Weight: 5
+  - Card: {fileID: 11400000, guid: 502ba0efbafa5f341ba8abd250a5693e, type: 2}
+    Weight: 5
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

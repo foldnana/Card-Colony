@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_08
+  m_EditorClassIdentifier: 
+  id: 51662be6793342268a6fca5d912f8359
+  title: Get a Stick
+  description: Drag Villager onto a Timber to craft a Wooden Stick.
+  type: 4
+  targetCard: {fileID: 11400000, guid: 8ac674a56ad01e64fb1f8c9bddb2b50e, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetDays: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: f9cdcade7b09255438db691b89a8a387, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: ead7fe8e9c06dde4b9c5c19f66ce5e40, type: 2}

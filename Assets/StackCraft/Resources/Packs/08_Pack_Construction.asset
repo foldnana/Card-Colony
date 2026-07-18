@@ -1,0 +1,106 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd09011e80313714da9d2d5e5b22a2e5, type: 3}
+  m_Name: 08_Pack_Construction
+  m_EditorClassIdentifier: 
+  id: ae9bc80b79444f81860f49d1818270b0
+  displayName: Construction
+  description: A Construction card pack.
+  artTexture: {fileID: 2800000, guid: faa1469fddaf2894ea32eab96e08683a, type: 3}
+  category: 0
+  faction: 0
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
+  buyPrice: 25
+  minQuests: 34
+  slots:
+  - Entries:
+    - Card: {fileID: 11400000, guid: bef65c9c6c9b0094a970ebef7246a462, type: 2}
+      Weight: 100
+    PossibleRecipes: []
+    RecipeChance: 0
+  - Entries:
+    - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 4a5dc3b171013e847960209c993ad6bf, type: 2}
+      Weight: 25
+    PossibleRecipes:
+    - {fileID: 11400000, guid: a60eb16151d8f76429eceed663e20ab1, type: 2}
+    - {fileID: 11400000, guid: fdcf95c3938acc54598fd044b3f04c74, type: 2}
+    - {fileID: 11400000, guid: a6c9fbebd7b049e4f8fa788ff778f79c, type: 2}
+    - {fileID: 11400000, guid: e6cb146cb29306c4e91447fd4cedff2d, type: 2}
+    - {fileID: 11400000, guid: bbf9849c4bb842f4fab66d77f9626441, type: 2}
+    - {fileID: 11400000, guid: 89105399afe37264fa0a56cb86090bc4, type: 2}
+    - {fileID: 11400000, guid: 802dc41e7932d3b4a960a69a387ed7a2, type: 2}
+    - {fileID: 11400000, guid: 79feba0857f5a74419aeeb370443dd44, type: 2}
+    - {fileID: 11400000, guid: 752a69439b40e824180a725ea362ade4, type: 2}
+    - {fileID: 11400000, guid: 02b41131b1aeef74bb50b19fb37874c6, type: 2}
+    - {fileID: 11400000, guid: f16c1630cdfc6ab44bb6f848129f32c2, type: 2}
+    - {fileID: 11400000, guid: f4a7bf74ed86be64f974b2814cc014ef, type: 2}
+    RecipeChance: 0.8
+  - Entries:
+    - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 4a5dc3b171013e847960209c993ad6bf, type: 2}
+      Weight: 25
+    PossibleRecipes:
+    - {fileID: 11400000, guid: a60eb16151d8f76429eceed663e20ab1, type: 2}
+    - {fileID: 11400000, guid: fdcf95c3938acc54598fd044b3f04c74, type: 2}
+    - {fileID: 11400000, guid: a6c9fbebd7b049e4f8fa788ff778f79c, type: 2}
+    - {fileID: 11400000, guid: e6cb146cb29306c4e91447fd4cedff2d, type: 2}
+    - {fileID: 11400000, guid: bbf9849c4bb842f4fab66d77f9626441, type: 2}
+    - {fileID: 11400000, guid: 89105399afe37264fa0a56cb86090bc4, type: 2}
+    - {fileID: 11400000, guid: 802dc41e7932d3b4a960a69a387ed7a2, type: 2}
+    - {fileID: 11400000, guid: 79feba0857f5a74419aeeb370443dd44, type: 2}
+    - {fileID: 11400000, guid: 752a69439b40e824180a725ea362ade4, type: 2}
+    - {fileID: 11400000, guid: 02b41131b1aeef74bb50b19fb37874c6, type: 2}
+    - {fileID: 11400000, guid: f16c1630cdfc6ab44bb6f848129f32c2, type: 2}
+    - {fileID: 11400000, guid: f4a7bf74ed86be64f974b2814cc014ef, type: 2}
+    RecipeChance: 0.8
+  - Entries:
+    - Card: {fileID: 11400000, guid: 71995e795738a0849a04d5c6f0f6804f, type: 2}
+      Weight: 33
+    - Card: {fileID: 11400000, guid: 2756aa51cb0a746459632482b91cc0d5, type: 2}
+      Weight: 33
+    - Card: {fileID: 11400000, guid: ff958ed6e79eda44baff0c3862d262e9, type: 2}
+      Weight: 33
+    PossibleRecipes: []
+    RecipeChance: 0

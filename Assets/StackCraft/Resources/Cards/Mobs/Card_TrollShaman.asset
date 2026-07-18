@@ -1,0 +1,51 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_TrollShaman
+  m_EditorClassIdentifier: 
+  id: bd83fbc693c945b7b285bad5162dde90
+  displayName: Troll Shaman
+  description: A crude spellcaster who hurls unstable magic from afar.
+  artTexture: {fileID: 2800000, guid: 42e673efa856ebc4e89bbed79d9c0c91, type: 3}
+  category: 9
+  faction: 2
+  combatType: 3
+  loot:
+  - Card: {fileID: 11400000, guid: 75b974c09ffed1041a7cd678c71148ab, type: 2}
+    Weight: 37
+  - Card: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
+    Weight: 38
+  - Card: {fileID: 11400000, guid: 307bdecb7ce88ed46b2ff9764df7be27, type: 2}
+    Weight: 7
+  - Card: {fileID: 11400000, guid: 277147698936cf447b63a4eeee901156, type: 2}
+    Weight: 12
+  - Card: {fileID: 11400000, guid: f517b0cd0e684bd4ca84f4f81d0886b8, type: 2}
+    Weight: 6
+  isAggressive: 1
+  aggroRadius: 10
+  attackRadius: 2.3
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 90
+  accuracy: 95
+  dodge: 8
+  criticalChance: 16
+  criticalMultiplier: 140
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

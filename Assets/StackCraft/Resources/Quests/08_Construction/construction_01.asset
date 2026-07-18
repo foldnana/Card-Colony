@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: construction_01
+  m_EditorClassIdentifier: 
+  id: 2894233df84a450795899a0eb77a56dd
+  title: Yard
+  description: Build a Yard.
+  type: 4
+  targetCard: {fileID: 11400000, guid: bd8ec86c3b7345a47b47067b776af305, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 022720e5c652cef4f93a0a1908524f15, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: d2cc936c81521804e8fbdb98d7056016, type: 2}

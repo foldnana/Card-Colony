@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Timber
+  m_EditorClassIdentifier: 
+  id: 37aae3b2866d4177819a925fd22621a7
+  displayName: Timber
+  description: Processed from wood.
+  artTexture: {fileID: 2800000, guid: 2c7fb21b97a1e4c488839d950147278e, type: 3}
+  category: 4
+  faction: 0
+  isSellable: 1
+  sellPrice: 2
+  isInfinite: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 1

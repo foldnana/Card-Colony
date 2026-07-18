@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Sword
+  m_EditorClassIdentifier: 
+  id: eb1b129e91fa4f45b0d8084d70430113
+  category: 4
+  displayName: Forging Sword
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 8ca68e344bcdba54dabca7cbcc29f565, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 8ac674a56ad01e64fb1f8c9bddb2b50e, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 9e4a8e57f755493428b41fd81fd0bc4e, type: 2}
+    count: 1
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: 6a04fd75abdb571439892bd645ae9716, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 15
+  randomWeight: 1

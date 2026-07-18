@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Chainmail
+  m_EditorClassIdentifier: 
+  id: 1c66038a4139476da0f8a1cc867dc1ae
+  category: 4
+  displayName: Crafting Chainmail
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 8ca68e344bcdba54dabca7cbcc29f565, type: 2}
+    count: 2
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 9e4a8e57f755493428b41fd81fd0bc4e, type: 2}
+    count: 1
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: 3a85897f9fc268947acd4ff9180bb99f, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 15
+  randomWeight: 1

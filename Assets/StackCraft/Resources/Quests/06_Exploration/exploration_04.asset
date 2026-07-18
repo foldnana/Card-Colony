@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: exploration_04
+  m_EditorClassIdentifier: 
+  id: b9e1738891054e2b91651a4f6f887051
+  title: Explore the Ruins
+  description: Send someone into the ruins to discover what lies within.
+  type: 8
+  targetCard: {fileID: 11400000, guid: ff52a1dc39756dc41bfea423da264550, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: e4f5169ef331d7b4caaac5fe7a6a2625, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: d7db95a423dbba9428bc1b36b4e225f2, type: 2}

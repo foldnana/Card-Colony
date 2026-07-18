@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Steak_2
+  m_EditorClassIdentifier: 
+  id: 2c3104d022064b79a29b3c834b069092
+  category: 3
+  displayName: Cooking Steak
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: e8ac81eea747f3e4793f2930a3cb1246, type: 2}
+    count: 1
+    consumptionMode: 1
+  - card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: 99ed60a85092674458be69c4bdac5261, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 30
+  randomWeight: 1

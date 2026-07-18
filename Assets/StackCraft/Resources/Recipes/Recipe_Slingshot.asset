@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Slingshot
+  m_EditorClassIdentifier: 
+  id: 440b6afc075d40c58f40ecf8dd558b09
+  category: 4
+  displayName: Crafting Slingshot
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 8ac674a56ad01e64fb1f8c9bddb2b50e, type: 2}
+    count: 2
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: cd07ac519c9e49945a115885ba158123, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+    count: 1
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: 9df151d357a5fc745b993a2e51813bc7, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 15
+  randomWeight: 1

@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Slime
+  m_EditorClassIdentifier: 
+  id: 366be2e0e40c4b4d93229a94ae7133ae
+  displayName: Slime
+  description: A slimy slime.
+  artTexture: {fileID: 2800000, guid: 81536172f5f86274ca563f8fd368f7cb, type: 3}
+  category: 9
+  faction: 2
+  combatType: 0
+  loot:
+  - Card: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
+    Weight: 70
+  - Card: {fileID: 11400000, guid: 2779c2a939b1de446895fa126c81280d, type: 2}
+    Weight: 20
+  - Card: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+    Weight: 10
+  isAggressive: 1
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 0
+  sellPrice: 1
+  uses: 1
+  nutrition: 0
+  maxHealth: 7
+  attack: 3
+  defense: 0
+  attackSpeed: 60
+  accuracy: 75
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

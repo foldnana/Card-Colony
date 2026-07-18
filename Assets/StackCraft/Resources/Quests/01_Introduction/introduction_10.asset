@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: introduction_10
+  m_EditorClassIdentifier: 
+  id: f39f0e437de74aeb8c926db032b3a882
+  title: Grow Berry Bush
+  description: Stack Berry onto a Soil card to grow a Berry Bush.
+  type: 4
+  targetCard: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetDays: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: ead7fe8e9c06dde4b9c5c19f66ce5e40, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: cfbc709d4094df143872c528fe117d71, type: 2}

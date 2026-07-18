@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_WoodenClub
+  m_EditorClassIdentifier: 
+  id: 0a61046110e24e9396982aa03d995c04
+  category: 4
+  displayName: Wooden Club
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 72aeff93ef451ea40aeadb2a0e067f97, type: 2}
+    count: 2
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 8ac674a56ad01e64fb1f8c9bddb2b50e, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: c7c554e773779c44b935ac769f24c3aa, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 15
+  randomWeight: 1

@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: training_01
+  m_EditorClassIdentifier: 
+  id: 96cc6a4cfc594e3d91ee83eaa03201fe
+  title: Train a Warrior
+  description: Drag a Wooden Club onto a Villager to train a Warrior.
+  type: 7
+  targetCard: {fileID: 11400000, guid: c7c554e773779c44b935ac769f24c3aa, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 022720e5c652cef4f93a0a1908524f15, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: bf803dd51c75e874cadee2653ddd9b34, type: 2}

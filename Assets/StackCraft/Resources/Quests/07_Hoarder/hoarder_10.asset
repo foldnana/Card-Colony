@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: hoarder_10
+  m_EditorClassIdentifier: 
+  id: 262c1fde482342a39d3a3b997a8a08d5
+  title: The Expander I
+  description: Increase your card capacity to 30 or more.
+  type: 13
+  targetCard: {fileID: 0}
+  targetRecipe: {fileID: 0}
+  targetAmount: 30
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 647b7becee6a88d44badc7e59574f367, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 0c82a0db655b96a41a214a1722fef6fd, type: 2}

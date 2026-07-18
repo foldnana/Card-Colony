@@ -1,0 +1,43 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Baby
+  m_EditorClassIdentifier: 
+  id: 1048bfa14d374720bbc4bbfdc206347e
+  displayName: Baby
+  description: A cute little baby.
+  artTexture: {fileID: 2800000, guid: 719a72e62dafeba4b975ad96edf4c4c3, type: 3}
+  category: 2
+  faction: 0
+  combatType: 0
+  loot:
+  - Card: {fileID: 11400000, guid: f7e0b31eb7aafda4ba2da048c7774792, type: 2}
+    Weight: 100
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 0.5
+  isSellable: 0
+  sellPrice: 0
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 5
+  attack: 2
+  defense: 1
+  attackSpeed: 50
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

@@ -1,0 +1,97 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd09011e80313714da9d2d5e5b22a2e5, type: 3}
+  m_Name: 03_Pack_Farmstead
+  m_EditorClassIdentifier: 
+  id: 8c1c9032539f469ab3c0d270671c32b0
+  displayName: Farmstead
+  description: A Farmstead card pack.
+  artTexture: {fileID: 2800000, guid: 1fb3b3003d74fb447b7b1f089c416db3, type: 3}
+  category: 0
+  faction: 0
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
+  buyPrice: 10
+  minQuests: 16
+  slots:
+  - Entries:
+    - Card: {fileID: 11400000, guid: 4b2c6f2b0cdae81459db75add07cc727, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 2ac53164cb5efa24c857c2d32d1057c1, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 3bc7882b9caf7cb48bb45e25da615ed2, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+      Weight: 25
+    PossibleRecipes: []
+    RecipeChance: 0
+  - Entries:
+    - Card: {fileID: 11400000, guid: 8323f8054f4ded345bb9822395094b0b, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: d5849cf3a6819a946bfe8c7d7f6d737d, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: fae3864d00d3b5b4ba96e1c85f54874b, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: a731e6eacd5ff85408bc7bc72c109143, type: 2}
+      Weight: 25
+    PossibleRecipes: []
+    RecipeChance: 0
+  - Entries:
+    - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: c79e3830e1a920f40a0f507d3b31b7b2, type: 2}
+      Weight: 25
+    PossibleRecipes:
+    - {fileID: 11400000, guid: ecb9e01026f013a4c8272d951d027b84, type: 2}
+    - {fileID: 11400000, guid: 0587fcdf97cb65b4a8f697e3c62b3424, type: 2}
+    - {fileID: 11400000, guid: 457e9e8e17ca08548ba1dd8f2ab3d5ce, type: 2}
+    - {fileID: 11400000, guid: ae1b4b21d70ffbc48996e27a6fd1c951, type: 2}
+    - {fileID: 11400000, guid: 790e1f9c025c7b7448a738cb583b3133, type: 2}
+    - {fileID: 11400000, guid: b425d8cd19f0771489f402f05d8fd67f, type: 2}
+    - {fileID: 11400000, guid: dcfda4afdaa313147b42ca3a7c573f9c, type: 2}
+    RecipeChance: 0.4
+  - Entries:
+    - Card: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+      Weight: 25
+    - Card: {fileID: 11400000, guid: c79e3830e1a920f40a0f507d3b31b7b2, type: 2}
+      Weight: 25
+    PossibleRecipes: []
+    RecipeChance: 0

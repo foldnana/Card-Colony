@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: construction_04
+  m_EditorClassIdentifier: 
+  id: 954e9f3f16a3409dae0a4801a7427141
+  title: Clay Quarry
+  description: Build a Clay Quarry.
+  type: 4
+  targetCard: {fileID: 11400000, guid: d597a45d2a2d9884da4065a071a395b0, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 3d5d98ddc04847745b2d70c319a7e028, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 24db2966d5de02345b6ef5602200d876, type: 2}

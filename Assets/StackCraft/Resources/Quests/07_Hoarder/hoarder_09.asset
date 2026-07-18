@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: hoarder_09
+  m_EditorClassIdentifier: 
+  id: 42dd1013968b4e47a9b197cb0252fd04
+  title: Savings Goal III
+  description: Accumulate at least 100 Coins to complete the objective.
+  type: 12
+  targetCard: {fileID: 0}
+  targetRecipe: {fileID: 0}
+  targetAmount: 100
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 75f175bf709f94b40a7bb8084d31ed89, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 9b817196f21f15441be26f70086d919c, type: 2}

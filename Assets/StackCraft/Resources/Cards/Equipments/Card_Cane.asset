@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Cane
+  m_EditorClassIdentifier: 
+  id: ad84246a274d4c4e9854856e428d6af9
+  displayName: Cane
+  description: A magical wooden cane.
+  artTexture: {fileID: 2800000, guid: fb49426a6851e074891125fd5d6d7fd8, type: 3}
+  category: 5
+  faction: 0
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 3
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers:
+  - Stat: 1
+    value: 1
+  - Stat: 5
+    value: 1
+  classChangeResult: {fileID: 11400000, guid: 1f43e740a8b65554c84bd5888659eb25, type: 2}

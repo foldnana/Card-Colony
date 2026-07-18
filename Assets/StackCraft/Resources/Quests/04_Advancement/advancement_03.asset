@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: advancement_03
+  m_EditorClassIdentifier: 
+  id: 4e516067ef724b708d5b1e5e4cbd2214
+  title: Craft an Anvil
+  description: Gather the required materials and craft an Anvil to unlock advanced
+    crafting.
+  type: 4
+  targetCard: {fileID: 11400000, guid: 9e4a8e57f755493428b41fd81fd0bc4e, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: d93d0e7bc51188f4187b5fe2af49be99, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 5c750781fa2368945a4cb61f45c886f6, type: 2}

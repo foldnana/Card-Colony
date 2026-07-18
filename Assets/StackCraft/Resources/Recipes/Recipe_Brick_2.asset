@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Brick_2
+  m_EditorClassIdentifier: 
+  id: 12a41b6cb07e49ea8409d0be5176992a
+  category: 5
+  displayName: Baking Brick
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 499e594ed9683634ba40cc3c9ace2c90, type: 2}
+    count: 2
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: c4b87a04e299b984792f24dce73a91b2, type: 2}
+    count: 1
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: 71995e795738a0849a04d5c6f0f6804f, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 1
+  craftingDuration: 10
+  randomWeight: 1

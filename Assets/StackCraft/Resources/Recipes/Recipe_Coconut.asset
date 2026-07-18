@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_Coconut
+  m_EditorClassIdentifier: 
+  id: 7c0da9371f144d54b81e1ddcc304675c
+  category: 1
+  displayName: Shaking Tree
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 6924a592de4e8c942b3f7e1eb89389fb, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+    count: 1
+    consumptionMode: 1
+  resultingCard: {fileID: 11400000, guid: dd2693ebe3b7fbc46a8825052c06d4a1, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 0
+  craftingDuration: 10
+  randomWeight: 1

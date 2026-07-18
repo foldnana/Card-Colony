@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: exploration_03
+  m_EditorClassIdentifier: 
+  id: 85d60adf4b9e466fa83bb7d51a477452
+  title: Explore the Highlands
+  description: Send someone into the highlands to discover what lies within.
+  type: 8
+  targetCard: {fileID: 11400000, guid: 9390a1bb285c1af4895d874e85f3e919, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: e3c74cebc1ffb334e918be46117d1714, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 4527fcf1b0471d04690a59806c7114e0, type: 2}

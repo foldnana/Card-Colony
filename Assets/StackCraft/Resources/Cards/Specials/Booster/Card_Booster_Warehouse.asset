@@ -1,0 +1,40 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 099cc67f9e07b4241ab55e6cfda4a5eb, type: 3}
+  m_Name: Card_Booster_Warehouse
+  m_EditorClassIdentifier: 
+  id: 8c47d9879c1d48d6874a5b2f38198f23
+  displayName: Warehouse
+  description: Increase card limit by 10.
+  artTexture: {fileID: 2800000, guid: 96a941cbc991f2f4688a35a784ed09a9, type: 3}
+  category: 6
+  faction: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  isSellable: 1
+  sellPrice: 5
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 2
+  defense: 1
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
+  boostAmount: 10

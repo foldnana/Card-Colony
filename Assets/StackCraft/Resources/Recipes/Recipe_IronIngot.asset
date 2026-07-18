@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 97f7fb60f81c4a649a9a909539c0bdb6, type: 3}
+  m_Name: Recipe_IronIngot
+  m_EditorClassIdentifier: 
+  id: a30a576e97104addb346389250590b4b
+  category: 5
+  displayName: Smelting Iron
+  requiredIngredients:
+  - card: {fileID: 11400000, guid: 035fcb98e6bf9cb4d99cfd0dbd0534c9, type: 2}
+    count: 1
+    consumptionMode: 1
+  - card: {fileID: 11400000, guid: 72aeff93ef451ea40aeadb2a0e067f97, type: 2}
+    count: 1
+    consumptionMode: 0
+  - card: {fileID: 11400000, guid: 2756aa51cb0a746459632482b91cc0d5, type: 2}
+    count: 1
+    consumptionMode: 0
+  resultingCard: {fileID: 11400000, guid: 8ca68e344bcdba54dabca7cbcc29f565, type: 2}
+  isContinuous: 0
+  allowExcessIngredients: 1
+  craftingDuration: 10
+  randomWeight: 1

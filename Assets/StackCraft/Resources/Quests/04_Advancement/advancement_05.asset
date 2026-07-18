@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a0ce48adb836f5141814c5a1fa514ba0, type: 3}
+  m_Name: advancement_05
+  m_EditorClassIdentifier: 
+  id: 10103a30dc024c7eb04b0f7dde4eb3be
+  title: Train a Mage
+  description: Give a character a Cane to unlock their magical potential and transform
+    them into a Mage.
+  type: 7
+  targetCard: {fileID: 11400000, guid: 75b974c09ffed1041a7cd678c71148ab, type: 2}
+  targetRecipe: {fileID: 0}
+  targetAmount: 1
+  targetPace: 1
+  prerequisiteQuests:
+  - {fileID: 11400000, guid: 5c750781fa2368945a4cb61f45c886f6, type: 2}
+  questsToUnlock:
+  - {fileID: 11400000, guid: 41b1e490b08e7cd4684fc6f77db7c4a3, type: 2}
