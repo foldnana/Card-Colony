@@ -25,6 +25,10 @@ namespace CryingSnow.StackCraft
         private void Awake()
         {
             canvasGroup = GetComponent<CanvasGroup>();
+
+            dayText.enableWordWrapping = false;
+            dayText.overflowMode = TextOverflowModes.Overflow;
+            dayText.alignment = TextAlignmentOptions.MidlineLeft;
         }
 
         private void Start()
@@ -62,7 +66,7 @@ namespace CryingSnow.StackCraft
 
         private void HandleDayStarted(int currentDay)
         {
-            dayText.text = $"第 {currentDay} 天";
+            dayText.text = $"第{currentDay}天";
             paceImage.sprite = paceIcons[1];
 
             canvasGroup.alpha = 1f;

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
 using TMPro;
 
 namespace CryingSnow.StackCraft
@@ -20,13 +21,20 @@ namespace CryingSnow.StackCraft
         private TextMeshProUGUI infoText;
 
         [SerializeField, Tooltip("The font size used for the Header portion of the info text (e.g., the title of a zone or item).")]
-        private int headerSize = 34;
+        private int headerSize = 32;
 
         [SerializeField, Tooltip("The font size used for the Body portion of the info text (e.g., the description or details).")]
-        private int bodySize = 30;
+        private int bodySize = 26;
 
         [SerializeField, Tooltip("The TextButton component that is displayed when the highest priority info request includes a mandatory action.")]
         private TextButton actionButton;
+
+        private const float PanelWidth = 420f;
+        private const float ActionButtonHeight = 54f;
+
+        private RectTransform panelRect;
+        private RectTransform textRect;
+        private RectTransform actionButtonRect;
 
         private static int s_requestCounter = 0;
 
@@ -52,6 +60,7 @@ namespace CryingSnow.StackCraft
             }
             Instance = this;
 
+            ConfigureLayout();
             RefreshInfo();
         }
 
@@ -126,6 +135,8 @@ namespace CryingSnow.StackCraft
                 ClearInfo();
                 actionButton.Deactivate();
             }
+
+            RebuildLayout();
         }
 
         private void UpdateInfo((string header, string body) newInfo)
@@ -136,15 +147,73 @@ namespace CryingSnow.StackCraft
 
             if (!string.IsNullOrEmpty(newInfo.header))
             {
-                headerText = $"<size={headerSize}>[{newInfo.header}]\n";
+                headerText = $"<size={headerSize}><color=#F2C94C>【{newInfo.header}】</color></size>\n";
             }
             if (!string.IsNullOrEmpty(newInfo.body))
             {
-                bodyText = $"<size={bodySize}>{newInfo.body}";
+                bodyText = $"<size={bodySize}>{newInfo.body}</size>";
             }
 
             infoText.text = headerText + bodyText;
             lastDisplayedInfo = newInfo;
+        }
+
+        private void ConfigureLayout()
+        {
+            panelRect = (RectTransform)transform;
+            textRect = infoText.rectTransform;
+            actionButtonRect = (RectTransform)actionButton.transform;
+
+            // These two components both try to drive the same RectTransforms. Their
+            // result depends on initialization order and can collapse Chinese text
+            // to a one-character column, so this panel uses deterministic sizing.
+            if (TryGetComponent(out VerticalLayoutGroup layoutGroup))
+                layoutGroup.enabled = false;
+            if (TryGetComponent(out ContentSizeFitter sizeFitter))
+                sizeFitter.enabled = false;
+
+            panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, PanelWidth);
+
+            textRect.anchorMin = new Vector2(0f, 1f);
+            textRect.anchorMax = new Vector2(1f, 1f);
+            textRect.pivot = new Vector2(0.5f, 1f);
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+
+            actionButtonRect.anchorMin = new Vector2(0f, 1f);
+            actionButtonRect.anchorMax = new Vector2(1f, 1f);
+            actionButtonRect.pivot = new Vector2(0.5f, 1f);
+
+            infoText.margin = new Vector4(24f, 18f, 24f, 20f);
+            infoText.lineSpacing = 6f;
+            infoText.paragraphSpacing = 12f;
+            infoText.alignment = TextAlignmentOptions.TopLeft;
+            infoText.enableWordWrapping = true;
+
+            RebuildLayout();
+        }
+
+        private void RebuildLayout()
+        {
+            if (panelRect == null || textRect == null || actionButtonRect == null)
+                return;
+
+            float textHeight = 0f;
+            if (!string.IsNullOrEmpty(infoText.text))
+            {
+                float textWidth = PanelWidth - infoText.margin.x - infoText.margin.z;
+                Vector2 preferred = infoText.GetPreferredValues(infoText.text, textWidth, 0f);
+                textHeight = Mathf.Ceil(preferred.y + infoText.margin.y + infoText.margin.w);
+            }
+
+            textRect.sizeDelta = new Vector2(0f, textHeight);
+
+            float buttonHeight = actionButton.gameObject.activeSelf ? ActionButtonHeight : 0f;
+            actionButtonRect.anchoredPosition = new Vector2(0f, -textHeight);
+            actionButtonRect.sizeDelta = new Vector2(0f, buttonHeight);
+
+            panelRect.sizeDelta = new Vector2(PanelWidth, textHeight + buttonHeight);
+            infoText.ForceMeshUpdate();
         }
 
         private void ClearInfo()

@@ -94,6 +94,8 @@ namespace CryingSnow.StackCraft
             {
                 CreateQuestButton(quest);
             }
+
+            ScheduleItemLayout();
         }
 
         /// <summary>
@@ -202,6 +204,8 @@ namespace CryingSnow.StackCraft
                     questBtn.gameObject.SetActive(newState);
                 }
             }
+
+            ScheduleItemLayout();
         }
 
         /// <summary>

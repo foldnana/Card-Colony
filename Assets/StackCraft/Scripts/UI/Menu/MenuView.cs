@@ -1,4 +1,7 @@
+using System.Collections;
 using UnityEngine;
+using UnityEngine.UI;
+using TMPro;
 
 namespace CryingSnow.StackCraft
 {
@@ -20,10 +23,24 @@ namespace CryingSnow.StackCraft
 
         private object infoRequesterKey;
 
+        private Coroutine itemLayoutRoutine;
+        private const float ItemHorizontalPadding = 20f;
+        private const float ItemTopPadding = 10f;
+        private const float ItemBottomPadding = 10f;
+        private const float ItemSpacing = 8f;
+
         protected virtual void Awake()
         {
             canvasGroup = GetComponent<CanvasGroup>();
             infoRequesterKey = this;
+
+            // The stock VerticalLayoutGroup can calculate a zero width during the
+            // first frame when the menu is stretched by its ScrollRect. Use an
+            // explicit list layout so localized labels always receive the full row.
+            if (content.TryGetComponent(out VerticalLayoutGroup layoutGroup))
+                layoutGroup.enabled = false;
+            if (content.TryGetComponent(out ContentSizeFitter sizeFitter))
+                sizeFitter.enabled = false;
         }
 
         /// <summary>
@@ -34,6 +51,9 @@ namespace CryingSnow.StackCraft
         {
             canvasGroup.alpha = show ? 1f : 0f;
             canvasGroup.blocksRaycasts = show;
+
+            if (show)
+                ScheduleItemLayout();
 
             if (show) AudioManager.Instance?.PlaySFX(AudioId.Click);
         }
@@ -105,7 +125,80 @@ namespace CryingSnow.StackCraft
                 }
             );
 
+            RectTransform itemRect = (RectTransform)go.transform;
+            itemRect.anchorMin = new Vector2(0f, 1f);
+            itemRect.anchorMax = new Vector2(0f, 1f);
+            itemRect.pivot = new Vector2(0f, 1f);
+            itemRect.sizeDelta = new Vector2(360f, Mathf.Max(44f, fontSize + 14f));
+
+            TextMeshProUGUI label = go.GetComponent<TextMeshProUGUI>();
+            label.enableWordWrapping = false;
+            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.alignment = TextAlignmentOptions.MidlineLeft;
+
+            ScheduleItemLayout();
+
             return itemBtn;
+        }
+
+        protected void ScheduleItemLayout()
+        {
+            if (!isActiveAndEnabled)
+                return;
+
+            if (itemLayoutRoutine != null)
+                StopCoroutine(itemLayoutRoutine);
+
+            itemLayoutRoutine = StartCoroutine(RebuildItemLayoutNextFrame());
+        }
+
+        private IEnumerator RebuildItemLayoutNextFrame()
+        {
+            yield return null;
+            RebuildItemLayout();
+            itemLayoutRoutine = null;
+        }
+
+        private void RebuildItemLayout()
+        {
+            RectTransform viewport = content.parent as RectTransform;
+            if (viewport == null)
+                return;
+
+            Canvas.ForceUpdateCanvases();
+
+            content.anchorMin = new Vector2(0f, 1f);
+            content.anchorMax = new Vector2(1f, 1f);
+            content.pivot = new Vector2(0f, 1f);
+            content.anchoredPosition = Vector2.zero;
+
+            float rowWidth = Mathf.Max(120f, viewport.rect.width - ItemHorizontalPadding * 2f);
+            float y = ItemTopPadding;
+
+            foreach (RectTransform itemRect in content)
+            {
+                if (!itemRect.gameObject.activeSelf)
+                    continue;
+
+                TextMeshProUGUI label = itemRect.GetComponent<TextMeshProUGUI>();
+                float rowHeight = label != null ? Mathf.Max(44f, label.fontSize + 14f) : 44f;
+
+                itemRect.anchorMin = new Vector2(0f, 1f);
+                itemRect.anchorMax = new Vector2(0f, 1f);
+                itemRect.pivot = new Vector2(0f, 1f);
+                itemRect.anchoredPosition = new Vector2(ItemHorizontalPadding, -y);
+                itemRect.sizeDelta = new Vector2(rowWidth, rowHeight);
+
+                y += rowHeight + ItemSpacing;
+            }
+
+            content.sizeDelta = new Vector2(0f, y + ItemBottomPadding - ItemSpacing);
+        }
+
+        private void OnRectTransformDimensionsChange()
+        {
+            if (content != null && isActiveAndEnabled)
+                ScheduleItemLayout();
         }
 
         /// <summary>
