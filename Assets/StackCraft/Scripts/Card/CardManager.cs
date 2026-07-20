@@ -218,7 +218,11 @@ namespace CryingSnow.StackCraft
             }
             else
             {
-                SpawnDefaultCards();
+                WorldMapBootstrap worldMapBootstrap = GetComponent<WorldMapBootstrap>();
+                if (worldMapBootstrap != null)
+                    worldMapBootstrap.SpawnNewGame(this);
+                else
+                    SpawnDefaultCards();
             }
         }
 

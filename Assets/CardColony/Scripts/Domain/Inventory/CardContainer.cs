@@ -67,6 +67,33 @@ namespace CardColony.Inventory
             return new InventoryAddResult(accepted, remaining);
         }
 
+        /// <summary>
+        /// Adds the complete card stack or leaves the container unchanged.
+        /// </summary>
+        public bool TryAddAll(ItemCardStack incoming)
+        {
+            if (incoming == null)
+                throw new ArgumentNullException(nameof(incoming));
+
+            if (!CanAddAll(incoming))
+                return false;
+
+            InventoryAddResult result = Add(incoming);
+            if (!result.IsComplete)
+                throw new InvalidOperationException("Container capacity changed during a transactional add.");
+
+            return true;
+        }
+
+        public bool CanAddAll(ItemCardStack incoming)
+        {
+            if (incoming == null)
+                throw new ArgumentNullException(nameof(incoming));
+
+            CardContainer simulation = FromSnapshot(CreateSnapshot());
+            return simulation.Add(incoming).IsComplete;
+        }
+
         public bool TryRemove(string cardInstanceId, int quantity, out ItemCardStack detachedCard)
         {
             if (string.IsNullOrWhiteSpace(cardInstanceId))
@@ -89,6 +116,94 @@ namespace CardColony.Inventory
             return true;
         }
 
+        public int GetQuantity(string itemId)
+        {
+            ValidateItemId(itemId);
+
+            int total = 0;
+            foreach (ItemCardStack card in cards)
+            {
+                if (card.ItemId == itemId)
+                    total = checked(total + card.Quantity);
+            }
+
+            return total;
+        }
+
+        public bool TryConsume(string itemId, int quantity)
+        {
+            ValidateItemId(itemId);
+            if (quantity <= 0)
+                throw new ArgumentOutOfRangeException(nameof(quantity));
+            if (GetQuantity(itemId) < quantity)
+                return false;
+
+            int remaining = quantity;
+            for (int index = cards.Count - 1; index >= 0 && remaining > 0; index--)
+            {
+                ItemCardStack card = cards[index];
+                if (card.ItemId != itemId)
+                    continue;
+
+                int amount = Math.Min(card.Quantity, remaining);
+                card.Decrease(amount);
+                remaining -= amount;
+                if (card.Quantity == 0)
+                    cards.RemoveAt(index);
+            }
+
+            return true;
+        }
+
+        public CardContainerSnapshot CreateSnapshot()
+        {
+            return new CardContainerSnapshot
+            {
+                SlotCapacity = SlotCapacity,
+                MaxWeight = MaxWeight,
+                Cards = cards.Select(card => new ItemCardSnapshot
+                {
+                    ItemId = card.ItemId,
+                    Quantity = card.Quantity,
+                    MaxStackSize = card.MaxStackSize,
+                    UnitWeight = card.UnitWeight,
+                    Quality = card.Quality,
+                    BatchId = card.BatchId,
+                    InstanceId = card.InstanceId
+                }).ToList()
+            };
+        }
+
+        public static CardContainer FromSnapshot(CardContainerSnapshot snapshot)
+        {
+            if (snapshot == null)
+                throw new ArgumentNullException(nameof(snapshot));
+
+            var container = new CardContainer(snapshot.SlotCapacity, snapshot.MaxWeight);
+            var instanceIds = new HashSet<string>();
+            foreach (ItemCardSnapshot card in snapshot.Cards ?? new List<ItemCardSnapshot>())
+            {
+                if (card == null)
+                    throw new ArgumentException("Container snapshot contains a null card.", nameof(snapshot));
+                if (!instanceIds.Add(card.InstanceId))
+                    throw new ArgumentException($"Duplicate card instance ID '{card.InstanceId}'.", nameof(snapshot));
+
+                var itemCard = new ItemCardStack(
+                    card.ItemId,
+                    card.Quantity,
+                    card.MaxStackSize,
+                    card.UnitWeight,
+                    card.Quality,
+                    card.BatchId,
+                    card.InstanceId);
+                InventoryAddResult result = container.Add(itemCard);
+                if (!result.IsComplete)
+                    throw new ArgumentException("Container snapshot exceeds its slot or weight capacity.", nameof(snapshot));
+            }
+
+            return container;
+        }
+
         private int GetFittingQuantity(ItemCardStack incoming, int requested, int stackSpace)
         {
             int byStack = Math.Min(requested, stackSpace);
@@ -102,6 +217,12 @@ namespace CardColony.Inventory
 
             int byWeight = (int)Math.Floor(availableWeight / incoming.UnitWeight);
             return Math.Min(byStack, byWeight);
+        }
+
+        private static void ValidateItemId(string itemId)
+        {
+            if (string.IsNullOrWhiteSpace(itemId))
+                throw new ArgumentException("Item ID cannot be empty.", nameof(itemId));
         }
     }
 }

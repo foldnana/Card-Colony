@@ -491,6 +491,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1093070150}
   - component: {fileID: 1093070149}
+  - component: {fileID: 1093070151}
   m_Layer: 0
   m_Name: CardManager
   m_TagString: Untagged
@@ -512,8 +513,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   defaultSpawnRadius: 1.2
   defaultSpawnPosition: {x: -3.5, y: 0, z: 0.6}
-  defaultSpawnCards:
-  - {fileID: 11400000, guid: 51c2d41ab5d413649adfbe0e3bb29d85, type: 2}
+  defaultSpawnCards: []
   packPrefab: {fileID: 9200086714593408704, guid: 43dc482c0cf2a7a46a389884dacaf76c, type: 3}
   cardPrefabs:
   - category: 1
@@ -557,6 +557,40 @@ Transform:
   m_Children: []
   m_Father: {fileID: 1211518933}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1093070151
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1093070148}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ccd10000000000000000000000000001, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  locationSpawns:
+  - definition: {fileID: 11400000, guid: 6baac782c2acd694f9dd9003a8824df8, type: 2}
+    position: {x: -3.75, y: 0, z: 0.1}
+  - definition: {fileID: 11400000, guid: 9390a1bb285c1af4895d874e85f3e919, type: 2}
+    position: {x: -3.4, y: 0, z: 1.65}
+  - definition: {fileID: 11400000, guid: 601f144cf9f0bf947a1e61c64a99587f, type: 2}
+    position: {x: 0, y: 0, z: 1.9}
+  - definition: {fileID: 11400000, guid: cea56a23d9a12cb4cb7f6f182382d075, type: 2}
+    position: {x: -0.35, y: 0, z: 0.25}
+  - definition: {fileID: 11400000, guid: bd8ec86c3b7345a47b47067b776af305, type: 2}
+    position: {x: 2.6, y: 0, z: -1}
+  - definition: {fileID: 11400000, guid: ff52a1dc39756dc41bfea423da264550, type: 2}
+    position: {x: 3.8, y: 0, z: 0.05}
+  travelerDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  travelerPosition: {x: -2.25, y: 0, z: -1.15}
+  jobDefinitions:
+  - {fileID: 11400000, guid: 88758e503575176428df3a6711b91a49, type: 2}
+  - {fileID: 11400000, guid: 3e1ae68790501954c9de997ccb78deff, type: 2}
+  - {fileID: 11400000, guid: 1f43e740a8b65554c84bd5888659eb25, type: 2}
+  jobStackPosition: {x: 0.35, y: 0, z: -1.8}
+  worldMapTexture: {fileID: 2800000, guid: 205cabeff57e629449b9bf0b8efe9fa9, type: 3}
+  worldMapShader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}
 --- !u!1 &1192909442
 GameObject:
   m_ObjectHideFlags: 0
@@ -1010,6 +1044,10 @@ PrefabInstance:
       value: CryingSnow.StackCraft.MenuView, Assembly-CSharp
       objectReference: {fileID: 0}
     - target: {fileID: 1225375140556120073, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMax.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1225375140556120073, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
@@ -1127,6 +1165,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 5516243882949190484, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5534356309095252170, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMax.x
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5534356309095252170, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
@@ -1416,6 +1458,23 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bac6796dd8c3a14469f4d3b82e57a875, type: 3}
+--- !u!1001 &7619000000000000000
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 6981490210267865667, guid: 93f7e9df926343d42a6a12945c6c2d52, type: 3}
+      propertyPath: m_Name
+      value: GameUiRoot
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 93f7e9df926343d42a6a12945c6c2d52, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1426,3 +1485,4 @@ SceneRoots:
   - {fileID: 2056759083933773671}
   - {fileID: 1211518933}
   - {fileID: 2604837606948666750}
+  - {fileID: 7619000000000000000}

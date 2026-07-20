@@ -125,5 +125,78 @@ namespace CardColony.Tests
             Assert.That(container.Cards, Has.Count.EqualTo(1));
             Assert.That(container.Cards[0].Quantity, Is.EqualTo(100000));
         }
+
+        [Test]
+        public void TryConsume_WhenQuantitySpansCards_RemovesRequiredAmount()
+        {
+            var container = new CardContainer(4, 100f);
+            container.Add(new ItemCardStack("herb", 2, 10, 0.1f, 0, "wild"));
+            container.Add(new ItemCardStack("herb", 2, 10, 0.1f, 1, "wild"));
+
+            bool consumed = container.TryConsume("herb", 3);
+
+            Assert.That(consumed, Is.True);
+            Assert.That(container.GetQuantity("herb"), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void TryConsume_WhenQuantityIsInsufficient_DoesNotMutateContainer()
+        {
+            var container = new CardContainer(4, 100f);
+            container.Add(new ItemCardStack("herb", 2, 10, 0.1f));
+
+            bool consumed = container.TryConsume("herb", 3);
+
+            Assert.That(consumed, Is.False);
+            Assert.That(container.GetQuantity("herb"), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void CreateSnapshot_AndRestore_PreserveVisibleItemCards()
+        {
+            var container = new CardContainer(4, 50f);
+            container.Add(new ItemCardStack("herb", 3, 10, 0.1f, 2, "forest", "herb-card"));
+
+            CardContainerSnapshot snapshot = container.CreateSnapshot();
+            CardContainer restored = CardContainer.FromSnapshot(snapshot);
+
+            Assert.That(restored.SlotCapacity, Is.EqualTo(4));
+            Assert.That(restored.MaxWeight, Is.EqualTo(50f));
+            Assert.That(restored.Cards, Has.Count.EqualTo(1));
+            Assert.That(restored.Cards[0].ItemId, Is.EqualTo("herb"));
+            Assert.That(restored.Cards[0].Quantity, Is.EqualTo(3));
+            Assert.That(restored.Cards[0].Quality, Is.EqualTo(2));
+            Assert.That(restored.Cards[0].BatchId, Is.EqualTo("forest"));
+            Assert.That(restored.Cards[0].InstanceId, Is.EqualTo("herb-card"));
+        }
+
+        [Test]
+        public void TryAddAll_WhenOnlyPartFits_LeavesContainerUnchanged()
+        {
+            var container = new CardContainer(1, 100f);
+            container.Add(new ItemCardStack("herb", 19, 20, 0.1f, 0, "forest", "existing"));
+
+            bool added = container.TryAddAll(
+                new ItemCardStack("herb", 3, 20, 0.1f, 0, "forest", "reward"));
+
+            Assert.That(added, Is.False);
+            Assert.That(container.Cards, Has.Count.EqualTo(1));
+            Assert.That(container.Cards[0].Quantity, Is.EqualTo(19));
+            Assert.That(container.Cards[0].InstanceId, Is.EqualTo("existing"));
+        }
+
+        [Test]
+        public void CanAddAll_DoesNotMutateContainer()
+        {
+            var container = new CardContainer(2, 100f);
+            container.Add(new ItemCardStack("herb", 19, 20, 0.1f, 0, "forest", "existing"));
+
+            bool canAdd = container.CanAddAll(
+                new ItemCardStack("herb", 3, 20, 0.1f, 0, "forest", "reward"));
+
+            Assert.That(canAdd, Is.True);
+            Assert.That(container.Cards, Has.Count.EqualTo(1));
+            Assert.That(container.Cards[0].Quantity, Is.EqualTo(19));
+        }
     }
 }
