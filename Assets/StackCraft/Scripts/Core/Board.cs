@@ -19,6 +19,8 @@ namespace CryingSnow.StackCraft
         private SkinnedMeshRenderer skinnedMesh;
         private Mesh bakedMesh;
         private Bounds currentBounds;
+        private bool hasWorldBoundsOverride;
+        private Bounds worldBoundsOverride;
         private int totalBoost;
 
         private void Awake()
@@ -79,6 +81,13 @@ namespace CryingSnow.StackCraft
         [ContextMenu("Update Current Bounds")]
         private void UpdateCurrentBounds()
         {
+            if (hasWorldBoundsOverride)
+            {
+                currentBounds = worldBoundsOverride;
+                OnBoundsUpdated?.Invoke(currentBounds);
+                return;
+            }
+
             if (skinnedMesh == null)
                 skinnedMesh = GetComponent<SkinnedMeshRenderer>();
 
@@ -94,6 +103,19 @@ namespace CryingSnow.StackCraft
 
             currentBounds = new Bounds(center, extents * 2f);
 
+            OnBoundsUpdated?.Invoke(currentBounds);
+        }
+
+        /// <summary>
+        /// Replaces the mesh-derived placement bounds with a fixed world-space area.
+        /// World-map scenes use this so their full background remains playable even
+        /// though the original board renderer is hidden.
+        /// </summary>
+        public void SetWorldBoundsOverride(Bounds bounds)
+        {
+            hasWorldBoundsOverride = true;
+            worldBoundsOverride = bounds;
+            currentBounds = bounds;
             OnBoundsUpdated?.Invoke(currentBounds);
         }
 

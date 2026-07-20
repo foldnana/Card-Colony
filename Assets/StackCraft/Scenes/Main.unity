@@ -199,7 +199,7 @@ Transform:
   m_GameObject: {fileID: 37186788}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0, y: -10, z: 0}
+  m_LocalPosition: {x: 0, y: -0.06, z: 0}
   m_LocalScale: {x: 10, y: 1, z: 10}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -571,25 +571,43 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   locationSpawns:
   - definition: {fileID: 11400000, guid: 6baac782c2acd694f9dd9003a8824df8, type: 2}
-    position: {x: -3.75, y: 0, z: 0.1}
+    position: {x: -5.55, y: 0, z: -2}
   - definition: {fileID: 11400000, guid: 9390a1bb285c1af4895d874e85f3e919, type: 2}
-    position: {x: -3.4, y: 0, z: 1.65}
+    position: {x: -5.05, y: 0, z: 2.55}
   - definition: {fileID: 11400000, guid: 601f144cf9f0bf947a1e61c64a99587f, type: 2}
-    position: {x: 0, y: 0, z: 1.9}
+    position: {x: -0.9, y: 0, z: 2.55}
   - definition: {fileID: 11400000, guid: cea56a23d9a12cb4cb7f6f182382d075, type: 2}
-    position: {x: -0.35, y: 0, z: 0.25}
+    position: {x: -0.85, y: 0, z: 0.15}
   - definition: {fileID: 11400000, guid: bd8ec86c3b7345a47b47067b776af305, type: 2}
-    position: {x: 2.6, y: 0, z: -1}
+    position: {x: 2.5, y: 0, z: -3.2}
   - definition: {fileID: 11400000, guid: ff52a1dc39756dc41bfea423da264550, type: 2}
-    position: {x: 3.8, y: 0, z: 0.05}
-  travelerDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
-  travelerPosition: {x: -2.25, y: 0, z: -1.15}
-  jobDefinitions:
+    position: {x: 6.85, y: 0, z: -1.25}
+  routes:
+  - fromLocationIndex: 0
+    toLocationIndex: 1
+  - fromLocationIndex: 0
+    toLocationIndex: 3
+  - fromLocationIndex: 1
+    toLocationIndex: 2
+  - fromLocationIndex: 2
+    toLocationIndex: 3
+  - fromLocationIndex: 3
+    toLocationIndex: 4
+  - fromLocationIndex: 3
+    toLocationIndex: 5
+  - fromLocationIndex: 4
+    toLocationIndex: 5
+  partyDefinition: {fileID: 11400000, guid: e2d07c0c902843e98fbd0af90c7b7fa1, type: 2}
+  initialPartyLocationIndex: 0
+  partyDockOffset: {x: -0.65, y: 0, z: -0.45}
+  destinationSnapRadius: 1.25
+  partyTravelSpeed: 0.9
+  legacyTravelerDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  legacyJobDefinitions:
   - {fileID: 11400000, guid: 88758e503575176428df3a6711b91a49, type: 2}
   - {fileID: 11400000, guid: 3e1ae68790501954c9de997ccb78deff, type: 2}
   - {fileID: 11400000, guid: 1f43e740a8b65554c84bd5888659eb25, type: 2}
-  jobStackPosition: {x: 0.35, y: 0, z: -1.8}
-  worldMapTexture: {fileID: 2800000, guid: 205cabeff57e629449b9bf0b8efe9fa9, type: 3}
+  worldMapTexture: {fileID: 2800000, guid: a8ab002c8db220747a0d08c6616cb3a3, type: 3}
   worldMapShader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}
 --- !u!1 &1192909442
 GameObject:
@@ -1458,23 +1476,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: bac6796dd8c3a14469f4d3b82e57a875, type: 3}
---- !u!1001 &7619000000000000000
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 0}
-    m_Modifications:
-    - target: {fileID: 6981490210267865667, guid: 93f7e9df926343d42a6a12945c6c2d52, type: 3}
-      propertyPath: m_Name
-      value: GameUiRoot
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 93f7e9df926343d42a6a12945c6c2d52, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1485,4 +1486,3 @@ SceneRoots:
   - {fileID: 2056759083933773671}
   - {fileID: 1211518933}
   - {fileID: 2604837606948666750}
-  - {fileID: 7619000000000000000}

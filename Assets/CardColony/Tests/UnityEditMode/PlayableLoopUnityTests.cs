@@ -384,12 +384,87 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void MainScene_ContainsGameUiRootPrefabInstance()
+        public void MainScene_UsesOnlyOriginalStackCraftUiRoot()
         {
             const string scenePath = "Assets/StackCraft/Scenes/Main.unity";
-            string sceneYaml = File.ReadAllText(scenePath);
+            const string originalUiRootPath = "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+            const string duplicateConceptUiPath = "Assets/CardColony/Prefabs/GameUiRoot.prefab";
+            var scene = EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            string[] rootPrefabPaths = scene.GetRootGameObjects()
+                .Select(PrefabUtility.GetCorrespondingObjectFromOriginalSource)
+                .Where(source => source != null)
+                .Select(AssetDatabase.GetAssetPath)
+                .ToArray();
 
-            Assert.That(sceneYaml, Does.Contain("guid: 93f7e9df926343d42a6a12945c6c2d52"));
+            Assert.That(
+                rootPrefabPaths.Count(path => path == originalUiRootPath),
+                Is.EqualTo(1),
+                "Main 应且只应保留一个原项目 UIRoot");
+            Assert.That(
+                rootPrefabPaths,
+                Has.None.EqualTo(duplicateConceptUiPath),
+                "Main 只能使用原项目 UIRoot；额外的全屏概念 HUD 会重复绘制日期、状态和任务面板");
+        }
+
+        [Test]
+        public void MainScene_WorldMapBackgroundSharesTheNativeCardPlane()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            GameObject background = GameObject.Find("Background");
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+
+            Assert.That(background, Is.Not.Null);
+            Assert.That(board, Is.Not.Null);
+            Assert.That(bootstrap, Is.Not.Null);
+
+            MethodInfo boardAwake = board.GetType().GetMethod(
+                "Awake",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(boardAwake, Is.Not.Null);
+            boardAwake.Invoke(board, null);
+
+            background.transform.position = new Vector3(7f, -10f, 9f);
+            MethodInfo applyBackground = bootstrap.GetType().GetMethod(
+                "ApplyWorldMapBackground",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(applyBackground, Is.Not.Null);
+            applyBackground.Invoke(bootstrap, null);
+
+            Assert.That(background.transform.position.x, Is.EqualTo(board.transform.position.x).Within(0.001f));
+            Assert.That(background.transform.position.z, Is.EqualTo(board.transform.position.z).Within(0.001f));
+            Assert.That(
+                background.transform.position.y,
+                Is.EqualTo(board.transform.position.y - 0.01f).Within(0.001f),
+                "地图与原生卡牌桌面相距过远，透视相机移动时会产生明显视差");
+        }
+
+        [Test]
+        public void WorldMapBackground_KeepsSceneFallbackWhenBoardIsUnavailable()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            GameObject background = GameObject.Find("Background");
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+
+            Assert.That(background, Is.Not.Null);
+            Assert.That(board, Is.Not.Null);
+            Assert.That(bootstrap, Is.Not.Null);
+
+            Object.DestroyImmediate(board.gameObject);
+            Vector3 fallbackPosition = new(3f, -0.06f, 4f);
+            background.transform.position = fallbackPosition;
+            MethodInfo applyBackground = bootstrap.GetType().GetMethod(
+                "ApplyWorldMapBackground",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(applyBackground, Is.Not.Null);
+            Assert.That(() => applyBackground.Invoke(bootstrap, null), Throws.Nothing);
+            Assert.That(background.transform.position, Is.EqualTo(fallbackPosition));
         }
 
         [Test]
@@ -413,7 +488,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void WorldMapBootstrap_DefinesLocationsTravelerAndJobStack()
+        public void WorldMapBootstrap_DefinesLocationsSinglePartyAndTravelRoutes()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
             MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
@@ -423,19 +498,35 @@ namespace CardColony.Tests
 
             var serialized = new SerializedObject(bootstrap);
             SerializedProperty locations = serialized.FindProperty("locationSpawns");
-            SerializedProperty traveler = serialized.FindProperty("travelerDefinition");
-            SerializedProperty jobs = serialized.FindProperty("jobDefinitions");
+            SerializedProperty party = serialized.FindProperty("partyDefinition");
+            SerializedProperty routes = serialized.FindProperty("routes");
             SerializedProperty mapTexture = serialized.FindProperty("worldMapTexture");
             SerializedProperty mapShader = serialized.FindProperty("worldMapShader");
 
             Assert.That(locations, Is.Not.Null);
             Assert.That(locations.arraySize, Is.GreaterThanOrEqualTo(6));
-            Assert.That(traveler, Is.Not.Null);
-            Assert.That(traveler.objectReferenceValue, Is.Not.Null);
-            Assert.That(jobs, Is.Not.Null);
-            Assert.That(jobs.arraySize, Is.EqualTo(3));
+            Assert.That(party, Is.Not.Null);
+            Assert.That(party.objectReferenceValue, Is.Not.Null);
+            Assert.That(routes, Is.Not.Null);
+            Assert.That(routes.arraySize, Is.GreaterThanOrEqualTo(7));
+            Assert.That(
+                bootstrap.GetType().GetMethod("SpawnJobStack", BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Null,
+                "世界地图只能生成一张小队卡，不能继续生成战士、游侠和法师职业堆");
             Assert.That(mapTexture, Is.Not.Null);
             Assert.That(mapTexture.objectReferenceValue, Is.Not.Null, "原生卡牌下方需要世界地图底图");
+            Assert.That(
+                AssetDatabase.GetAssetPath(mapTexture.objectReferenceValue),
+                Is.EqualTo("Assets/CardColony/Art/Backgrounds/WorldMapBackground_v4_MinimalRoutes.png"),
+                "世界地图场景必须引用已确认的简笔画路线底图");
+            const string mapTexturePath =
+                "Assets/CardColony/Art/Backgrounds/WorldMapBackground_v4_MinimalRoutes.png";
+            var mapImporter = AssetImporter.GetAtPath(mapTexturePath) as TextureImporter;
+            Assert.That(mapImporter, Is.Not.Null);
+            Assert.That(mapImporter.mipmapEnabled, Is.False, "简笔路线底图不能因 Mipmap 采样而变糊");
+            Assert.That(mapImporter.npotScale, Is.EqualTo(TextureImporterNPOTScale.None),
+                "必须保留地图原始 1672×941 比例，不能重采样为二次幂尺寸");
+            Assert.That(mapImporter.wrapMode, Is.EqualTo(TextureWrapMode.Clamp));
             Assert.That(mapShader, Is.Not.Null);
             Assert.That(mapShader.objectReferenceValue, Is.Not.Null, "地图材质必须明确引用 URP Shader，不能运行时猜测");
 
@@ -446,25 +537,240 @@ namespace CardColony.Tests
                 Assert.That(definition, Is.Not.Null, $"地点 {index} 缺少原生 CardDefinition");
                 Assert.That(definition.GetType().Name, Is.Not.EqualTo("PackDefinition"));
             }
+
+            MethodInfo areConnected = bootstrap.GetType().GetMethod("AreLocationsConnected");
+            Assert.That(areConnected, Is.Not.Null);
+            Assert.That(areConnected.Invoke(bootstrap, new object[] { 0, 1 }), Is.True);
+            Assert.That(areConnected.Invoke(bootstrap, new object[] { 0, 5 }), Is.False);
         }
 
         [Test]
-        public void WorldClockDriver_DisablesLegacyClockAndKeepsRealtimeSimulationNormal()
+        public void Board_WorldMapBoundsOverrideMatchesTheVisibleMapArea()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            Assert.That(board, Is.Not.Null);
+
+            MethodInfo setOverride = board.GetType().GetMethod("SetWorldBoundsOverride");
+            Assert.That(setOverride, Is.Not.Null);
+
+            Bounds expected = new(Vector3.zero, new Vector3(20f, 0.1f, 11.25f));
+            setOverride.Invoke(board, new object[] { expected });
+            Bounds actual = (Bounds)board.GetType().GetProperty("WorldBounds").GetValue(board);
+
+            Assert.That(actual.center, Is.EqualTo(expected.center));
+            Assert.That(actual.size, Is.EqualTo(expected.size));
+        }
+
+        [Test]
+        public void WorldMapLocationSpawns_AlignWithTheBakedRouteAnchors()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            GameObject background = GameObject.Find("Background");
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(background, Is.Not.Null);
+            Assert.That(board, Is.Not.Null);
+            Assert.That(bootstrap, Is.Not.Null);
+
+            MethodInfo boardAwake = board.GetType().GetMethod(
+                "Awake",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            MethodInfo applyBackground = bootstrap.GetType().GetMethod(
+                "ApplyWorldMapBackground",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(boardAwake, Is.Not.Null);
+            Assert.That(applyBackground, Is.Not.Null);
+            boardAwake.Invoke(board, null);
+            applyBackground.Invoke(bootstrap, null);
+
+            Bounds mapBounds = background.GetComponent<Renderer>().bounds;
+            Assert.That(mapBounds.size.x, Is.EqualTo(20f).Within(0.01f));
+            Assert.That(mapBounds.size.z, Is.EqualTo(11.25f).Within(0.01f));
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locations = serialized.FindProperty("locationSpawns");
+            SerializedProperty mapTexture = serialized.FindProperty("worldMapTexture");
+            var texture = mapTexture.objectReferenceValue as Texture2D;
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(
+                (float)texture.width / texture.height,
+                Is.EqualTo(mapBounds.size.x / mapBounds.size.z).Within(0.002f));
+
+            Vector2[] anchorUvs =
+            {
+                new(0.2225f, 0.3222f),
+                new(0.2475f, 0.7267f),
+                new(0.4550f, 0.7267f),
+                new(0.4575f, 0.5133f),
+                new(0.6250f, 0.2156f),
+                new(0.8425f, 0.3889f),
+            };
+
+            Assert.That(locations.arraySize, Is.EqualTo(anchorUvs.Length));
+            for (int index = 0; index < anchorUvs.Length; index++)
+            {
+                Vector3 actual = locations.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("position").vector3Value;
+                Vector3 expected = new(
+                    Mathf.Lerp(mapBounds.min.x, mapBounds.max.x, anchorUvs[index].x),
+                    0f,
+                    Mathf.Lerp(mapBounds.min.z, mapBounds.max.z, anchorUvs[index].y));
+                Assert.That(
+                    Vector3.Distance(actual, expected),
+                    Is.LessThan(0.05f),
+                    $"地点 {index} 没有覆盖新地图的路线落点");
+            }
+        }
+
+        [Test]
+        public void CardController_RejectsDraggingWhenItsWorldMapStackIsLocked()
+        {
+            var gameObject = new GameObject("Locked world map card");
+            try
+            {
+                System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+                System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+                System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
+                Assert.That(cardType, Is.Not.Null);
+                Assert.That(controllerType, Is.Not.Null);
+                Assert.That(stackType, Is.Not.Null);
+
+                Component card = gameObject.AddComponent(cardType);
+                Component controller = gameObject.AddComponent(controllerType);
+                object stack = System.Activator.CreateInstance(stackType, nonPublic: true);
+                cardType.GetProperty("Stack").SetValue(card, stack);
+                MethodInfo controllerAwake = controllerType.GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(controllerAwake, Is.Not.Null);
+                controllerAwake.Invoke(controller, null);
+                PropertyInfo canBeDragged = controller.GetType().GetProperty("CanBeDragged");
+
+                Assert.That(canBeDragged, Is.Not.Null);
+                Assert.That(canBeDragged.GetValue(controller), Is.True);
+
+                stackType.GetProperty("IsLocked").SetValue(stack, true);
+                Assert.That(canBeDragged.GetValue(controller), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(gameObject);
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_ConfiguresLocationsAsLockedAndPartyAsMovable()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locations = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyProperty = serialized.FindProperty("partyDefinition");
+            Assert.That(locations, Is.Not.Null);
+            Assert.That(partyProperty, Is.Not.Null);
+
+            Object locationDefinition = locations
+                .GetArrayElementAtIndex(0).FindPropertyRelative("definition").objectReferenceValue;
+            Object partyDefinition = partyProperty.objectReferenceValue;
+            Assert.That(locationDefinition, Is.Not.Null);
+            Assert.That(partyDefinition, Is.Not.Null);
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+            Assert.That(configure, Is.Not.Null);
+
+            Component location = CreateUninitializedCard(locationDefinition, "Test Location");
+            Component party = CreateUninitializedCard(partyDefinition, "Test Party");
+            try
+            {
+                configure.Invoke(bootstrap, new object[] { location });
+                configure.Invoke(bootstrap, new object[] { party });
+
+                object locationStack = location.GetType().GetProperty("Stack").GetValue(location);
+                object partyStack = party.GetType().GetProperty("Stack").GetValue(party);
+                Assert.That(locationStack.GetType().GetProperty("IsLocked").GetValue(locationStack), Is.True);
+                Assert.That(location.GetComponent("WorldMapLocation"), Is.Not.Null);
+                Assert.That(partyStack.GetType().GetProperty("IsLocked").GetValue(partyStack), Is.False);
+                Assert.That(party.GetComponent("WorldMapPartyController"), Is.Not.Null);
+            }
+            finally
+            {
+                DestroyTestCard(location);
+                DestroyTestCard(party);
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_DoesNotOverlayRuntimeLinesOnTheBakedRouteMap()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            int lineCountBeforeInitialization = Object.FindObjectsOfType<LineRenderer>(true).Length;
+            MethodInfo start = bootstrap.GetType().GetMethod(
+                "Start",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(start, Is.Not.Null);
+            start.Invoke(bootstrap, null);
+
+            Assert.That(
+                Object.FindObjectsOfType<LineRenderer>(true).Length,
+                Is.EqualTo(lineCountBeforeInitialization),
+                "路线已绘制在地图底图中，世界地图初始化不能再叠加 LineRenderer");
+        }
+
+        private static Component CreateUninitializedCard(Object definition, string name)
+        {
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
+            System.Type settingsType = FindType("CryingSnow.StackCraft.CardSettings");
+            var gameObject = new GameObject(name);
+            Component card = gameObject.AddComponent(cardType);
+            cardType.GetProperty("Definition").SetValue(card, definition);
+            ScriptableObject settings = ScriptableObject.CreateInstance(settingsType);
+            cardType.GetProperty("Settings").SetValue(card, settings);
+            _ = System.Activator.CreateInstance(stackType, card, Vector3.zero);
+            return card;
+        }
+
+        private static void DestroyTestCard(Component card)
+        {
+            if (card == null)
+                return;
+
+            Object settings = (Object)card.GetType().GetProperty("Settings").GetValue(card);
+            Object.DestroyImmediate(card.gameObject);
+            if (settings != null)
+                Object.DestroyImmediate(settings);
+        }
+
+        private static System.Type FindType(string fullName)
+        {
+            return System.AppDomain.CurrentDomain.GetAssemblies()
+                .Select(assembly => assembly.GetType(fullName))
+                .FirstOrDefault(type => type != null);
+        }
+
+        [Test]
+        public void MainScene_KeepsOriginalTimeManagerForTheOriginalUi()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
             MonoBehaviour legacyClock = Object.FindObjectsOfType<MonoBehaviour>(true)
                 .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.TimeManager");
             WorldClockDriver driver = Object.FindObjectOfType<WorldClockDriver>(true);
+
             Assert.That(legacyClock, Is.Not.Null);
-            Assert.That(driver, Is.Not.Null);
-
-            legacyClock.enabled = true;
-            Time.timeScale = 4f;
-            bool disabled = driver.DisableLegacyTimeManager();
-
-            Assert.That(disabled, Is.True);
-            Assert.That(legacyClock.enabled, Is.False);
-            Assert.That(Time.timeScale, Is.EqualTo(1f));
+            Assert.That(legacyClock.enabled, Is.True,
+                "原项目 UIRoot 依赖原生 TimeManager，主场景不能禁用它");
+            Assert.That(driver, Is.Null,
+                "Main 场景不应再次挂载属于重复 GameUiRoot 的时钟驱动");
         }
 
         [Test]

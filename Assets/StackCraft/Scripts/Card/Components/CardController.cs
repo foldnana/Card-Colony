@@ -5,6 +5,11 @@ using UnityEngine.EventSystems;
 
 namespace CryingSnow.StackCraft
 {
+    public interface ICardDropHandler
+    {
+        bool HandleDrop(CardInstance card, Vector3 dropPosition);
+    }
+
     [RequireComponent(typeof(CardInstance))]
     public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
@@ -22,6 +27,8 @@ namespace CryingSnow.StackCraft
         private bool isEquipped => _equipmentComponent != null && _equipmentComponent.IsEquipped;
         private bool inCombat => _combatant != null && _combatant.IsInCombat;
         private CardInstance equipperCard => _equipmentComponent?.Equipper;
+
+        public bool CanBeDragged => _card != null && _card.Stack != null && !_card.Stack.IsLocked;
 
         private void Awake()
         {
@@ -44,6 +51,7 @@ namespace CryingSnow.StackCraft
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (!InputManager.Instance.IsInputEnabled) return;
+            if (!CanBeDragged) return;
 
             // 1. Handle Equipped Cards
             if (isEquipped)
@@ -188,6 +196,15 @@ namespace CryingSnow.StackCraft
 
         private void HandleStandardDrop(Vector3 dropPosition)
         {
+            foreach (ICardDropHandler handler in GetComponents<ICardDropHandler>())
+            {
+                if (handler.HandleDrop(_card, dropPosition))
+                {
+                    _card.OriginalCraftingStack = null;
+                    return;
+                }
+            }
+
             var terminalActions = new System.Func<bool>[]
             {
                 TryTradeWithNearbyZone,
