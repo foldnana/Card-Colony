@@ -4,7 +4,12 @@ namespace CryingSnow.StackCraft
 {
     public class Highlight
     {
-        private GameObject highlightObject;
+        private static readonly int OutlineColorId = Shader.PropertyToID("_OutlineColor");
+
+        private readonly GameObject highlightObject;
+        private readonly MeshRenderer highlightRenderer;
+        private readonly MaterialPropertyBlock propertyBlock = new MaterialPropertyBlock();
+        private readonly Color defaultOutlineColor;
 
         public Highlight(Transform parent, Mesh mesh, Material material)
         {
@@ -17,12 +22,26 @@ namespace CryingSnow.StackCraft
             MeshFilter filter = obj.AddComponent<MeshFilter>();
             filter.sharedMesh = mesh;
 
-            MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
-            renderer.sharedMaterial = material;
-            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            renderer.receiveShadows = false;
+            highlightRenderer = obj.AddComponent<MeshRenderer>();
+            highlightRenderer.sharedMaterial = material;
+            highlightRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            highlightRenderer.receiveShadows = false;
+
+            defaultOutlineColor = material != null && material.HasProperty(OutlineColorId)
+                ? material.GetColor(OutlineColorId)
+                : Color.white;
+            SetColor(defaultOutlineColor);
         }
 
         public void SetActive(bool value) => highlightObject.SetActive(value);
+
+        public void SetColor(Color color)
+        {
+            highlightRenderer.GetPropertyBlock(propertyBlock);
+            propertyBlock.SetColor(OutlineColorId, color);
+            highlightRenderer.SetPropertyBlock(propertyBlock);
+        }
+
+        public void ResetColor() => SetColor(defaultOutlineColor);
     }
 }

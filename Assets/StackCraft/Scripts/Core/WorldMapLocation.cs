@@ -15,8 +15,10 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0f)] private float selectionBobHeight = 0.012f;
         [SerializeField, Min(0.01f)] private float selectionBobDuration = 0.5f;
 
+        [Header("Party Occupancy")]
+        [SerializeField] private Color occupiedOutlineColor = new Color(0.95f, 0.72f, 0.22f, 1f);
+
         private WorldMapPersonSlot personSlot;
-        private Camera mainCamera;
         private Tween selectionTween;
         private float restingLocalY;
         private bool hasRestingPose;
@@ -33,7 +35,6 @@ namespace CryingSnow.StackCraft
         {
             Index = index;
             Card = card;
-            mainCamera = Camera.main;
 
             if (!hasRestingPose)
             {
@@ -48,11 +49,8 @@ namespace CryingSnow.StackCraft
 
             if (Card?.Stack != null)
                 Card.Stack.IsLocked = true;
-        }
 
-        private void Update()
-        {
-            CheckForOutsideClick();
+            RefreshLocationOutline();
         }
 
         private void OnDisable()
@@ -88,7 +86,7 @@ namespace CryingSnow.StackCraft
             else if (activeSelection == this)
                 activeSelection = null;
 
-            SetLocationOutline(selected);
+            RefreshLocationOutline();
             SetOccupantOutline(selected);
 
             if (selected)
@@ -126,6 +124,8 @@ namespace CryingSnow.StackCraft
 
             personSlot.Attach(partyCard, localDockPosition, dockedScale, instant);
 
+            RefreshLocationOutline();
+
             if (IsSelected)
             {
                 personSlot.ShowCards();
@@ -139,6 +139,7 @@ namespace CryingSnow.StackCraft
                 SetSelected(false, instant: true);
 
             personSlot?.Detach(partyCard);
+            RefreshLocationOutline();
         }
 
         public void ReleaseDockedParty()
@@ -189,13 +190,27 @@ namespace CryingSnow.StackCraft
                 .SetUpdate(true);
         }
 
-        private void SetLocationOutline(bool active)
+        private void RefreshLocationOutline()
         {
-            if (Card == null || locationOutlineActive == active)
+            if (Card == null)
                 return;
 
-            Card.SetHighlighted(active);
-            locationOutlineActive = active;
+            bool shouldShowOutline = IsSelected || DockedParty != null;
+            if (!shouldShowOutline)
+            {
+                if (locationOutlineActive)
+                    Card.SetHighlighted(false);
+
+                locationOutlineActive = false;
+                return;
+            }
+
+            if (IsSelected)
+                Card.SetHighlighted(true);
+            else
+                Card.SetHighlighted(true, occupiedOutlineColor);
+
+            locationOutlineActive = true;
         }
 
         private void SetOccupantOutline(bool active)
@@ -214,25 +229,15 @@ namespace CryingSnow.StackCraft
             occupantOutlineActive = active;
         }
 
-        private void CheckForOutsideClick()
+        public static void NotifyCardClicked(CardInstance clickedCard)
         {
-            if (!IsSelected || !Input.GetMouseButtonDown(0))
+            if (activeSelection == null || clickedCard == null)
                 return;
 
-            if (mainCamera == null)
-                mainCamera = Camera.main;
+            if (clickedCard == activeSelection.Card)
+                return;
 
-            if (mainCamera != null)
-            {
-                Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-                if (Physics.Raycast(ray, out RaycastHit hit, 100f) &&
-                    hit.transform.IsChildOf(transform))
-                {
-                    return;
-                }
-            }
-
-            SetSelected(false, instant: false);
+            activeSelection.SetSelected(false, instant: false);
         }
     }
 }

@@ -863,7 +863,8 @@ namespace CardColony.Tests
                 setSelected.Invoke(location, new object[] { false, true });
                 Assert.That(isSelected.GetValue(location), Is.False);
                 Assert.That(locationCard.transform.localPosition, Is.EqualTo(restingPosition));
-                Assert.That(locationCard.transform.Find("Highlight").gameObject.activeSelf, Is.False);
+                Assert.That(locationCard.transform.Find("Highlight").gameObject.activeSelf, Is.True,
+                    "小队驻扎地点即使没有被选中，也必须保留常驻外框");
                 Assert.That(partyCard.transform.Find("Highlight").gameObject.activeSelf, Is.False);
                 Assert.That(partyCard.GetComponent<Renderer>().enabled, Is.False);
             }
@@ -873,6 +874,139 @@ namespace CardColony.Tests
                     partyCard.transform.SetParent(null, true);
                 DestroyTestCard(locationCard);
                 DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_OccupiedLocationUsesDistinctPersistentOutlineColor()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Occupied Location Outline");
+            Component partyCard = CreateUninitializedCard(null, "Occupying Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, new Vector3(0f, 0.01f, -0.55f), 0.78f, true });
+
+                Transform highlight = locationCard.transform.Find("Highlight");
+                Assert.That(highlight, Is.Not.Null, "小队驻扎后地点卡必须立即创建常驻外框");
+                Assert.That(highlight.gameObject.activeSelf, Is.True);
+
+                var propertyBlock = new MaterialPropertyBlock();
+                Renderer outlineRenderer = highlight.GetComponent<Renderer>();
+                outlineRenderer.GetPropertyBlock(propertyBlock);
+                int outlineColorId = Shader.PropertyToID("_OutlineColor");
+                Color occupiedColor = propertyBlock.GetColor(outlineColorId);
+
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                setSelected.Invoke(location, new object[] { true, true });
+                outlineRenderer.GetPropertyBlock(propertyBlock);
+                Color selectedColor = propertyBlock.GetColor(outlineColorId);
+                Assert.That(Vector4.Distance(occupiedColor, selectedColor), Is.GreaterThan(0.1f),
+                    "驻扎状态必须使用与普通选中状态不同的外框颜色");
+
+                setSelected.Invoke(location, new object[] { false, true });
+                outlineRenderer.GetPropertyBlock(propertyBlock);
+                Assert.That(highlight.gameObject.activeSelf, Is.True);
+                Assert.That(
+                    Vector4.Distance(occupiedColor, propertyBlock.GetColor(outlineColorId)),
+                    Is.LessThan(0.001f),
+                    "取消选中后应恢复驻扎状态颜色，而不是关闭外框");
+
+                locationType.GetMethod("DetachParty").Invoke(location, new object[] { partyCard });
+                Assert.That(highlight.gameObject.activeSelf, Is.False,
+                    "小队离开后，旧地点不能继续显示驻扎外框");
+            }
+            finally
+            {
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_SelectionIgnoresEmptyMapAndCancelsForOtherCard()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Persistent Selection Location");
+            Component otherCard = CreateUninitializedCard(null, "Other Clicked Card");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                MethodInfo notifyCardClicked = locationType.GetMethod(
+                    "NotifyCardClicked",
+                    BindingFlags.Public | BindingFlags.Static);
+                PropertyInfo isSelected = locationType.GetProperty("IsSelected");
+                Assert.That(notifyCardClicked, Is.Not.Null,
+                    "地点选择需要统一处理卡牌点击，同时忽略空白地图点击");
+
+                setSelected.Invoke(location, new object[] { true, true });
+                notifyCardClicked.Invoke(null, new object[] { null });
+                Assert.That(isSelected.GetValue(location), Is.True,
+                    "点击空白地图不能取消当前地点选择");
+
+                notifyCardClicked.Invoke(null, new object[] { otherCard });
+                Assert.That(isSelected.GetValue(location), Is.False,
+                    "点击其他卡牌必须取消当前地点选择");
+            }
+            finally
+            {
+                DestroyTestCard(locationCard);
+                DestroyTestCard(otherCard);
+            }
+        }
+
+        [Test]
+        public void CardController_ClickingAnotherCardCancelsWorldMapSelection()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            System.Type inputManagerType = FindType("CryingSnow.StackCraft.InputManager");
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+            var inputObject = new GameObject("Selection Input Manager");
+            Component locationCard = CreateUninitializedCard(null, "Selected Location Before Other Card Click");
+            Component otherCard = CreateUninitializedCard(null, "Locked Other Card");
+            try
+            {
+                Component inputManager = inputObject.AddComponent(inputManagerType);
+                inputManagerType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(inputManager, null);
+
+                Component location = locationCard.gameObject.AddComponent(locationType);
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(location, new object[] { true, true });
+
+                object otherStack = otherCard.GetType().GetProperty("Stack").GetValue(otherCard);
+                otherStack.GetType().GetProperty("IsLocked").SetValue(otherStack, true);
+                Component controller = otherCard.gameObject.AddComponent(controllerType);
+                controllerType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(controller, null);
+
+                ((IPointerDownHandler)controller).OnPointerDown(new PointerEventData(null)
+                {
+                    button = PointerEventData.InputButton.Left,
+                });
+
+                Assert.That(locationType.GetProperty("IsSelected").GetValue(location), Is.False,
+                    "即使另一张卡不可拖动，点击它也必须取消当前地点选择");
+            }
+            finally
+            {
+                Object.DestroyImmediate(inputObject);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(otherCard);
             }
         }
 

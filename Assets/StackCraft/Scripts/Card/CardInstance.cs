@@ -232,13 +232,28 @@ namespace CryingSnow.StackCraft
         /// <param name="value">If true, the card is highlighted; otherwise, the highlight is hidden.</param>
         public void SetHighlighted(bool value)
         {
-            if (_highlight == null)
-            {
-                var mesh = GetComponent<MeshFilter>().sharedMesh;
-                _highlight = new Highlight(transform, mesh, Settings.OutlineMaterial);
-                _highlight.SetActive(value);
-            }
-            else _highlight.SetActive(value);
+            EnsureHighlight();
+            _highlight.ResetColor();
+            _highlight.SetActive(value);
+        }
+
+        /// <summary>
+        /// Controls the card highlight and overrides its outline color for this card only.
+        /// </summary>
+        public void SetHighlighted(bool value, Color outlineColor)
+        {
+            EnsureHighlight();
+            _highlight.SetColor(outlineColor);
+            _highlight.SetActive(value);
+        }
+
+        private void EnsureHighlight()
+        {
+            if (_highlight != null)
+                return;
+
+            var mesh = GetComponent<MeshFilter>().sharedMesh;
+            _highlight = new Highlight(transform, mesh, Settings.OutlineMaterial);
         }
 
         /// <summary>

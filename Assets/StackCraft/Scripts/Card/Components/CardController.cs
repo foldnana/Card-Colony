@@ -56,6 +56,9 @@ namespace CryingSnow.StackCraft
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (!InputManager.Instance.IsInputEnabled) return;
+
+            WorldMapLocation.NotifyCardClicked(_card);
+
             if (!CanBeDragged) return;
 
             foreach (ICardDragStartHandler handler in GetComponents<ICardDragStartHandler>())
