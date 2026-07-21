@@ -1239,6 +1239,261 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void RiverbendLocation_UsesCompactWideBoardAndDedicatedSketchBackground()
+        {
+            const string scenePath = "Assets/StackCraft/Scenes/Location.unity";
+            const string backgroundPath =
+                "Assets/CardColony/Art/Backgrounds/RiverbendVillageBackground_v3.png";
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+
+            MonoBehaviour controller = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.LocationSceneController");
+            var serializedController = new SerializedObject(controller);
+            Object riverbend = serializedController.FindProperty("locationDefinitions")
+                .GetArrayElementAtIndex(0)
+                .objectReferenceValue;
+            var serializedDefinition = new SerializedObject(riverbend);
+
+            SerializedProperty mapSize = serializedDefinition.FindProperty("mapSize");
+            Assert.That(mapSize, Is.Not.Null,
+                "地点定义需要独立地图尺寸，未来地点才能复用同一场景而不共享固定大小");
+            Assert.That(mapSize.vector2Value.x, Is.EqualTo(46f).Within(0.01f));
+            Assert.That(mapSize.vector2Value.y, Is.EqualTo(25.875f).Within(0.01f));
+
+            Texture2D expectedBackground = AssetDatabase.LoadAssetAtPath<Texture2D>(backgroundPath);
+            Assert.That(expectedBackground, Is.Not.Null);
+            var textureImporter = AssetImporter.GetAtPath(backgroundPath) as TextureImporter;
+            Assert.That(textureImporter, Is.Not.Null);
+            Assert.That(textureImporter.npotScale, Is.EqualTo(TextureImporterNPOTScale.None),
+                "宽屏背景必须保留原始比例，不能被导入器强制缩放成方形尺寸");
+            Assert.That(textureImporter.wrapMode, Is.EqualTo(TextureWrapMode.Clamp));
+            Assert.That(
+                serializedDefinition.FindProperty("backgroundTexture").objectReferenceValue,
+                Is.EqualTo(expectedBackground),
+                "河湾村不能继续使用通用草地纹理");
+
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+            controller.GetType().GetField(
+                    "activeDefinition",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(controller, riverbend);
+            controller.GetType().GetMethod(
+                    "ApplyBackground",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(controller, new object[] { expectedBackground });
+
+            Bounds worldBounds = (Bounds)board.GetType().GetProperty("WorldBounds").GetValue(board);
+            Assert.That(worldBounds.size.x, Is.EqualTo(46f).Within(0.01f));
+            Assert.That(worldBounds.size.z, Is.EqualTo(25.875f).Within(0.01f));
+            Assert.That(board.GetComponent<SkinnedMeshRenderer>().enabled, Is.False,
+                "地点背景接管桌面后应隐藏旧模板棋盘，避免边框与新地图尺寸不一致");
+
+            Transform background = GameObject.Find("Background").transform;
+            Assert.That(background.localScale.x, Is.EqualTo(4.6f).Within(0.01f));
+            Assert.That(background.localScale.z, Is.EqualTo(2.5875f).Within(0.01f));
+        }
+
+        [Test]
+        public void RiverbendLocation_StartsZoomedOutAndAllowsWholeMapOverview()
+        {
+            const string scenePath = "Assets/StackCraft/Scenes/Location.unity";
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+
+            MonoBehaviour locationController = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.LocationSceneController");
+            var serializedController = new SerializedObject(locationController);
+            Object riverbend = serializedController.FindProperty("locationDefinitions")
+                .GetArrayElementAtIndex(0)
+                .objectReferenceValue;
+            var serializedDefinition = new SerializedObject(riverbend);
+
+            SerializedProperty cameraMinDistance =
+                serializedDefinition.FindProperty("cameraMinDistance");
+            SerializedProperty cameraMaxDistance =
+                serializedDefinition.FindProperty("cameraMaxDistance");
+            SerializedProperty cameraInitialDistance =
+                serializedDefinition.FindProperty("cameraInitialDistance");
+            SerializedProperty cameraZoomSpeed =
+                serializedDefinition.FindProperty("cameraZoomSpeed");
+            Assert.That(cameraMinDistance, Is.Not.Null,
+                "地点定义需要独立缩放参数，不能继续共用模板相机的固定范围");
+            Assert.That(cameraMaxDistance, Is.Not.Null);
+            Assert.That(cameraInitialDistance, Is.Not.Null);
+            Assert.That(cameraZoomSpeed, Is.Not.Null,
+                "Each location needs its own mouse-wheel zoom sensitivity.");
+            Assert.That(cameraMinDistance.floatValue, Is.EqualTo(5f).Within(0.01f));
+            Assert.That(cameraMaxDistance.floatValue, Is.EqualTo(52f).Within(0.01f));
+            Assert.That(cameraInitialDistance.floatValue, Is.EqualTo(22f).Within(0.01f));
+            Assert.That(cameraZoomSpeed.floatValue, Is.EqualTo(3f).Within(0.01f));
+
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+
+            MonoBehaviour cameraController = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CameraController");
+            cameraController.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cameraController, null);
+
+            locationController.GetType().GetField(
+                    "activeDefinition",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(locationController, riverbend);
+            Texture2D backgroundTexture = (Texture2D)serializedDefinition
+                .FindProperty("backgroundTexture")
+                .objectReferenceValue;
+            locationController.GetType().GetMethod(
+                    "ApplyBackground",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(locationController, new object[] { backgroundTexture });
+
+            float minDistance = (float)cameraController.GetType().GetField(
+                    "minDistance",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(cameraController);
+            float maxDistance = (float)cameraController.GetType().GetField(
+                    "maxDistance",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(cameraController);
+            Assert.That(minDistance, Is.EqualTo(5f).Within(0.01f));
+            Assert.That(maxDistance, Is.EqualTo(52f).Within(0.01f));
+            float zoomSpeed = (float)cameraController.GetType().GetField(
+                    "zoomSpeed",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(cameraController);
+            Assert.That(zoomSpeed, Is.EqualTo(3f).Within(0.01f));
+
+            Transform cameraTransform = (Transform)cameraController.GetType().GetField(
+                    "cameraTransform",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .GetValue(cameraController);
+            var ground = new Plane(Vector3.up, Vector3.zero);
+            Assert.That(
+                ground.Raycast(new Ray(cameraTransform.position, cameraTransform.forward), out float distance),
+                Is.True);
+            Assert.That(distance, Is.EqualTo(22f).Within(0.1f),
+                "进入河湾村时应先看到较大范围，而不是沿用模板的近距离视角");
+            Assert.That(cameraTransform.GetComponent<Camera>().farClipPlane, Is.GreaterThanOrEqualTo(104f),
+                "扩大缩放上限后必须同步提高远裁剪面，避免地图在远景被裁掉");
+
+            Vector3 initialFocus = new Ray(cameraTransform.position, cameraTransform.forward)
+                .GetPoint(distance);
+            cameraController.GetType().GetMethod("ConfigureZoom").Invoke(
+                cameraController,
+                new object[] { 5f, 52f, 52f, 3f });
+            Assert.That(
+                ground.Raycast(new Ray(cameraTransform.position, cameraTransform.forward), out float overviewDistance),
+                Is.True);
+            Assert.That(overviewDistance, Is.EqualTo(52f).Within(0.1f));
+            Vector3 overviewFocus = new Ray(cameraTransform.position, cameraTransform.forward)
+                .GetPoint(overviewDistance);
+            Assert.That(Vector3.Distance(initialFocus, overviewFocus), Is.LessThan(0.01f),
+                "从初始视角拉到最远视角时不能漂移地图焦点");
+        }
+
+        [Test]
+        public void CameraController_ZoomUsesRealCameraOffsetAndIgnoresInvalidGroundRay()
+        {
+            System.Type cameraControllerType = FindType("CryingSnow.StackCraft.CameraController");
+            var root = new GameObject("Offset Camera Controller");
+            var cameraObject = new GameObject("Offset Camera", typeof(Camera));
+            cameraObject.transform.SetParent(root.transform, false);
+            cameraObject.transform.localPosition = new Vector3(1f, 2f, 0.5f);
+            cameraObject.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
+            root.transform.position = new Vector3(4f, 10f, -3f);
+            Component cameraController = root.AddComponent(cameraControllerType);
+            try
+            {
+                cameraControllerType.GetField(
+                        "cameraTransform",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(cameraController, cameraObject.transform);
+                cameraControllerType.GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(cameraController, null);
+
+                var ground = new Plane(Vector3.up, Vector3.zero);
+                Ray originalRay = new Ray(cameraObject.transform.position, cameraObject.transform.forward);
+                Assert.That(ground.Raycast(originalRay, out float originalDistance), Is.True);
+                Vector3 originalFocus = originalRay.GetPoint(originalDistance);
+
+                cameraControllerType.GetMethod("ConfigureZoom").Invoke(
+                    cameraController,
+                    new object[] { 5f, 80f, 32f, 3f });
+                Ray configuredRay = new Ray(cameraObject.transform.position, cameraObject.transform.forward);
+                Assert.That(ground.Raycast(configuredRay, out float configuredDistance), Is.True);
+                Assert.That(configuredDistance, Is.EqualTo(32f).Within(0.1f));
+                Assert.That(
+                    Vector3.Distance(originalFocus, configuredRay.GetPoint(configuredDistance)),
+                    Is.LessThan(0.01f),
+                    "相机子节点有偏移时，缩放仍必须围绕真实地面焦点进行");
+
+                cameraObject.transform.rotation = Quaternion.identity;
+                Vector3 positionBeforeInvalidRay = root.transform.position;
+                cameraControllerType.GetMethod("ConfigureZoom").Invoke(
+                    cameraController,
+                    new object[] { 5f, 80f, 60f, 3f });
+                Assert.That(root.transform.position, Is.EqualTo(positionBeforeInvalidRay),
+                    "相机不朝向地面时不能为了套用缩放距离而把控制器移动到地下");
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
+        public void CameraController_ZoomDistanceUsesSensitivityAndClampsAtLimits()
+        {
+            System.Type cameraControllerType = FindType("CryingSnow.StackCraft.CameraController");
+            var root = new GameObject("Zoom Distance Controller");
+            Component cameraController = root.AddComponent(cameraControllerType);
+            try
+            {
+                cameraControllerType.GetField(
+                        "minDistance",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(cameraController, 5f);
+                cameraControllerType.GetField(
+                        "maxDistance",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(cameraController, 60f);
+                cameraControllerType.GetField(
+                        "zoomSpeed",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(cameraController, 3f);
+
+                MethodInfo calculateZoomDistance = cameraControllerType.GetMethod(
+                    "CalculateZoomDistance",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(calculateZoomDistance, Is.Not.Null);
+                Assert.That(
+                    (float)calculateZoomDistance.Invoke(cameraController, new object[] { 26f, 1f }),
+                    Is.EqualTo(23f).Within(0.01f));
+                Assert.That(
+                    (float)calculateZoomDistance.Invoke(cameraController, new object[] { 59f, -1f }),
+                    Is.EqualTo(60f).Within(0.01f),
+                    "A large wheel step must land on the maximum instead of being discarded.");
+                Assert.That(
+                    (float)calculateZoomDistance.Invoke(cameraController, new object[] { 6f, 1f }),
+                    Is.EqualTo(5f).Within(0.01f),
+                    "A large wheel step must land on the minimum instead of being discarded.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(root);
+            }
+        }
+
+        [Test]
         public void MainScene_ConfiguresSidebarDetailsForEveryWorldMapLocation()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);

@@ -16,7 +16,8 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string LocationScenePath = "Assets/StackCraft/Scenes/Location.unity";
         private const string DefinitionPath = "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset";
         private const string VillagerPath = "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset";
-        private const string BackgroundPath = "Assets/StackCraft/Textures/Backgrounds/Grass.png";
+        private const string BackgroundPath =
+            "Assets/CardColony/Art/Backgrounds/RiverbendVillageBackground_v3.png";
 
         [MenuItem("Tools/Card Colony/Install Riverbend Location Scene")]
         public static void Install()
@@ -74,6 +75,11 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("displayName").stringValue = "河湾村";
             serialized.FindProperty("backgroundTexture").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath);
+            serialized.FindProperty("mapSize").vector2Value = new Vector2(46f, 25.875f);
+            serialized.FindProperty("cameraMinDistance").floatValue = 5f;
+            serialized.FindProperty("cameraMaxDistance").floatValue = 52f;
+            serialized.FindProperty("cameraInitialDistance").floatValue = 22f;
+            serialized.FindProperty("cameraZoomSpeed").floatValue = 3f;
             serialized.FindProperty("expandedPartyMemberDefinition").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath);
             serialized.FindProperty("partySpawnPosition").vector3Value = new Vector3(0f, 0f, -1.2f);

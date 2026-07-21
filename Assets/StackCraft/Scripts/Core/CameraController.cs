@@ -131,17 +131,82 @@ namespace CryingSnow.StackCraft
 
             if (Mathf.Abs(scroll) > 0.01f)
             {
-                Vector3 forward = cameraTransform.forward;
-                Vector3 newPos = targetPos + forward * (scroll * zoomSpeed);
+                if (!TryGetGroundFocus(out Vector3 focusPoint, out float currentDistance))
+                    return;
 
-                float distance = newPos.y / Mathf.Cos(Mathf.Deg2Rad * (90f - cameraTransform.eulerAngles.x));
-                if (distance >= minDistance && distance <= maxDistance)
-                {
-                    targetPos = newPos;
-                    // Re-clamp after zoom because zooming moves the camera position in X/Z too.
-                    ClampTargetPosition();
-                }
+                float desiredDistance = CalculateZoomDistance(currentDistance, scroll);
+                if (Mathf.Approximately(desiredDistance, currentDistance))
+                    return;
+
+                SetCameraDistance(focusPoint, desiredDistance, instant: false);
             }
+        }
+
+        private float CalculateZoomDistance(float currentDistance, float scroll)
+        {
+            return Mathf.Clamp(
+                currentDistance - scroll * zoomSpeed,
+                minDistance,
+                maxDistance);
+        }
+
+        /// <summary>
+        /// Applies a location-specific zoom range and places the camera at a useful
+        /// starting distance while preserving its current ground focus point.
+        /// </summary>
+        public void ConfigureZoom(
+            float minimumDistance,
+            float maximumDistance,
+            float initialDistance,
+            float zoomSensitivity)
+        {
+            minDistance = Mathf.Max(0.1f, minimumDistance);
+            maxDistance = Mathf.Max(minDistance, maximumDistance);
+            zoomSpeed = Mathf.Max(0.1f, zoomSensitivity);
+            float desiredDistance = Mathf.Clamp(initialDistance, minDistance, maxDistance);
+
+            if (cameraTransform == null)
+                return;
+
+            Camera camera = cameraTransform.GetComponent<Camera>();
+            if (camera != null)
+                camera.farClipPlane = Mathf.Max(camera.farClipPlane, maxDistance * 2f);
+
+            if (Board.Instance != null)
+                UpdateMovementClamps(Board.Instance.WorldBounds);
+
+            if (!TryGetGroundFocus(out Vector3 focusPoint, out _))
+                return;
+
+            SetCameraDistance(focusPoint, desiredDistance, instant: true);
+        }
+
+        private bool TryGetGroundFocus(out Vector3 focusPoint, out float distance)
+        {
+            focusPoint = Vector3.zero;
+            distance = 0f;
+
+            if (cameraTransform == null)
+                return false;
+
+            var ground = new Plane(Vector3.up, Vector3.zero);
+            var viewRay = new Ray(cameraTransform.position, cameraTransform.forward);
+            if (!ground.Raycast(viewRay, out distance) || distance <= 0f)
+                return false;
+
+            focusPoint = viewRay.GetPoint(distance);
+            return true;
+        }
+
+        private void SetCameraDistance(Vector3 focusPoint, float distance, bool instant)
+        {
+            Vector3 desiredCameraPosition = focusPoint - cameraTransform.forward * distance;
+            Vector3 cameraOffset = cameraTransform.position - transform.position;
+            targetPos = desiredCameraPosition - cameraOffset;
+            ClampTargetPosition();
+
+            if (instant)
+                transform.position = targetPos;
         }
 
         private bool IsPointerBlocked()

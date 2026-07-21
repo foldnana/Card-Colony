@@ -14,7 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: riverbend
   displayName: "\u6CB3\u6E7E\u6751"
-  backgroundTexture: {fileID: 2800000, guid: 6f0ddc12af2166d4baa827c45ecf9594, type: 3}
+  backgroundTexture: {fileID: 2800000, guid: ce736f53fbc54523a027c50bde3488ca, type: 3}
+  mapSize: {x: 46, y: 25.875}
+  cameraMinDistance: 5
+  cameraMaxDistance: 52
+  cameraInitialDistance: 22
+  cameraZoomSpeed: 3
   expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
   partySpawnPosition: {x: 0, y: 0, z: -1.2}
   partyMemberSpacing: 0.9

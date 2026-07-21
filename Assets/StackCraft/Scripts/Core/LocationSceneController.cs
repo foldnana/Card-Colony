@@ -143,14 +143,37 @@ namespace CryingSnow.StackCraft
             if (texture == null || backgroundShader == null)
                 return;
 
+            if (activeDefinition == null)
+                return;
+
+            Vector2 mapSize = activeDefinition.MapSize;
+            if (mapSize.x <= 0f || mapSize.y <= 0f)
+                mapSize = new Vector2(48f, 32f);
+
             GameObject background = GameObject.Find("Background");
             if (background == null || !background.TryGetComponent(out MeshRenderer renderer))
                 return;
 
+            if (Board.Instance != null)
+            {
+                SkinnedMeshRenderer defaultBoard = Board.Instance.GetComponent<SkinnedMeshRenderer>();
+                if (defaultBoard != null)
+                    defaultBoard.enabled = false;
+            }
+
+            // Unity's built-in Plane mesh is 10x10 world units. Scale it to the
+            // location's configured wide map area so art and card bounds agree.
+            background.transform.localScale = new Vector3(
+                mapSize.x / 10f,
+                1f,
+                mapSize.y / 10f);
+
             backgroundMaterial = new Material(backgroundShader);
             backgroundMaterial.SetTexture("_MainTex", texture);
             backgroundMaterial.SetTextureScale("_MainTex", Vector2.one);
-            renderer.material = backgroundMaterial;
+            renderer.sharedMaterial = backgroundMaterial;
+            renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
 
             if (Board.Instance != null)
             {
@@ -159,7 +182,18 @@ namespace CryingSnow.StackCraft
                     boardPosition.x,
                     boardPosition.y + backgroundSurfaceOffset,
                     boardPosition.z);
+
+                Board.Instance.SetWorldBoundsOverride(new Bounds(
+                    new Vector3(boardPosition.x, 0f, boardPosition.z),
+                    new Vector3(mapSize.x, 0.1f, mapSize.y)));
             }
+
+            CameraController cameraController = FindObjectOfType<CameraController>(true);
+            cameraController?.ConfigureZoom(
+                activeDefinition.CameraMinDistance,
+                activeDefinition.CameraMaxDistance,
+                activeDefinition.CameraInitialDistance,
+                activeDefinition.CameraZoomSpeed);
         }
     }
 }
