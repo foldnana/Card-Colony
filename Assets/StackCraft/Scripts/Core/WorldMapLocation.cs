@@ -9,6 +9,9 @@ namespace CryingSnow.StackCraft
     [Serializable]
     public sealed class WorldMapLocationDetails
     {
+        public string locationId;
+        [Tooltip("Whether this location already has a playable local map.")]
+        public bool localMapImplemented;
         public string locationType = "地点";
         [Min(1)] public int dangerLevel = 1;
         public string travelTime = "1秒（临时）";

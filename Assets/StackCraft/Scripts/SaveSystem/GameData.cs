@@ -8,6 +8,8 @@ namespace CryingSnow.StackCraft
     {
         public int SlotNumber;
         public string CurrentScene;
+        public string ActiveLocationId;
+        public List<CardData> PartyMembers = new();
         public GameplayPrefs GameplayPrefs;
         public Dictionary<string, SceneData> SavedScenes = new();
         public HashSet<string> DiscoveredCards = new();
@@ -25,14 +27,22 @@ namespace CryingSnow.StackCraft
 
         public bool TryGetScene(out SceneData sceneData)
         {
-            if (SavedScenes.TryGetValue(CurrentScene, out sceneData))
+            string sceneScope = GetCurrentSceneScope();
+            if (SavedScenes.TryGetValue(sceneScope, out sceneData))
             {
                 return true;
             }
 
-            sceneData = new SceneData(CurrentScene);
-            SavedScenes.Add(CurrentScene, sceneData);
+            sceneData = new SceneData(sceneScope);
+            SavedScenes.Add(sceneScope, sceneData);
             return false;
+        }
+
+        public string GetCurrentSceneScope()
+        {
+            return CurrentScene == "Location" && !string.IsNullOrWhiteSpace(ActiveLocationId)
+                ? $"Location/{ActiveLocationId}"
+                : CurrentScene;
         }
     }
 

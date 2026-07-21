@@ -77,6 +77,7 @@ namespace CryingSnow.StackCraft
             ApplyWorldMapBackground();
             ConfigureExistingCards();
             RemoveLegacyJobCards();
+            ApplyReturnedPartyState(GameDirector.Instance?.GameData?.PartyMembers);
             RefreshPartyInfo("驻扎中");
         }
 
@@ -192,6 +193,45 @@ namespace CryingSnow.StackCraft
         {
             return CanTravelPartyTo(locationIndex) &&
                 partyController.TryTravelToLocation(locationIndex);
+        }
+
+        public bool TryEnterPartyLocation(int locationIndex)
+        {
+            if (!CanEnterPartyLocation(locationIndex) || GameDirector.Instance == null)
+                return false;
+
+            WorldMapLocationDetails details = GetLocationDetails(locationIndex);
+            if (details == null || string.IsNullOrWhiteSpace(details.locationId) ||
+                legacyTravelerDefinition == null)
+            {
+                return false;
+            }
+
+            CardInstance partyCard = partyController.PartyCard;
+            var expandedMember = new CardData
+            {
+                Id = legacyTravelerDefinition.Id,
+                UsesLeft = partyCard.UsesLeft,
+                CurrentHealth = partyCard.CurrentHealth,
+                CurrentNutrition = partyCard.CurrentNutrition
+            };
+            return GameDirector.Instance.EnterLocation(
+                details.locationId,
+                new[] { expandedMember });
+        }
+
+        public bool CanEnterPartyLocation(int locationIndex)
+        {
+            return IsPartyAtLocation(locationIndex) &&
+                IsLocationMapImplemented(locationIndex);
+        }
+
+        public bool IsLocationMapImplemented(int locationIndex)
+        {
+            WorldMapLocationDetails details = GetLocationDetails(locationIndex);
+            return details != null &&
+                details.localMapImplemented &&
+                !string.IsNullOrWhiteSpace(details.locationId);
         }
 
         public bool IsPartyTraveling => partyController != null && partyController.IsTraveling;
@@ -407,6 +447,16 @@ namespace CryingSnow.StackCraft
 
             if (legacyCards.Count > 0)
                 cardManager.NotifyStatsChanged();
+        }
+
+        private void ApplyReturnedPartyState(IEnumerable<CardData> partyMembers)
+        {
+            CardData returnedMember = partyMembers?.FirstOrDefault(member => member != null);
+            if (returnedMember == null || partyController?.PartyCard == null)
+                return;
+
+            partyController.PartyCard.RestoreSavedStats(returnedMember);
+            cardManager?.NotifyStatsChanged();
         }
 
         private void HandleStatsChanged(StatsSnapshot _)

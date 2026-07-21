@@ -1023,11 +1023,11 @@ namespace CardColony.Tests
                 Assert.That(
                     controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
                     Is.EqualTo(destinationIndex));
-                Assert.That(actionButton.interactable, Is.True);
+                Assert.That(actionButton.interactable, Is.False);
                 Assert.That(
                     actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
-                    Is.EqualTo("进入地点"),
-                    "抵达当前选中的地点后，右侧操作应自动从旅行恢复为进入地点");
+                    Is.EqualTo("地点地图开发中"),
+                    "第一阶段抵达河湾村以外的地点后，应保留旅行结果但不能进入未实现的局部地图");
             }
             finally
             {
@@ -1047,6 +1047,195 @@ namespace CardColony.Tests
                 foreach (Component location in locations)
                     DestroyTestCard(location);
             }
+        }
+
+        [Test]
+        public void GameData_RiverbendLocationUsesItsOwnPersistentSceneScope()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Assert.That(gameDataType, Is.Not.Null);
+
+            FieldInfo activeLocation = gameDataType.GetField("ActiveLocationId");
+            FieldInfo partyMembers = gameDataType.GetField("PartyMembers");
+            Assert.That(activeLocation, Is.Not.Null,
+                "通用地点场景必须保存当前地点 ID，不能只记住 Unity 场景名");
+            Assert.That(partyMembers, Is.Not.Null,
+                "小队进入局部地图前必须拥有可跨场景恢复的成员数据");
+
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("CurrentScene").SetValue(gameData, "Location");
+            activeLocation.SetValue(gameData, "riverbend");
+
+            object[] arguments = { null };
+            bool wasLoaded = (bool)gameDataType.GetMethod("TryGetScene")
+                .Invoke(gameData, arguments);
+            Assert.That(wasLoaded, Is.False);
+            Assert.That(
+                arguments[0].GetType().GetField("SceneName").GetValue(arguments[0]),
+                Is.EqualTo("Location/riverbend"),
+                "河湾村和未来的森林不能覆盖同一个 Location 存档槽");
+        }
+
+        [Test]
+        public void MainScene_ConfiguresRiverbendAsTheFirstEnterableLocation()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty firstDetails = serialized.FindProperty("locationDetails")
+                .GetArrayElementAtIndex(0);
+            SerializedProperty locationId = firstDetails.FindPropertyRelative("locationId");
+
+            Assert.That(locationId, Is.Not.Null);
+            Assert.That(locationId.stringValue, Is.EqualTo("riverbend"));
+            Assert.That(
+                bootstrap.GetType().GetMethod("TryEnterPartyLocation"),
+                Is.Not.Null,
+                "世界地图的进入按钮需要调用真实地点切换入口");
+            Assert.That(
+                serialized.FindProperty("legacyTravelerDefinition").objectReferenceValue.name,
+                Is.EqualTo("Card_Villager"),
+                "世界地图的小队卡进入河湾村后应展开为成员卡，而不是继续显示小队汇总卡");
+        }
+
+        [Test]
+        public void MainScene_OnlyRiverbendHasAnImplementedLocalMapInPhaseOne()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            SerializedProperty details = new SerializedObject(bootstrap)
+                .FindProperty("locationDetails");
+
+            for (int index = 0; index < details.arraySize; index++)
+            {
+                SerializedProperty entry = details.GetArrayElementAtIndex(index);
+                bool expected = entry.FindPropertyRelative("locationId").stringValue == "riverbend";
+                SerializedProperty implemented = entry.FindPropertyRelative("localMapImplemented");
+                Assert.That(implemented, Is.Not.Null,
+                    "地点配置必须明确标记是否已有局部地图，避免未完成地点进入空场景");
+                Assert.That(implemented.boolValue, Is.EqualTo(expected),
+                    "第一阶段应当只开放河湾村的地点地图");
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_AppliesReturnedMemberStatsAfterSavedWorldStackRestoration()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            bootstrap.GetType().GetMethod(
+                "Awake",
+                BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(bootstrap, null);
+
+            Component party = null;
+            try
+            {
+                var serialized = new SerializedObject(bootstrap);
+                SerializedProperty spawns = serialized.FindProperty("locationSpawns");
+                int originIndex = serialized.FindProperty("initialPartyLocationIndex").intValue;
+                party = CreateUninitializedCard(
+                    serialized.FindProperty("partyDefinition").objectReferenceValue,
+                    "Returned Party State");
+                SetTestCardStackPosition(
+                    party,
+                    spawns.GetArrayElementAtIndex(originIndex)
+                        .FindPropertyRelative("position").vector3Value);
+                bootstrap.GetType().GetMethod("ConfigureSpawnedCard")
+                    .Invoke(bootstrap, new object[] { party });
+
+                System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+                object staleWorldData = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("CurrentHealth").SetValue(staleWorldData, 15);
+                cardDataType.GetField("CurrentNutrition").SetValue(staleWorldData, 4);
+                cardDataType.GetField("UsesLeft").SetValue(staleWorldData, 1);
+                party.GetType().GetMethod("RestoreSavedStats")
+                    .Invoke(party, new[] { staleWorldData });
+
+                object returnedMemberData = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("CurrentHealth").SetValue(returnedMemberData, 7);
+                cardDataType.GetField("CurrentNutrition").SetValue(returnedMemberData, 2);
+                cardDataType.GetField("UsesLeft").SetValue(returnedMemberData, 3);
+                System.Type listType = typeof(List<>).MakeGenericType(cardDataType);
+                object returnedMembers = System.Activator.CreateInstance(listType);
+                listType.GetMethod("Add").Invoke(returnedMembers, new[] { returnedMemberData });
+
+                MethodInfo applyReturnedState = bootstrap.GetType().GetMethod(
+                    "ApplyReturnedPartyState",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(applyReturnedState, Is.Not.Null,
+                    "返回 Main 后必须在世界地图旧堆栈恢复完成之后再应用地点内的人物状态");
+                applyReturnedState.Invoke(bootstrap, new[] { returnedMembers });
+
+                Assert.That(
+                    party.GetType().GetProperty("CurrentHealth").GetValue(party),
+                    Is.EqualTo(7));
+                Assert.That(
+                    party.GetType().GetProperty("CurrentNutrition").GetValue(party),
+                    Is.EqualTo(2));
+                Assert.That(
+                    party.GetType().GetProperty("UsesLeft").GetValue(party),
+                    Is.EqualTo(3));
+            }
+            finally
+            {
+                DestroyTestCard(party);
+                bootstrap.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(bootstrap, null);
+            }
+        }
+
+        [Test]
+        public void LocationScene_IsAReusableRiverbendBoardWithReturnAndExpandedPartyConfiguration()
+        {
+            const string scenePath = "Assets/StackCraft/Scenes/Location.unity";
+            Assert.That(File.Exists(scenePath), Is.True,
+                "第一阶段需要独立的通用地点桌面场景");
+            Assert.That(
+                EditorBuildSettings.scenes.Any(scene => scene.enabled && scene.path == scenePath),
+                Is.True,
+                "地点场景必须进入 Build Settings 才能由进入按钮加载");
+
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            MonoBehaviour controller = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.LocationSceneController");
+            Assert.That(controller, Is.Not.Null);
+
+            var serializedController = new SerializedObject(controller);
+            SerializedProperty definitions = serializedController.FindProperty("locationDefinitions");
+            Assert.That(definitions, Is.Not.Null);
+            Assert.That(definitions.arraySize, Is.EqualTo(1));
+            Object riverbend = definitions.GetArrayElementAtIndex(0).objectReferenceValue;
+            Assert.That(riverbend, Is.Not.Null);
+            var serializedDefinition = new SerializedObject(riverbend);
+            Assert.That(serializedDefinition.FindProperty("id").stringValue, Is.EqualTo("riverbend"));
+            Assert.That(serializedDefinition.FindProperty("displayName").stringValue, Is.EqualTo("河湾村"));
+            Assert.That(serializedDefinition.FindProperty("expandedPartyMemberDefinition")
+                .objectReferenceValue.name, Is.EqualTo("Card_Villager"));
+            Button returnButton = serializedController.FindProperty("returnButton")
+                .objectReferenceValue as Button;
+            Assert.That(returnButton, Is.Not.Null);
+            Assert.That(returnButton.interactable, Is.True,
+                "进入河湾村后必须能点击返回世界地图，不能继承一个禁用按钮状态");
+
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            Assert.That(
+                new SerializedObject(cardManager).FindProperty("defaultSpawnCards").arraySize,
+                Is.Zero,
+                "通用地点场景不能生成 Island 的旧默认卡牌");
+            Assert.That(
+                Object.FindObjectsOfType<MonoBehaviour>(true).Any(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap"),
+                Is.False);
         }
 
         [Test]

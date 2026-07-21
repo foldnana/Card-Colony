@@ -14,4 +14,7 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/StackCraft/Scenes/Island.unity
     guid: 81fb3c4f11c280247a6a00b58c2cd78f
+  - enabled: 1
+    path: Assets/StackCraft/Scenes/Location.unity
+    guid: d25cc58a982a5eb44a45141ac82146ad
   m_configObjects: {}

@@ -583,7 +583,9 @@ MonoBehaviour:
   - definition: {fileID: 11400000, guid: ff52a1dc39756dc41bfea423da264550, type: 2}
     position: {x: 6.85, y: 0, z: -1.25}
   locationDetails:
-  - locationType: 村庄
+  - locationId: riverbend
+    localMapImplemented: 1
+    locationType: 村庄
     dangerLevel: 1
     travelTime: 当前所在地
     possibleResources:
@@ -592,7 +594,8 @@ MonoBehaviour:
     - 商店
     explorationProgress: 1
     description: 沿河建立的安静村庄，是小队整备、交易和接受委托的起点。
-  - locationType: 城镇
+  - locationId: white-stone-city
+    locationType: 城镇
     dangerLevel: 3
     travelTime: 1秒（临时）
     possibleResources:
@@ -601,7 +604,8 @@ MonoBehaviour:
     - 委托
     explorationProgress: 0.2
     description: 建在白色岩山上的城镇，防备森严，也流通着更好的装备。
-  - locationType: 遗迹
+  - locationId: old-mine
+    locationType: 遗迹
     dangerLevel: 2
     travelTime: 1秒（临时）
     possibleResources:
@@ -610,7 +614,8 @@ MonoBehaviour:
     - 未知
     explorationProgress: 0.1
     description: 废弃矿道通向更深的地下，仍能找到矿石，也可能惊动潜伏者。
-  - locationType: 森林
+  - locationId: whispering-forest
+    locationType: 森林
     dangerLevel: 2
     travelTime: 1秒（临时）
     possibleResources:
@@ -619,7 +624,8 @@ MonoBehaviour:
     - 未知
     explorationProgress: 0.35
     description: 雾气笼罩的古老森林，适合采集草药，也潜藏着未知危险。
-  - locationType: 营地设施
+  - locationId: caravan
+    locationType: 营地设施
     dangerLevel: 1
     travelTime: 1秒（临时）
     possibleResources:
@@ -627,7 +633,8 @@ MonoBehaviour:
     - 补给
     explorationProgress: 1
     description: 随队移动的马车，可用于存放物资并为接下来的旅程做准备。
-  - locationType: 禁区
+  - locationId: demon-castle
+    locationType: 禁区
     dangerLevel: 5
     travelTime: 未知
     possibleResources:

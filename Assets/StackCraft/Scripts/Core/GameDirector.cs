@@ -18,6 +18,9 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("The name of the default gameplay scene to load when starting a new game.")]
         private string defaultScene = "Main";
 
+        [SerializeField, Tooltip("The reusable scene used for local location boards.")]
+        private string locationScene = "Location";
+
         public Dictionary<string, GameData> SavedGames { get; private set; }
         public GameData GameData { get; private set; }
 
@@ -122,6 +125,33 @@ namespace CryingSnow.StackCraft
         {
             this.GameData = gameData;
             StartCoroutine(TravelSequence(gameData.CurrentScene, null));
+        }
+
+        public bool EnterLocation(string locationId, IEnumerable<CardData> partyMembers)
+        {
+            if (GameData == null || string.IsNullOrWhiteSpace(locationId))
+                return false;
+
+            GameData.ActiveLocationId = locationId;
+            GameData.PartyMembers = partyMembers != null
+                ? new List<CardData>(partyMembers)
+                : new List<CardData>();
+            SaveGame();
+            StartCoroutine(TravelSequence(locationScene, null));
+            return true;
+        }
+
+        public bool ReturnToWorldMap(IEnumerable<CardData> partyMembers)
+        {
+            if (GameData == null)
+                return false;
+
+            if (partyMembers != null)
+                GameData.PartyMembers = new List<CardData>(partyMembers);
+
+            SaveGame();
+            StartCoroutine(TravelSequence(defaultScene, null));
+            return true;
         }
 
         /// <summary>

@@ -128,7 +128,7 @@ namespace CryingSnow.StackCraft
                 return;
 
             if (worldMap.IsPartyAtLocation(SelectedLocation.Index))
-                SelectedLocation.RequestEnter();
+                worldMap.TryEnterPartyLocation(SelectedLocation.Index);
             else
                 worldMap.TryTravelPartyTo(SelectedLocation.Index);
 
@@ -151,16 +151,19 @@ namespace CryingSnow.StackCraft
             }
 
             bool isCurrentLocation = worldMap.IsPartyAtLocation(SelectedLocation.Index);
+            bool localMapImplemented = worldMap.IsLocationMapImplemented(SelectedLocation.Index);
             if (actionLabel != null)
             {
                 actionLabel.text = isCurrentLocation
-                    ? "进入地点"
+                    ? localMapImplemented
+                        ? "进入地点"
+                        : "地点地图开发中"
                     : worldMap.IsPartyTraveling
                         ? "旅行中…"
                         : "旅行到这个地点";
             }
 
-            enterLocationButton.interactable = isCurrentLocation ||
+            enterLocationButton.interactable = worldMap.CanEnterPartyLocation(SelectedLocation.Index) ||
                 worldMap.CanTravelPartyTo(SelectedLocation.Index);
         }
 

@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c7f5a4d4a14b09a7d9fd4b1fc9aa11, type: 3}
+  m_Name: Location_Riverbend
+  m_EditorClassIdentifier: 
+  id: riverbend
+  displayName: "\u6CB3\u6E7E\u6751"
+  backgroundTexture: {fileID: 2800000, guid: 6f0ddc12af2166d4baa827c45ecf9594, type: 3}
+  expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  partySpawnPosition: {x: 0, y: 0, z: -1.2}
+  partyMemberSpacing: 0.9
