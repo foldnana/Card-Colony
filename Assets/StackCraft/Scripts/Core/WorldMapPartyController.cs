@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 
 namespace CryingSnow.StackCraft
@@ -9,14 +8,37 @@ namespace CryingSnow.StackCraft
         private WorldMapBootstrap worldMap;
         private CardInstance partyCard;
         private float destinationSnapRadius;
-        private float travelSpeed;
+        private float configuredTravelDuration;
+        private int travelOriginIndex = -1;
+        private int travelDestinationIndex = -1;
+        private float travelElapsed;
+        private float activeTravelDuration;
+        private ProgressUI travelProgressUI;
 
         public int CurrentLocationIndex { get; private set; } = -1;
         public bool IsTraveling { get; private set; }
         public CardInstance PartyCard => partyCard;
+        public float TravelProgress => IsTraveling && activeTravelDuration > 0f
+            ? Mathf.Clamp01(travelElapsed / activeTravelDuration)
+            : 0f;
+        public ProgressUI TravelProgressUI => travelProgressUI;
+
+        private void Update()
+        {
+            if (IsTraveling)
+                TickTravel(Time.deltaTime);
+        }
+
+        private void OnDisable()
+        {
+            if (IsTraveling)
+                CancelTravel(returnToOrigin: true, instant: true);
+        }
 
         private void OnDestroy()
         {
+            CancelTravel(returnToOrigin: false, instant: true);
+
             if (worldMap != null && partyCard != null)
                 worldMap.DetachPartyFromLocation(partyCard);
         }
@@ -25,12 +47,12 @@ namespace CryingSnow.StackCraft
             WorldMapBootstrap map,
             CardInstance card,
             float snapRadius,
-            float speed)
+            float travelDuration)
         {
             worldMap = map;
             partyCard = card;
             destinationSnapRadius = Mathf.Max(0.1f, snapRadius);
-            travelSpeed = Mathf.Max(0.1f, speed);
+            configuredTravelDuration = Mathf.Max(0.1f, travelDuration);
 
             if (partyCard?.Stack == null || worldMap == null)
                 return;
@@ -85,7 +107,7 @@ namespace CryingSnow.StackCraft
                 return true;
             }
 
-            StartCoroutine(TravelTo(destinationIndex));
+            BeginTravel(destinationIndex);
             return true;
         }
 
@@ -97,36 +119,123 @@ namespace CryingSnow.StackCraft
             worldMap.DetachPartyFromLocation(partyCard);
         }
 
-        private IEnumerator TravelTo(int destinationIndex)
+        private void BeginTravel(int destinationIndex)
         {
+            travelOriginIndex = CurrentLocationIndex;
+            travelDestinationIndex = destinationIndex;
+            travelElapsed = 0f;
+            activeTravelDuration = worldMap.GetTravelDuration(
+                travelOriginIndex,
+                travelDestinationIndex);
+            if (activeTravelDuration <= 0f)
+                activeTravelDuration = configuredTravelDuration;
+
             IsTraveling = true;
             partyCard.Stack.IsLocked = true;
-
-            Vector3 start = worldMap.GetPartyDockPosition(CurrentLocationIndex);
-            Vector3 destination = worldMap.GetPartyDockPosition(destinationIndex);
             worldMap.DetachPartyFromLocation(partyCard);
-            partyCard.Stack.SetTargetPosition(start, instant: true);
+            worldMap.SetTravelHighlights(
+                travelOriginIndex,
+                travelDestinationIndex,
+                highlighted: true);
+
+            Vector3 stackPosition = worldMap.GetTravelStackPosition(
+                travelDestinationIndex,
+                partyCard);
+            partyCard.Stack.SetTargetPosition(stackPosition, instant: true);
+            travelProgressUI = worldMap.CreateTravelProgressUI(stackPosition);
+            travelProgressUI?.UpdateProgress(stackPosition, 0f);
+
             worldMap.NotifyPartyStateChanged(
                 this,
                 $"前往 {worldMap.GetLocationName(destinationIndex)}");
+        }
 
-            float duration = Mathf.Max(0.1f, Vector3.Distance(start, destination) / travelSpeed);
-            float elapsed = 0f;
-            while (elapsed < duration)
+        private void TickTravel(float deltaTime)
+        {
+            if (!IsTraveling)
+                return;
+
+            if (worldMap == null || partyCard?.Stack == null)
             {
-                elapsed += Time.deltaTime;
-                float progress = Mathf.Clamp01(elapsed / duration);
-                partyCard.Stack.SetTargetPosition(
-                    Vector3.Lerp(start, destination, Mathf.SmoothStep(0f, 1f, progress)),
-                    instant: true);
-                yield return null;
+                CancelTravel(returnToOrigin: false, instant: true);
+                return;
             }
 
-            CurrentLocationIndex = destinationIndex;
+            bool originAvailable = worldMap.IsRuntimeLocationAvailable(travelOriginIndex);
+            if (!originAvailable ||
+                !worldMap.IsRuntimeLocationAvailable(travelDestinationIndex))
+            {
+                CancelTravel(returnToOrigin: originAvailable, instant: true);
+                return;
+            }
+
+            travelElapsed = Mathf.Min(
+                activeTravelDuration,
+                travelElapsed + Mathf.Max(0f, deltaTime));
+
+            Vector3 stackPosition = worldMap.GetTravelStackPosition(
+                travelDestinationIndex,
+                partyCard);
+            partyCard.Stack.SetTargetPosition(stackPosition, instant: true);
+            travelProgressUI?.UpdateProgress(stackPosition, TravelProgress);
+
+            if (travelElapsed >= activeTravelDuration)
+                CompleteTravel();
+        }
+
+        private void CompleteTravel()
+        {
+            int completedDestination = travelDestinationIndex;
+            ClearTravelPresentation(instant: false);
+
+            CurrentLocationIndex = completedDestination;
             DockAt(CurrentLocationIndex, instant: true);
             partyCard.Stack.IsLocked = false;
             IsTraveling = false;
             worldMap.NotifyPartyStateChanged(this, "驻扎中");
+        }
+
+        private void CancelTravel(bool returnToOrigin, bool instant)
+        {
+            int canceledOrigin = travelOriginIndex;
+            ClearTravelPresentation(instant);
+            IsTraveling = false;
+
+            if (partyCard?.Stack != null)
+                partyCard.Stack.IsLocked = false;
+
+            if (!returnToOrigin || worldMap == null || canceledOrigin < 0)
+                return;
+
+            CurrentLocationIndex = canceledOrigin;
+            DockAt(canceledOrigin, instant: true);
+            worldMap.NotifyPartyStateChanged(this, "驻扎中");
+        }
+
+        private void ClearTravelPresentation(bool instant)
+        {
+            if (worldMap != null)
+            {
+                worldMap.SetTravelHighlights(
+                    travelOriginIndex,
+                    travelDestinationIndex,
+                    highlighted: false,
+                    instant: instant);
+                worldMap.ReleaseTravelProgressUI(travelProgressUI);
+            }
+            else if (travelProgressUI != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(travelProgressUI.gameObject);
+                else
+                    DestroyImmediate(travelProgressUI.gameObject);
+            }
+
+            travelProgressUI = null;
+            travelOriginIndex = -1;
+            travelDestinationIndex = -1;
+            travelElapsed = 0f;
+            activeTravelDuration = 0f;
         }
 
         private void ReturnToCurrentLocation(string message)

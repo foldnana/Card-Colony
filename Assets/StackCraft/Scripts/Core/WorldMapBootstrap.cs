@@ -34,7 +34,8 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Vector3 partyDockOffset = new(0f, 0.01f, -0.55f);
         [SerializeField, Range(0.5f, 1f)] private float partyDockScale = 0.78f;
         [SerializeField, Min(0.1f)] private float destinationSnapRadius = 1.25f;
-        [SerializeField, Min(0.1f)] private float partyTravelSpeed = 0.9f;
+        [SerializeField, Min(0.1f)] private float partyTravelDuration = 1f;
+        [SerializeField] private ProgressUI travelProgressUIPrefab;
 
         [Header("Legacy save cleanup")]
         [SerializeField, HideInInspector] private CardDefinition legacyTravelerDefinition;
@@ -144,7 +145,7 @@ namespace CryingSnow.StackCraft
                 this,
                 card,
                 destinationSnapRadius,
-                partyTravelSpeed);
+                partyTravelDuration);
             RefreshPartyInfo("驻扎中");
         }
 
@@ -201,6 +202,79 @@ namespace CryingSnow.StackCraft
             return location != null
                 ? location.GetPartyDockWorldPosition(partyDockOffset)
                 : GetLocationWorldPosition(locationIndex) + partyDockOffset;
+        }
+
+        public float GetTravelDuration(int originIndex, int destinationIndex)
+        {
+            return IsValidLocationIndex(originIndex) && IsValidLocationIndex(destinationIndex)
+                ? Mathf.Max(0.1f, partyTravelDuration)
+                : 0f;
+        }
+
+        public bool IsRuntimeLocationAvailable(int locationIndex)
+        {
+            if (!IsValidLocationIndex(locationIndex))
+                return false;
+
+            EnsureRuntimeLocationCapacity();
+            WorldMapLocation location = runtimeLocations[locationIndex];
+            return location != null && location.Card != null;
+        }
+
+        public Vector3 GetTravelStackPosition(int destinationIndex, CardInstance partyCard)
+        {
+            if (!IsValidLocationIndex(destinationIndex))
+                return Vector3.zero;
+
+            EnsureRuntimeLocationCapacity();
+            WorldMapLocation destination = runtimeLocations[destinationIndex];
+            Vector3 locationPosition = destination != null && destination.Card != null
+                ? destination.Card.transform.position
+                : GetLocationWorldPosition(destinationIndex);
+            Vector3 stackStep = partyCard?.Settings != null
+                ? partyCard.Settings.StackStep
+                : new Vector3(0f, 0.002f, -0.18f);
+            return locationPosition + stackStep;
+        }
+
+        public ProgressUI CreateTravelProgressUI(Vector3 stackPosition)
+        {
+            if (travelProgressUIPrefab == null)
+                return null;
+
+            ProgressUI progressUI = Instantiate(
+                travelProgressUIPrefab,
+                stackPosition + travelProgressUIPrefab.DisplayOffset,
+                Quaternion.identity);
+            progressUI.transform.SetParent(WorldCanvas.Instance?.transform);
+            progressUI.transform.localRotation = Quaternion.identity;
+            return progressUI;
+        }
+
+        public void ReleaseTravelProgressUI(ProgressUI progressUI)
+        {
+            if (progressUI == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(progressUI.gameObject);
+            else
+                DestroyImmediate(progressUI.gameObject);
+        }
+
+        public void SetTravelHighlights(
+            int originIndex,
+            int destinationIndex,
+            bool highlighted,
+            bool instant = false)
+        {
+            EnsureRuntimeLocationCapacity();
+
+            if (IsValidLocationIndex(originIndex))
+                runtimeLocations[originIndex]?.SetTravelHighlighted(highlighted, instant);
+
+            if (destinationIndex != originIndex && IsValidLocationIndex(destinationIndex))
+                runtimeLocations[destinationIndex]?.SetTravelHighlighted(highlighted, instant);
         }
 
         public void DockPartyAtLocation(int locationIndex, CardInstance partyCard, bool instant)

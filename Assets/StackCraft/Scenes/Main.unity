@@ -602,7 +602,8 @@ MonoBehaviour:
   partyDockOffset: {x: 0, y: 0.01, z: -0.55}
   partyDockScale: 0.78
   destinationSnapRadius: 1.25
-  partyTravelSpeed: 0.9
+  partyTravelDuration: 1
+  travelProgressUIPrefab: {fileID: 2569926694442495855, guid: a48d6d69a145d5147b6559846d962866, type: 3}
   legacyTravelerDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
   legacyJobDefinitions:
   - {fileID: 11400000, guid: 88758e503575176428df3a6711b91a49, type: 2}

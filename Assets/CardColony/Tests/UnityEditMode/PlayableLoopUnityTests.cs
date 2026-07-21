@@ -1446,6 +1446,216 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void WorldMapBootstrap_TravelUsesOneSecondAndOriginalProgressBarPrefab()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty duration = serialized.FindProperty("partyTravelDuration");
+            SerializedProperty progressPrefab = serialized.FindProperty("travelProgressUIPrefab");
+            Assert.That(duration, Is.Not.Null, "世界地图需要独立的地点间旅行时长配置");
+            Assert.That(duration.floatValue, Is.EqualTo(1f).Within(0.001f));
+            Assert.That(progressPrefab, Is.Not.Null);
+            Assert.That(progressPrefab.objectReferenceValue, Is.Not.Null);
+            Assert.That(
+                AssetDatabase.GetAssetPath(progressPrefab.objectReferenceValue),
+                Is.EqualTo("Assets/StackCraft/Prefabs/UI/ProgressUI.prefab"),
+                "旅行必须复用原项目堆叠制作使用的进度条 prefab");
+        }
+
+        [Test]
+        public void WorldMapLocation_TravelHighlightIsGreenAndUsesSelectedLift()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Travel Highlight Location");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                MethodInfo setTravelHighlighted = locationType.GetMethod(
+                    "SetTravelHighlighted",
+                    new[] { typeof(bool), typeof(bool) });
+                PropertyInfo isTravelHighlighted = locationType.GetProperty("IsTravelHighlighted");
+                Assert.That(setTravelHighlighted, Is.Not.Null);
+                Assert.That(isTravelHighlighted, Is.Not.Null);
+
+                Vector3 restingPosition = locationCard.transform.localPosition;
+                setTravelHighlighted.Invoke(location, new object[] { true, true });
+
+                Assert.That(isTravelHighlighted.GetValue(location), Is.True);
+                Assert.That(locationCard.transform.localPosition.y,
+                    Is.GreaterThan(restingPosition.y + 0.01f));
+                Transform highlight = locationCard.transform.Find("Highlight");
+                Assert.That(highlight, Is.Not.Null);
+                Assert.That(highlight.gameObject.activeSelf, Is.True);
+                var propertyBlock = new MaterialPropertyBlock();
+                highlight.GetComponent<Renderer>().GetPropertyBlock(propertyBlock);
+                Color color = propertyBlock.GetColor(Shader.PropertyToID("_OutlineColor"));
+                Assert.That(color.g, Is.GreaterThan(color.r));
+                Assert.That(color.g, Is.GreaterThan(color.b), "旅行中的地点必须使用绿色流动外框");
+
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                setSelected.Invoke(location, new object[] { true, true });
+                setSelected.Invoke(location, new object[] { false, true });
+                Assert.That(locationCard.transform.localPosition.y,
+                    Is.GreaterThan(restingPosition.y + 0.01f),
+                    "普通选中状态切换不能取消旅行地点的抬升和浮动效果");
+
+                setTravelHighlighted.Invoke(location, new object[] { false, true });
+                Assert.That(isTravelHighlighted.GetValue(location), Is.False);
+                Assert.That(locationCard.transform.localPosition, Is.EqualTo(restingPosition));
+            }
+            finally
+            {
+                DestroyTestCard(locationCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapPartyController_DropStacksForOneSecondThenDocksAtDestination()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locationSpawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyDefinition = serialized.FindProperty("partyDefinition");
+            SerializedProperty initialLocation = serialized.FindProperty("initialPartyLocationIndex");
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+            var locations = new List<Component>();
+            Component party = null;
+            try
+            {
+                for (int index = 0; index < locationSpawns.arraySize; index++)
+                {
+                    SerializedProperty spawn = locationSpawns.GetArrayElementAtIndex(index);
+                    Component locationCard = CreateUninitializedCard(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue,
+                        $"Travel Location {index}");
+                    SetTestCardStackPosition(
+                        locationCard,
+                        spawn.FindPropertyRelative("position").vector3Value);
+                    configure.Invoke(bootstrap, new object[] { locationCard });
+                    locations.Add(locationCard);
+                }
+
+                int originIndex = initialLocation.intValue;
+                const int destinationIndex = 1;
+                party = CreateUninitializedCard(partyDefinition.objectReferenceValue, "Traveling Party");
+                SetTestCardStackPosition(
+                    party,
+                    locationSpawns.GetArrayElementAtIndex(originIndex)
+                        .FindPropertyRelative("position").vector3Value);
+                configure.Invoke(bootstrap, new object[] { party });
+
+                Component controller = party.GetComponent("WorldMapPartyController");
+                controller.GetType().GetMethod("HandleDragStarted")
+                    .Invoke(controller, new object[] { party });
+                Vector3 destinationPosition = locationSpawns.GetArrayElementAtIndex(destinationIndex)
+                    .FindPropertyRelative("position").vector3Value;
+                bool handled = (bool)controller.GetType().GetMethod("HandleDrop")
+                    .Invoke(controller, new object[] { party, destinationPosition });
+
+                Assert.That(handled, Is.True);
+                Assert.That(controller.GetType().GetProperty("IsTraveling").GetValue(controller), Is.True);
+                Assert.That(
+                    controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
+                    Is.EqualTo(originIndex),
+                    "进度条完成前小队仍属于起始地点");
+                Assert.That(
+                    locations[originIndex].GetComponent("WorldMapLocation").GetType()
+                        .GetProperty("IsTravelHighlighted").GetValue(
+                            locations[originIndex].GetComponent("WorldMapLocation")),
+                    Is.True);
+                Assert.That(
+                    locations[destinationIndex].GetComponent("WorldMapLocation").GetType()
+                        .GetProperty("IsTravelHighlighted").GetValue(
+                            locations[destinationIndex].GetComponent("WorldMapLocation")),
+                    Is.True);
+
+                MethodInfo getTravelStackPosition = bootstrap.GetType().GetMethod("GetTravelStackPosition");
+                Assert.That(getTravelStackPosition, Is.Not.Null);
+                Vector3 expectedStackPosition = (Vector3)getTravelStackPosition.Invoke(
+                    bootstrap,
+                    new object[] { destinationIndex, party });
+                object partyStack = party.GetType().GetProperty("Stack").GetValue(party);
+                Assert.That(
+                    partyStack.GetType().GetProperty("TargetPosition").GetValue(partyStack),
+                    Is.EqualTo(expectedStackPosition),
+                    "等待期间小队卡必须使用原生 StackStep 堆在目标地点卡上");
+                Assert.That(controller.GetType().GetProperty("TravelProgressUI").GetValue(controller), Is.Not.Null);
+
+                MethodInfo tickTravel = controller.GetType().GetMethod(
+                    "TickTravel",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(tickTravel, Is.Not.Null);
+                tickTravel.Invoke(controller, new object[] { 0.5f });
+                Assert.That(
+                    (float)controller.GetType().GetProperty("TravelProgress").GetValue(controller),
+                    Is.EqualTo(0.5f).Within(0.01f));
+                tickTravel.Invoke(controller, new object[] { 0.5f });
+
+                Assert.That(controller.GetType().GetProperty("IsTraveling").GetValue(controller), Is.False);
+                Assert.That(
+                    controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
+                    Is.EqualTo(destinationIndex));
+                Component destinationLocation = locations[destinationIndex].GetComponent("WorldMapLocation");
+                Assert.That(
+                    destinationLocation.GetType().GetProperty("DockedParty").GetValue(destinationLocation),
+                    Is.SameAs(party),
+                    "进度完成后小队才真正进入目标地点人物槽");
+                Assert.That(controller.GetType().GetProperty("TravelProgressUI").GetValue(controller), Is.Null);
+
+                controller.GetType().GetMethod("HandleDragStarted")
+                    .Invoke(controller, new object[] { party });
+                Vector3 returnPosition = locationSpawns.GetArrayElementAtIndex(originIndex)
+                    .FindPropertyRelative("position").vector3Value;
+                controller.GetType().GetMethod("HandleDrop")
+                    .Invoke(controller, new object[] { party, returnPosition });
+                Assert.That(controller.GetType().GetProperty("IsTraveling").GetValue(controller), Is.True);
+
+                controller.GetType().GetMethod(
+                    "OnDisable",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(controller, null);
+
+                Assert.That(controller.GetType().GetProperty("IsTraveling").GetValue(controller), Is.False,
+                    "禁用小队控制器必须取消尚未完成的旅行");
+                Assert.That(
+                    partyStack.GetType().GetProperty("IsLocked").GetValue(partyStack),
+                    Is.False,
+                    "取消旅行后小队栈必须解锁");
+                Assert.That(controller.GetType().GetProperty("TravelProgressUI").GetValue(controller), Is.Null);
+                Assert.That(
+                    locations[originIndex].GetComponent("WorldMapLocation").GetType()
+                        .GetProperty("IsTravelHighlighted").GetValue(
+                            locations[originIndex].GetComponent("WorldMapLocation")),
+                    Is.False);
+                Assert.That(
+                    locations[destinationIndex].GetComponent("WorldMapLocation").GetType()
+                        .GetProperty("IsTravelHighlighted").GetValue(
+                            locations[destinationIndex].GetComponent("WorldMapLocation")),
+                    Is.False);
+                Assert.That(
+                    destinationLocation.GetType().GetProperty("DockedParty").GetValue(destinationLocation),
+                    Is.SameAs(party),
+                    "取消旅行时小队应回到本次旅行的起始地点人物槽");
+            }
+            finally
+            {
+                DestroyTestCard(party);
+                foreach (Component location in locations)
+                    DestroyTestCard(location);
+            }
+        }
+
+        [Test]
         public void WorldMapBootstrap_DoesNotOverlayRuntimeLinesOnTheBakedRouteMap()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);

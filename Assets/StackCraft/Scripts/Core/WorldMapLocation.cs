@@ -18,6 +18,9 @@ namespace CryingSnow.StackCraft
         [Header("Party Occupancy")]
         [SerializeField] private Color occupiedOutlineColor = new Color(0.95f, 0.72f, 0.22f, 1f);
 
+        [Header("Travel")]
+        [SerializeField] private Color travelingOutlineColor = new Color(0.22f, 0.92f, 0.38f, 1f);
+
         private WorldMapPersonSlot personSlot;
         private Tween selectionTween;
         private float restingLocalY;
@@ -30,6 +33,7 @@ namespace CryingSnow.StackCraft
         public CardInstance DockedParty => personSlot != null ? personSlot.Occupant : null;
         public WorldMapPersonSlot PersonSlot => personSlot;
         public bool IsSelected { get; private set; }
+        public bool IsTravelHighlighted { get; private set; }
 
         public void Initialize(int index, CardInstance card)
         {
@@ -55,11 +59,13 @@ namespace CryingSnow.StackCraft
 
         private void OnDisable()
         {
+            SetTravelHighlighted(false, instant: true);
             SetSelected(false, instant: true);
         }
 
         private void OnDestroy()
         {
+            SetTravelHighlighted(false, instant: true);
             SetSelected(false, instant: true);
             selectionTween?.Kill();
         }
@@ -94,7 +100,17 @@ namespace CryingSnow.StackCraft
             else
                 personSlot?.HideCards();
 
-            AnimateSelectionPose(selected, instant);
+            AnimateSelectionPose(IsSelected || IsTravelHighlighted, instant);
+        }
+
+        public void SetTravelHighlighted(bool highlighted, bool instant = false)
+        {
+            if (IsTravelHighlighted == highlighted)
+                return;
+
+            IsTravelHighlighted = highlighted;
+            RefreshLocationOutline();
+            AnimateSelectionPose(IsSelected || IsTravelHighlighted, instant);
         }
 
         public Vector3 GetPartyDockWorldPosition(Vector3 localDockPosition)
@@ -174,7 +190,7 @@ namespace CryingSnow.StackCraft
             {
                 selectionTween.OnComplete(() =>
                 {
-                    if (IsSelected)
+                    if (IsSelected || IsTravelHighlighted)
                         StartSelectionBob(targetY);
                 });
             }
@@ -195,7 +211,7 @@ namespace CryingSnow.StackCraft
             if (Card == null)
                 return;
 
-            bool shouldShowOutline = IsSelected || DockedParty != null;
+            bool shouldShowOutline = IsTravelHighlighted || IsSelected || DockedParty != null;
             if (!shouldShowOutline)
             {
                 if (locationOutlineActive)
@@ -205,7 +221,9 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            if (IsSelected)
+            if (IsTravelHighlighted)
+                Card.SetHighlighted(true, travelingOutlineColor);
+            else if (IsSelected)
                 Card.SetHighlighted(true);
             else
                 Card.SetHighlighted(true, occupiedOutlineColor);

@@ -15,9 +15,14 @@ namespace CryingSnow.StackCraft
 
         public void UpdateUI(CraftingTask task)
         {
-            transform.position = task.TargetStack.TargetPosition + displayOffset;
             float normalizedProgress = task.Progress / task.Recipe.CraftingDuration;
-            progressFill.fillAmount = normalizedProgress;
+            UpdateProgress(task.TargetStack.TargetPosition, normalizedProgress);
+        }
+
+        public void UpdateProgress(Vector3 targetPosition, float normalizedProgress)
+        {
+            transform.position = targetPosition + displayOffset;
+            progressFill.fillAmount = Mathf.Clamp01(normalizedProgress);
         }
     }
 }
