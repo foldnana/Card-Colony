@@ -407,6 +407,684 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void OriginalUiRoot_HasFixedWorldMapLocationSidebarWithoutRouteButton()
+        {
+            GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(uiRoot, Is.Not.Null);
+
+            Transform locationToggle = FindDescendant(uiRoot, "LocationToggle");
+            Transform locationView = FindDescendant(uiRoot, "LocationView");
+            Transform enterButton = FindDescendant(uiRoot, "EnterLocationButton");
+            Assert.That(locationToggle, Is.Not.Null, "原生右侧栏需要新增地点页签");
+            Assert.That(locationView, Is.Not.Null, "地点详情必须作为原生右侧栏中的固定页面");
+            Assert.That(enterButton, Is.Not.Null);
+            Assert.That(FindDescendant(uiRoot, "LocationExploration"), Is.Null,
+                "当前地点栏不应显示探索进度文字");
+            Assert.That(FindDescendant(uiRoot, "LocationExplorationBar"), Is.Null,
+                "当前地点栏不应显示探索进度条");
+            Assert.That(FindDescendant(uiRoot, "ViewRouteButton"), Is.Null,
+                "当前版本不应显示查看路线按钮");
+            Assert.That(
+                locationToggle.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                Is.EqualTo("地点"));
+            Assert.That(
+                enterButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                Is.EqualTo("进入地点"));
+            Assert.That(
+                locationView.GetComponents<MonoBehaviour>()
+                    .Any(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView"),
+                Is.True,
+                "地点页需要由 WorldMapLocationView 绑定选中的原生地点卡");
+        }
+
+        [Test]
+        public void OriginalUiRoot_HasFixedWorldMapPartyStatusPanelWithoutBackpack()
+        {
+            GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(uiRoot, Is.Not.Null);
+
+            Transform panel = FindDescendant(uiRoot, "WorldMapPartyStatusPanel");
+            Assert.That(panel, Is.Not.Null, "世界地图左下角需要固定的小队状态栏");
+            Assert.That(
+                panel.GetComponents<MonoBehaviour>().Any(component =>
+                    component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapPartyStatusView"),
+                Is.True);
+            Assert.That(FindDescendant(panel.gameObject, "PartyPortrait"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyName"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyHealthText"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyHealthBar"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyLocationText"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyMembersText"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyStateText"), Is.Not.Null);
+            Assert.That(
+                panel.GetComponentsInChildren<Transform>(true).Any(child =>
+                    child.name.IndexOf("Backpack", System.StringComparison.OrdinalIgnoreCase) >= 0),
+                Is.False,
+                "本阶段的小队状态栏不显示背包");
+
+            RectTransform rect = panel.GetComponent<RectTransform>();
+            Assert.That(rect.anchorMin, Is.EqualTo(Vector2.zero));
+            Assert.That(rect.anchorMax, Is.EqualTo(Vector2.zero));
+            Assert.That(rect.pivot, Is.EqualTo(Vector2.zero));
+            Assert.That(rect.sizeDelta.x, Is.GreaterThanOrEqualTo(400f));
+            Assert.That(rect.sizeDelta.y, Is.GreaterThanOrEqualTo(300f));
+        }
+
+        [Test]
+        public void WorldMapPartyStatusView_ShowsPartyWhileGenericInfoPanelIsSuppressed()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component card = null;
+            ScriptableObject definition = null;
+            Component statusView = null;
+            Component infoPanel = null;
+            try
+            {
+                Transform panel = FindDescendant(uiInstance, "WorldMapPartyStatusPanel");
+                Assert.That(panel, Is.Not.Null);
+                statusView = panel.GetComponents<MonoBehaviour>().First(component =>
+                    component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapPartyStatusView");
+                infoPanel = FindDescendant(uiInstance, "InfoPanel")
+                    .GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.InfoPanel");
+                statusView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(statusView, null);
+                infoPanel.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(infoPanel, null);
+
+                MethodInfo suppress = infoPanel.GetType().GetMethod("SetWorldMapSuppressed");
+                Assert.That(suppress, Is.Not.Null);
+                suppress.Invoke(infoPanel, new object[] { true });
+
+                System.Type definitionType = FindType("CryingSnow.StackCraft.CardDefinition");
+                definition = ScriptableObject.CreateInstance(definitionType);
+                definitionType.GetMethod("SetDisplayName")
+                    .Invoke(definition, new object[] { "旅行小队" });
+                var serializedDefinition = new SerializedObject(definition);
+                serializedDefinition.FindProperty("maxHealth").intValue = 15;
+                serializedDefinition.ApplyModifiedPropertiesWithoutUndo();
+                card = CreateUninitializedCard(definition, "Fixed Party Status Card");
+                card.GetType().GetField(
+                    "<Stats>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(card, definitionType.GetMethod("CreateCombatStats").Invoke(definition, null));
+                card.GetType().GetField(
+                    "<CurrentHealth>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(card, 12);
+
+                MethodInfo showParty = statusView.GetType().GetMethod("ShowParty");
+                Assert.That(showParty, Is.Not.Null);
+                showParty.Invoke(statusView, new object[] { card, "河湾村", "驻扎中", 1 });
+
+                Assert.That(
+                    FindDescendant(uiInstance, "InfoPanel").GetComponent<CanvasGroup>().alpha,
+                    Is.EqualTo(0f));
+                Assert.That(panel.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyName").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("旅行小队"));
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyHealthText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("12/15"));
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyLocationText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("河湾村"));
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyMembersText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("1"));
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyStateText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("驻扎中"));
+
+                card.GetType().GetField(
+                    "<CurrentHealth>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(card, 7);
+                MethodInfo lateUpdate = statusView.GetType().GetMethod(
+                    "LateUpdate",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(lateUpdate, Is.Not.Null,
+                    "固定状态栏需要持续反映小队的实时生命变化");
+                lateUpdate.Invoke(statusView, null);
+                Assert.That(
+                    FindDescendant(panel.gameObject, "PartyHealthText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("7/15"));
+            }
+            finally
+            {
+                statusView?.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(statusView, null);
+                if (card != null)
+                    DestroyTestCard(card);
+                if (definition != null)
+                    Object.DestroyImmediate(definition);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void WorldMapPartyStatusView_UsesTravelingLocationWhilePartyIsMoving()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component card = null;
+            ScriptableObject definition = null;
+            Component statusView = null;
+            try
+            {
+                statusView = FindDescendant(uiInstance, "WorldMapPartyStatusPanel")
+                    .GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapPartyStatusView");
+                statusView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(statusView, null);
+
+                System.Type definitionType = FindType("CryingSnow.StackCraft.CardDefinition");
+                System.Type controllerType = FindType("CryingSnow.StackCraft.WorldMapPartyController");
+                definition = ScriptableObject.CreateInstance(definitionType);
+                definitionType.GetMethod("SetDisplayName")
+                    .Invoke(definition, new object[] { "旅行小队" });
+                card = CreateUninitializedCard(definition, "Traveling Status Party");
+                Component controller = card.gameObject.AddComponent(controllerType);
+                controllerType.GetField(
+                    "partyCard",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(controller, card);
+                controllerType.GetField(
+                    "<CurrentLocationIndex>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(controller, 0);
+                controllerType.GetField(
+                    "<IsTraveling>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(controller, true);
+                bootstrap.GetType().GetField(
+                    "partyController",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(bootstrap, controller);
+
+                bootstrap.GetType().GetMethod(
+                    "RefreshPartyInfo",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(bootstrap, new object[] { "前往 低语森林" });
+
+                Assert.That(
+                    FindDescendant(uiInstance, "PartyLocationText").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("旅途中"),
+                    "小队移动期间不能继续显示为驻扎在出发地点");
+            }
+            finally
+            {
+                statusView?.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(statusView, null);
+                if (card != null)
+                    DestroyTestCard(card);
+                if (definition != null)
+                    Object.DestroyImmediate(definition);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_SwapsGenericInfoForFixedPartyStatusDuringItsLifecycle()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component statusView = FindDescendant(uiInstance, "WorldMapPartyStatusPanel")
+                .GetComponents<MonoBehaviour>()
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapPartyStatusView");
+            Component infoPanel = FindDescendant(uiInstance, "InfoPanel")
+                .GetComponents<MonoBehaviour>()
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.InfoPanel");
+            try
+            {
+                MethodInfo statusAwake = statusView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo infoAwake = infoPanel.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(statusAwake, Is.Not.Null);
+                Assert.That(infoAwake, Is.Not.Null);
+                statusAwake.Invoke(statusView, null);
+                infoAwake.Invoke(infoPanel, null);
+
+                bootstrap.GetType().GetField(
+                    "worldMapTexture",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(bootstrap, null);
+                MethodInfo start = bootstrap.GetType().GetMethod(
+                    "Start",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                MethodInfo destroy = bootstrap.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(start, Is.Not.Null);
+                Assert.That(destroy, Is.Not.Null);
+
+                start.Invoke(bootstrap, null);
+                CanvasGroup infoVisibility = FindDescendant(uiInstance, "InfoPanel")
+                    .GetComponent<CanvasGroup>();
+                Assert.That(
+                    (bool)infoPanel.GetType().GetProperty("IsWorldMapSuppressed").GetValue(infoPanel),
+                    Is.True);
+                Assert.That(infoVisibility.alpha, Is.EqualTo(0f));
+                Assert.That(infoVisibility.interactable, Is.False);
+                Assert.That(infoVisibility.blocksRaycasts, Is.False);
+
+                destroy.Invoke(bootstrap, null);
+                Assert.That(
+                    (bool)infoPanel.GetType().GetProperty("IsWorldMapSuppressed").GetValue(infoPanel),
+                    Is.False);
+                Assert.That(infoVisibility.alpha, Is.EqualTo(1f));
+                Assert.That(infoVisibility.interactable, Is.True);
+                Assert.That(infoVisibility.blocksRaycasts, Is.True);
+                Assert.That(
+                    FindDescendant(uiInstance, "WorldMapPartyStatusPanel")
+                        .GetComponent<CanvasGroup>().alpha,
+                    Is.EqualTo(0f));
+            }
+            finally
+            {
+                statusView.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(statusView, null);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_SelectionPublishesSidebarSelectionChanges()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            EventInfo selectionChanged = locationType.GetEvent("SelectionChanged");
+            Assert.That(selectionChanged, Is.Not.Null,
+                "右侧固定栏需要订阅地点选择事件，而不是每帧查找场景对象");
+
+            Component card = CreateUninitializedCard(null, "Sidebar Selection Location");
+            Component location = card.gameObject.AddComponent(locationType);
+            object lastSelection = new object();
+            System.Action<Component> handler = selected => lastSelection = selected;
+            System.Delegate runtimeHandler = System.Delegate.CreateDelegate(
+                selectionChanged.EventHandlerType,
+                handler.Target,
+                handler.Method);
+            selectionChanged.AddEventHandler(null, runtimeHandler);
+            try
+            {
+                locationType.GetMethod(
+                    "Initialize",
+                    new[] { typeof(int), card.GetType() })
+                    .Invoke(location, new object[] { 0, card });
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(location, new object[] { true, true });
+                Assert.That(lastSelection, Is.SameAs(location));
+
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(location, new object[] { false, true });
+                Assert.That(lastSelection, Is.Null);
+            }
+            finally
+            {
+                selectionChanged.RemoveEventHandler(null, runtimeHandler);
+                DestroyTestCard(card);
+            }
+        }
+
+        [Test]
+        public void OriginalUiRoot_LocationSidebarStartsUnavailableWithoutASelection()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component locationView = FindDescendant(uiInstance, "LocationView")
+                .GetComponents<MonoBehaviour>()
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapLocationView");
+            try
+            {
+                locationView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationToggle").GetComponent<Toggle>().interactable,
+                    Is.False,
+                    "未选择地点时不能打开带占位数据的地点页");
+                Assert.That(
+                    FindDescendant(uiInstance, "EnterLocationButton").GetComponent<Button>().interactable,
+                    Is.False,
+                    "地点内部玩法接入前，进入地点按钮不能表现为可用按钮");
+            }
+            finally
+            {
+                locationView.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_ReplacingSelectionPublishesOnlyTheNewLocation()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            EventInfo selectionChanged = locationType.GetEvent("SelectionChanged");
+            Component firstCard = CreateUninitializedCard(null, "First Sidebar Location");
+            Component secondCard = CreateUninitializedCard(null, "Second Sidebar Location");
+            Component firstLocation = firstCard.gameObject.AddComponent(locationType);
+            Component secondLocation = secondCard.gameObject.AddComponent(locationType);
+            var publishedSelections = new List<Component>();
+            System.Action<Component> handler = selected => publishedSelections.Add(selected);
+            System.Delegate runtimeHandler = System.Delegate.CreateDelegate(
+                selectionChanged.EventHandlerType,
+                handler.Target,
+                handler.Method);
+            selectionChanged.AddEventHandler(null, runtimeHandler);
+            try
+            {
+                locationType.GetMethod("Initialize")
+                    .Invoke(firstLocation, new object[] { 0, firstCard });
+                locationType.GetMethod("Initialize")
+                    .Invoke(secondLocation, new object[] { 1, secondCard });
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(firstLocation, new object[] { true, true });
+                publishedSelections.Clear();
+
+                locationType.GetMethod("NotifyCardClicked", BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { secondCard });
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(secondLocation, new object[] { true, true });
+
+                Assert.That(publishedSelections, Is.EqualTo(new[] { secondLocation }),
+                    "地点切换应是原子的，不能在 A 到 B 之间广播空选择");
+            }
+            finally
+            {
+                selectionChanged.RemoveEventHandler(null, runtimeHandler);
+                DestroyTestCard(firstCard);
+                DestroyTestCard(secondCard);
+            }
+        }
+
+        [Test]
+        public void OriginalUiRoot_SelectedLocationAutomaticallyOpensAndPopulatesLocationView()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component card = null;
+            ScriptableObject definition = null;
+            try
+            {
+                Component locationView = FindDescendant(uiInstance, "LocationView")
+                    .GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView");
+                locationView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+
+                System.Type cardDefinitionType = FindType("CryingSnow.StackCraft.CardDefinition");
+                System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+                System.Type detailsType = FindType("CryingSnow.StackCraft.WorldMapLocationDetails");
+                definition = ScriptableObject.CreateInstance(cardDefinitionType);
+                cardDefinitionType.GetMethod("SetDisplayName")
+                    .Invoke(definition, new object[] { "测试森林" });
+                cardDefinitionType.GetMethod("SetDescription")
+                    .Invoke(definition, new object[] { "用于验证右侧地点栏。" });
+                card = CreateUninitializedCard(definition, "Sidebar Bound Location");
+                Component location = card.gameObject.AddComponent(locationType);
+                object details = System.Activator.CreateInstance(detailsType);
+                detailsType.GetField("locationType").SetValue(details, "森林");
+                detailsType.GetField("dangerLevel").SetValue(details, 2);
+                detailsType.GetField("travelTime").SetValue(details, "1秒（临时）");
+                detailsType.GetField("possibleResources").SetValue(
+                    details,
+                    new List<string> { "草药", "木材" });
+                detailsType.GetField("explorationProgress").SetValue(details, 0.35f);
+                detailsType.GetField("description").SetValue(details, "用于验证右侧地点栏。");
+                locationType.GetMethod(
+                    "InitializeWithDetails",
+                    new[] { typeof(int), card.GetType(), detailsType })
+                    .Invoke(location, new[] { (object)0, card, details });
+
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(location, new object[] { true, true });
+
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationToggle").GetComponent<Toggle>().isOn,
+                    Is.True);
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationTitle").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("测试森林"));
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationResources").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("草药"));
+                Assert.That(
+                    FindDescendant(uiInstance, "EnterLocationButton").GetComponent<Button>().interactable,
+                    Is.False,
+                    "地点内部玩法尚未接入时不能提供没有反馈的假按钮");
+
+                detailsType.GetField("possibleResources").SetValue(details, null);
+                locationView.GetType().GetMethod("ShowLocation")
+                    .Invoke(locationView, new[] { location });
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationResources").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("可能资源\n"),
+                    "异常或旧数据中的空资源列表不能让地点栏崩溃");
+
+                locationType.GetMethod("SetSelected", new[] { typeof(bool), typeof(bool) })
+                    .Invoke(location, new object[] { false, true });
+                Assert.That(
+                    FindDescendant(uiInstance, "QuestsToggle").GetComponent<Toggle>().isOn,
+                    Is.True,
+                    "取消地点选择后应回到任务页");
+            }
+            finally
+            {
+                DestroyTestCard(card);
+                if (definition != null)
+                    Object.DestroyImmediate(definition);
+                Component locationView = FindDescendant(uiInstance, "LocationView")
+                    ?.GetComponents<MonoBehaviour>()
+                    .FirstOrDefault(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView");
+                locationView?.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void OriginalUiRoot_LocationActionShowsEnterAtCurrentLocationAndTravelsToAnother()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            bootstrap.GetType().GetMethod(
+                "Awake",
+                BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(bootstrap, null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locationSpawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyDefinition = serialized.FindProperty("partyDefinition");
+            int originIndex = serialized.FindProperty("initialPartyLocationIndex").intValue;
+            int destinationIndex = Enumerable.Range(0, locationSpawns.arraySize)
+                .First(index => index != originIndex && (bool)bootstrap.GetType()
+                    .GetMethod("AreLocationsConnected")
+                    .Invoke(bootstrap, new object[] { originIndex, index }));
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+
+            GameObject uiInstance = null;
+            Component party = null;
+            var locations = new List<Component>();
+            try
+            {
+                for (int index = 0; index < locationSpawns.arraySize; index++)
+                {
+                    SerializedProperty spawn = locationSpawns.GetArrayElementAtIndex(index);
+                    Component locationCard = CreateUninitializedCard(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue,
+                        $"Action Location {index}");
+                    SetTestCardStackPosition(
+                        locationCard,
+                        spawn.FindPropertyRelative("position").vector3Value);
+                    configure.Invoke(bootstrap, new object[] { locationCard });
+                    locations.Add(locationCard);
+                }
+
+                party = CreateUninitializedCard(partyDefinition.objectReferenceValue, "Action Party");
+                SetTestCardStackPosition(
+                    party,
+                    locationSpawns.GetArrayElementAtIndex(originIndex)
+                        .FindPropertyRelative("position").vector3Value);
+                configure.Invoke(bootstrap, new object[] { party });
+
+                GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                    "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+                uiInstance = Object.Instantiate(prefab);
+                Component locationView = FindDescendant(uiInstance, "LocationView")
+                    .GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView");
+                locationView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+
+                Component origin = locations[originIndex].GetComponent("WorldMapLocation");
+                locationView.GetType().GetMethod("ShowLocation")
+                    .Invoke(locationView, new[] { origin });
+                Button actionButton = FindDescendant(uiInstance, "EnterLocationButton")
+                    .GetComponent<Button>();
+                Assert.That(actionButton.interactable, Is.True);
+                Assert.That(
+                    actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("进入地点"));
+
+                Component destination = locations[destinationIndex].GetComponent("WorldMapLocation");
+                locationView.GetType().GetMethod("ShowLocation")
+                    .Invoke(locationView, new[] { destination });
+                Assert.That(actionButton.interactable, Is.True);
+                Assert.That(
+                    actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("旅行到这个地点"));
+
+                actionButton.onClick.Invoke();
+
+                Component controller = party.GetComponent("WorldMapPartyController");
+                Assert.That(
+                    controller.GetType().GetProperty("IsTraveling").GetValue(controller),
+                    Is.True,
+                    "点击地点栏的旅行按钮必须启动现有的小队堆叠旅行流程");
+                Assert.That(
+                    destination.GetType().GetProperty("IsTravelHighlighted").GetValue(destination),
+                    Is.True);
+                Assert.That(actionButton.interactable, Is.False);
+                Assert.That(
+                    actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("旅行中…"));
+
+                controller.GetType().GetMethod(
+                    "TickTravel",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(controller, new object[] { 1f });
+
+                Assert.That(
+                    controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
+                    Is.EqualTo(destinationIndex));
+                Assert.That(actionButton.interactable, Is.True);
+                Assert.That(
+                    actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("进入地点"),
+                    "抵达当前选中的地点后，右侧操作应自动从旅行恢复为进入地点");
+            }
+            finally
+            {
+                if (uiInstance != null)
+                {
+                    Component locationView = FindDescendant(uiInstance, "LocationView")
+                        ?.GetComponents<MonoBehaviour>()
+                        .FirstOrDefault(component => component.GetType().FullName ==
+                            "CryingSnow.StackCraft.WorldMapLocationView");
+                    locationView?.GetType().GetMethod(
+                        "OnDestroy",
+                        BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+                    Object.DestroyImmediate(uiInstance);
+                }
+
+                DestroyTestCard(party);
+                foreach (Component location in locations)
+                    DestroyTestCard(location);
+            }
+        }
+
+        [Test]
+        public void MainScene_ConfiguresSidebarDetailsForEveryWorldMapLocation()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty spawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty details = serialized.FindProperty("locationDetails");
+            Assert.That(details, Is.Not.Null);
+            Assert.That(details.arraySize, Is.EqualTo(spawns.arraySize));
+
+            bool includesHerbs = false;
+            for (int index = 0; index < details.arraySize; index++)
+            {
+                SerializedProperty entry = details.GetArrayElementAtIndex(index);
+                Assert.That(entry.FindPropertyRelative("locationType").stringValue, Is.Not.Empty);
+                Assert.That(entry.FindPropertyRelative("dangerLevel").intValue, Is.GreaterThanOrEqualTo(1));
+                Assert.That(entry.FindPropertyRelative("travelTime").stringValue, Is.Not.Empty);
+                Assert.That(entry.FindPropertyRelative("description").stringValue, Is.Not.Empty);
+                SerializedProperty resources = entry.FindPropertyRelative("possibleResources");
+                Assert.That(resources.arraySize, Is.GreaterThan(0));
+                for (int resourceIndex = 0; resourceIndex < resources.arraySize; resourceIndex++)
+                {
+                    includesHerbs |= resources.GetArrayElementAtIndex(resourceIndex)
+                        .stringValue.Contains("草药");
+                }
+            }
+
+            Assert.That(includesHerbs, Is.True, "低语森林地点详情需要显示草药资源线索");
+        }
+
+        [Test]
         public void MainScene_WorldMapBackgroundSharesTheNativeCardPlane()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);

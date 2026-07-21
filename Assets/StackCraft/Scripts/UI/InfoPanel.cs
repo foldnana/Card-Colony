@@ -35,6 +35,9 @@ namespace CryingSnow.StackCraft
         private RectTransform panelRect;
         private RectTransform textRect;
         private RectTransform actionButtonRect;
+        private CanvasGroup visibilityGroup;
+
+        public bool IsWorldMapSuppressed { get; private set; }
 
         private static int s_requestCounter = 0;
 
@@ -60,8 +63,24 @@ namespace CryingSnow.StackCraft
             }
             Instance = this;
 
+            visibilityGroup = GetComponent<CanvasGroup>();
+            if (visibilityGroup == null)
+                visibilityGroup = gameObject.AddComponent<CanvasGroup>();
             ConfigureLayout();
             RefreshInfo();
+            ApplyVisibility();
+        }
+
+        private void OnDestroy()
+        {
+            if (Instance == this)
+                Instance = null;
+        }
+
+        public void SetWorldMapSuppressed(bool suppressed)
+        {
+            IsWorldMapSuppressed = suppressed;
+            ApplyVisibility();
         }
 
         /// <summary>
@@ -236,6 +255,18 @@ namespace CryingSnow.StackCraft
                 bodySize,
                 onClick: () => action?.Invoke()
             );
+        }
+
+        private void ApplyVisibility()
+        {
+            if (visibilityGroup == null)
+                visibilityGroup = GetComponent<CanvasGroup>();
+            if (visibilityGroup == null)
+                return;
+
+            visibilityGroup.alpha = IsWorldMapSuppressed ? 0f : 1f;
+            visibilityGroup.interactable = !IsWorldMapSuppressed;
+            visibilityGroup.blocksRaycasts = !IsWorldMapSuppressed;
         }
     }
 }

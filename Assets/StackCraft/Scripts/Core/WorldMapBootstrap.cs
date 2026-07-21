@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -10,6 +11,9 @@ namespace CryingSnow.StackCraft
     /// </summary>
     public sealed class WorldMapBootstrap : MonoBehaviour
     {
+        public static WorldMapBootstrap Instance { get; private set; }
+        public static event Action PartyMapStateChanged;
+
         [System.Serializable]
         public struct WorldMapCardSpawn
         {
@@ -26,6 +30,7 @@ namespace CryingSnow.StackCraft
 
         [Header("World locations")]
         [SerializeField] private List<WorldMapCardSpawn> locationSpawns = new();
+        [SerializeField] private List<WorldMapLocationDetails> locationDetails = new();
         [SerializeField] private List<WorldMapRoute> routes = new();
 
         [Header("Party")]
@@ -54,6 +59,7 @@ namespace CryingSnow.StackCraft
 
         private void Awake()
         {
+            Instance = this;
             cardManager = GetComponent<CardManager>();
             runtimeLocations = new WorldMapLocation[locationSpawns.Count];
 
@@ -66,6 +72,8 @@ namespace CryingSnow.StackCraft
 
         private void Start()
         {
+            InfoPanel.Instance?.SetWorldMapSuppressed(true);
+            WorldMapPartyStatusView.Instance?.Hide();
             ApplyWorldMapBackground();
             ConfigureExistingCards();
             RemoveLegacyJobCards();
@@ -80,7 +88,11 @@ namespace CryingSnow.StackCraft
                 cardManager.OnStatsChanged -= HandleStatsChanged;
             }
 
-            InfoPanel.Instance?.ClearInfoRequest(this);
+            InfoPanel.Instance?.SetWorldMapSuppressed(false);
+            WorldMapPartyStatusView.Instance?.Hide();
+
+            if (Instance == this)
+                Instance = null;
 
             if (mapMaterial != null)
                 Destroy(mapMaterial);
@@ -121,7 +133,7 @@ namespace CryingSnow.StackCraft
                 if (location == null)
                     location = card.gameObject.AddComponent<WorldMapLocation>();
 
-                location.Initialize(index, card);
+                location.InitializeWithDetails(index, card, GetLocationDetails(index));
                 EnsureRuntimeLocationCapacity();
                 runtimeLocations[index] = location;
 
@@ -157,6 +169,45 @@ namespace CryingSnow.StackCraft
             return routes.Any(route =>
                 (route.fromLocationIndex == firstIndex && route.toLocationIndex == secondIndex) ||
                 (route.fromLocationIndex == secondIndex && route.toLocationIndex == firstIndex));
+        }
+
+        public bool IsPartyAtLocation(int locationIndex)
+        {
+            return partyController != null &&
+                !partyController.IsTraveling &&
+                partyController.CurrentLocationIndex == locationIndex;
+        }
+
+        public bool CanTravelPartyTo(int locationIndex)
+        {
+            return partyController != null &&
+                !partyController.IsTraveling &&
+                partyController.CurrentLocationIndex >= 0 &&
+                partyController.CurrentLocationIndex != locationIndex &&
+                AreLocationsConnected(partyController.CurrentLocationIndex, locationIndex) &&
+                IsRuntimeLocationAvailable(locationIndex);
+        }
+
+        public bool TryTravelPartyTo(int locationIndex)
+        {
+            return CanTravelPartyTo(locationIndex) &&
+                partyController.TryTravelToLocation(locationIndex);
+        }
+
+        public bool IsPartyTraveling => partyController != null && partyController.IsTraveling;
+
+        public WorldMapLocationDetails GetLocationDetails(int locationIndex)
+        {
+            if (locationIndex >= 0 && locationIndex < locationDetails.Count &&
+                locationDetails[locationIndex] != null)
+            {
+                return locationDetails[locationIndex];
+            }
+
+            CardDefinition definition = IsValidLocationIndex(locationIndex)
+                ? locationSpawns[locationIndex].definition
+                : null;
+            return WorldMapLocationDetails.CreateFallback(definition);
         }
 
         public int FindNearestLocationIndex(Vector3 worldPosition, float maxDistance)
@@ -319,6 +370,7 @@ namespace CryingSnow.StackCraft
                 return;
 
             RefreshPartyInfo(status);
+            PartyMapStateChanged?.Invoke();
         }
 
         private bool IsValidLocationIndex(int index)
@@ -364,25 +416,20 @@ namespace CryingSnow.StackCraft
 
         private void RefreshPartyInfo(string status)
         {
-            if (InfoPanel.Instance == null || partyController == null || partyController.PartyCard == null)
+            if (partyController == null || partyController.PartyCard == null)
                 return;
 
             CardInstance partyCard = partyController.PartyCard;
-            int maxHealth = partyCard.Stats != null ? partyCard.Stats.MaxHealth.Value : partyCard.CurrentHealth;
-            string locationName = partyController.CurrentLocationIndex >= 0
-                ? GetLocationName(partyController.CurrentLocationIndex)
-                : "旅途中";
-            string body =
-                $"所在地点：{locationName}\n" +
-                "成员：1 人\n" +
-                $"生命：{partyCard.CurrentHealth}/{maxHealth}\n" +
-                $"状态：{status}\n\n" +
-                "将小队拖到相邻地点卡上开始旅行";
-
-            InfoPanel.Instance.RequestInfoDisplay(
-                this,
-                InfoPriority.Hover,
-                ("小队", body));
+            string locationName = partyController.IsTraveling
+                ? "旅途中"
+                : partyController.CurrentLocationIndex >= 0
+                    ? GetLocationName(partyController.CurrentLocationIndex)
+                    : "未知";
+            WorldMapPartyStatusView.Instance?.ShowParty(
+                partyCard,
+                locationName,
+                status,
+                memberCount: 1);
         }
 
         private void ApplyWorldMapBackground()

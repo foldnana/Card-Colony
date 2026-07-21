@@ -1,13 +1,37 @@
+using System;
+using System.Collections.Generic;
 using DG.Tweening;
 using UnityEngine;
 using UnityEngine.EventSystems;
 
 namespace CryingSnow.StackCraft
 {
+    [Serializable]
+    public sealed class WorldMapLocationDetails
+    {
+        public string locationType = "地点";
+        [Min(1)] public int dangerLevel = 1;
+        public string travelTime = "1秒（临时）";
+        public List<string> possibleResources = new() { "未知" };
+        [Range(0f, 1f)] public float explorationProgress;
+        [TextArea] public string description;
+
+        public static WorldMapLocationDetails CreateFallback(CardDefinition definition)
+        {
+            return new WorldMapLocationDetails
+            {
+                description = definition != null ? definition.Description : "尚未记录这个地点的信息。"
+            };
+        }
+    }
+
     [DisallowMultipleComponent]
     public sealed class WorldMapLocation : MonoBehaviour, IPointerClickHandler
     {
         private static WorldMapLocation activeSelection;
+
+        public static event Action<WorldMapLocation> SelectionChanged;
+        public static WorldMapLocation ActiveSelection => activeSelection;
 
         [Header("Selection")]
         [SerializeField, Min(0f)] private float selectionLiftHeight = 0.07f;
@@ -34,11 +58,21 @@ namespace CryingSnow.StackCraft
         public WorldMapPersonSlot PersonSlot => personSlot;
         public bool IsSelected { get; private set; }
         public bool IsTravelHighlighted { get; private set; }
+        public WorldMapLocationDetails Details { get; private set; }
 
         public void Initialize(int index, CardInstance card)
         {
+            InitializeWithDetails(index, card, null);
+        }
+
+        public void InitializeWithDetails(
+            int index,
+            CardInstance card,
+            WorldMapLocationDetails details)
+        {
             Index = index;
             Card = card;
+            Details = details ?? WorldMapLocationDetails.CreateFallback(card?.Definition);
 
             if (!hasRestingPose)
             {
@@ -83,8 +117,14 @@ namespace CryingSnow.StackCraft
 
         public void SetSelected(bool selected, bool instant = false)
         {
+            SetSelectedInternal(selected, instant, notifySelectionChanged: true);
+        }
+
+        private void SetSelectedInternal(bool selected, bool instant, bool notifySelectionChanged)
+        {
+            bool selectionChanged = IsSelected != selected;
             if (selected && activeSelection != null && activeSelection != this)
-                activeSelection.SetSelected(false, instant);
+                activeSelection.SetSelectedInternal(false, instant, notifySelectionChanged: false);
 
             IsSelected = selected;
             if (selected)
@@ -101,6 +141,9 @@ namespace CryingSnow.StackCraft
                 personSlot?.HideCards();
 
             AnimateSelectionPose(IsSelected || IsTravelHighlighted, instant);
+
+            if (notifySelectionChanged && selectionChanged)
+                SelectionChanged?.Invoke(selected ? this : null);
         }
 
         public void SetTravelHighlighted(bool highlighted, bool instant = false)
@@ -162,6 +205,12 @@ namespace CryingSnow.StackCraft
         {
             if (DockedParty != null)
                 DetachParty(DockedParty);
+        }
+
+        public void RequestEnter()
+        {
+            SetSelected(true, instant: false);
+            personSlot?.ShowCards();
         }
 
         private void AnimateSelectionPose(bool selected, bool instant)
@@ -253,6 +302,11 @@ namespace CryingSnow.StackCraft
                 return;
 
             if (clickedCard == activeSelection.Card)
+                return;
+
+            // Another location finishes the selection swap in its click handler.
+            // Cancelling here would publish a transient null selection first.
+            if (clickedCard.GetComponent<WorldMapLocation>() != null)
                 return;
 
             activeSelection.SetSelected(false, instant: false);

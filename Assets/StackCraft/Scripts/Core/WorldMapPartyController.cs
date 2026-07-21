@@ -111,6 +111,24 @@ namespace CryingSnow.StackCraft
             return true;
         }
 
+        public bool TryTravelToLocation(int destinationIndex)
+        {
+            if (worldMap == null || partyCard?.Stack == null || IsTraveling)
+                return false;
+
+            if (CurrentLocationIndex < 0 || destinationIndex == CurrentLocationIndex)
+                return false;
+
+            if (!worldMap.AreLocationsConnected(CurrentLocationIndex, destinationIndex) ||
+                !worldMap.IsRuntimeLocationAvailable(destinationIndex))
+            {
+                return false;
+            }
+
+            BeginTravel(destinationIndex);
+            return true;
+        }
+
         public void HandleDragStarted(CardInstance card)
         {
             if (card != partyCard || worldMap == null || IsTraveling)
