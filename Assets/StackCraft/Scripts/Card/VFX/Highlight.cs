@@ -15,10 +15,10 @@ namespace CryingSnow.StackCraft
             highlightObject = obj;
 
             MeshFilter filter = obj.AddComponent<MeshFilter>();
-            filter.mesh = mesh;
+            filter.sharedMesh = mesh;
 
             MeshRenderer renderer = obj.AddComponent<MeshRenderer>();
-            renderer.material = material;
+            renderer.sharedMaterial = material;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
         }

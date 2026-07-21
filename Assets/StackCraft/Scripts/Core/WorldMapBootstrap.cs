@@ -31,7 +31,8 @@ namespace CryingSnow.StackCraft
         [Header("Party")]
         [SerializeField] private CardDefinition partyDefinition;
         [SerializeField] private int initialPartyLocationIndex;
-        [SerializeField] private Vector3 partyDockOffset = new(-0.65f, 0f, -0.45f);
+        [SerializeField] private Vector3 partyDockOffset = new(0f, 0.01f, -0.55f);
+        [SerializeField, Range(0.5f, 1f)] private float partyDockScale = 0.78f;
         [SerializeField, Min(0.1f)] private float destinationSnapRadius = 1.25f;
         [SerializeField, Min(0.1f)] private float partyTravelSpeed = 0.9f;
 
@@ -122,6 +123,13 @@ namespace CryingSnow.StackCraft
                 location.Initialize(index, card);
                 EnsureRuntimeLocationCapacity();
                 runtimeLocations[index] = location;
+
+                if (partyController != null &&
+                    partyController.PartyCard != null &&
+                    partyController.CurrentLocationIndex == index)
+                {
+                    DockPartyAtLocation(index, partyController.PartyCard, instant: true);
+                }
                 return;
             }
 
@@ -185,7 +193,41 @@ namespace CryingSnow.StackCraft
 
         public Vector3 GetPartyDockPosition(int locationIndex)
         {
-            return GetLocationWorldPosition(locationIndex) + partyDockOffset;
+            if (!IsValidLocationIndex(locationIndex))
+                return Vector3.zero;
+
+            EnsureRuntimeLocationCapacity();
+            WorldMapLocation location = runtimeLocations[locationIndex];
+            return location != null
+                ? location.GetPartyDockWorldPosition(partyDockOffset)
+                : GetLocationWorldPosition(locationIndex) + partyDockOffset;
+        }
+
+        public void DockPartyAtLocation(int locationIndex, CardInstance partyCard, bool instant)
+        {
+            if (!IsValidLocationIndex(locationIndex) || partyCard == null)
+                return;
+
+            DetachPartyFromLocation(partyCard);
+            EnsureRuntimeLocationCapacity();
+            WorldMapLocation location = runtimeLocations[locationIndex];
+            if (location != null)
+            {
+                location.AttachParty(partyCard, partyDockOffset, partyDockScale, instant);
+                return;
+            }
+
+            partyCard.Stack?.SetTargetPosition(GetPartyDockPosition(locationIndex), instant);
+        }
+
+        public void DetachPartyFromLocation(CardInstance partyCard)
+        {
+            if (partyCard == null)
+                return;
+
+            EnsureRuntimeLocationCapacity();
+            foreach (WorldMapLocation location in runtimeLocations)
+                location?.DetachParty(partyCard);
         }
 
         public string GetLocationName(int locationIndex)

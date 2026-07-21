@@ -599,7 +599,8 @@ MonoBehaviour:
     toLocationIndex: 5
   partyDefinition: {fileID: 11400000, guid: e2d07c0c902843e98fbd0af90c7b7fa1, type: 2}
   initialPartyLocationIndex: 0
-  partyDockOffset: {x: -0.65, y: 0, z: -0.45}
+  partyDockOffset: {x: 0, y: 0.01, z: -0.55}
+  partyDockScale: 0.78
   destinationSnapRadius: 1.25
   partyTravelSpeed: 0.9
   legacyTravelerDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}

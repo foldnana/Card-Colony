@@ -161,6 +161,8 @@ namespace CryingSnow.StackCraft
             {
                 if (IsCrafting) CraftingManager.Instance.StopCraftingTask(this);
 
+                card.GetComponent<WorldMapLocation>()?.ReleaseDockedParty();
+
                 card.Stack = null;
                 GameObject.Destroy(card.gameObject);
 
@@ -186,6 +188,7 @@ namespace CryingSnow.StackCraft
             foreach (var card in Cards)
             {
                 card.KillTweens();
+                card.GetComponent<WorldMapLocation>()?.ReleaseDockedParty();
                 card.Stack = null;
                 GameObject.Destroy(card.gameObject);
             }

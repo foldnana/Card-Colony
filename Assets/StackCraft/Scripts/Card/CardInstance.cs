@@ -234,8 +234,9 @@ namespace CryingSnow.StackCraft
         {
             if (_highlight == null)
             {
-                var mesh = GetComponent<MeshFilter>().mesh;
+                var mesh = GetComponent<MeshFilter>().sharedMesh;
                 _highlight = new Highlight(transform, mesh, Settings.OutlineMaterial);
+                _highlight.SetActive(value);
             }
             else _highlight.SetActive(value);
         }

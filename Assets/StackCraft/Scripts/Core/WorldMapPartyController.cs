@@ -4,7 +4,7 @@ using UnityEngine;
 namespace CryingSnow.StackCraft
 {
     [DisallowMultipleComponent]
-    public sealed class WorldMapPartyController : MonoBehaviour, ICardDropHandler
+    public sealed class WorldMapPartyController : MonoBehaviour, ICardDropHandler, ICardDragStartHandler
     {
         private WorldMapBootstrap worldMap;
         private CardInstance partyCard;
@@ -14,6 +14,12 @@ namespace CryingSnow.StackCraft
         public int CurrentLocationIndex { get; private set; } = -1;
         public bool IsTraveling { get; private set; }
         public CardInstance PartyCard => partyCard;
+
+        private void OnDestroy()
+        {
+            if (worldMap != null && partyCard != null)
+                worldMap.DetachPartyFromLocation(partyCard);
+        }
 
         public void Initialize(
             WorldMapBootstrap map,
@@ -83,6 +89,14 @@ namespace CryingSnow.StackCraft
             return true;
         }
 
+        public void HandleDragStarted(CardInstance card)
+        {
+            if (card != partyCard || worldMap == null || IsTraveling)
+                return;
+
+            worldMap.DetachPartyFromLocation(partyCard);
+        }
+
         private IEnumerator TravelTo(int destinationIndex)
         {
             IsTraveling = true;
@@ -90,6 +104,7 @@ namespace CryingSnow.StackCraft
 
             Vector3 start = worldMap.GetPartyDockPosition(CurrentLocationIndex);
             Vector3 destination = worldMap.GetPartyDockPosition(destinationIndex);
+            worldMap.DetachPartyFromLocation(partyCard);
             partyCard.Stack.SetTargetPosition(start, instant: true);
             worldMap.NotifyPartyStateChanged(
                 this,
@@ -128,9 +143,7 @@ namespace CryingSnow.StackCraft
                 return;
 
             CurrentLocationIndex = locationIndex;
-            partyCard.Stack.SetTargetPosition(
-                worldMap.GetPartyDockPosition(locationIndex),
-                instant);
+            worldMap.DockPartyAtLocation(locationIndex, partyCard, instant);
         }
     }
 }

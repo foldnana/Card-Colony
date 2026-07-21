@@ -10,6 +10,11 @@ namespace CryingSnow.StackCraft
         bool HandleDrop(CardInstance card, Vector3 dropPosition);
     }
 
+    public interface ICardDragStartHandler
+    {
+        void HandleDragStarted(CardInstance card);
+    }
+
     [RequireComponent(typeof(CardInstance))]
     public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
@@ -52,6 +57,9 @@ namespace CryingSnow.StackCraft
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (!InputManager.Instance.IsInputEnabled) return;
             if (!CanBeDragged) return;
+
+            foreach (ICardDragStartHandler handler in GetComponents<ICardDragStartHandler>())
+                handler.HandleDragStarted(_card);
 
             // 1. Handle Equipped Cards
             if (isEquipped)

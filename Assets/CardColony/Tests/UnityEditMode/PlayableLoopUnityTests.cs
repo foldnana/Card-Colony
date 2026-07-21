@@ -706,6 +706,612 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void WorldMapLocation_AttachesPartyLikeEquipmentAndRestoresItWhenDetached()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Assert.That(locationType, Is.Not.Null);
+
+            Component locationCard = CreateUninitializedCard(null, "Equipment-style Location");
+            Component partyCard = CreateUninitializedCard(null, "Docked Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize")?.Invoke(location, new object[] { 0, locationCard });
+
+                MethodInfo attach = locationType.GetMethod("AttachParty");
+                MethodInfo detach = locationType.GetMethod("DetachParty");
+                PropertyInfo dockedParty = locationType.GetProperty("DockedParty");
+                Assert.That(attach, Is.Not.Null, "地点卡需要提供类似装备槽的驻扎挂载入口");
+                Assert.That(detach, Is.Not.Null, "小队开始旅行时需要能从地点卡脱离");
+                Assert.That(dockedParty, Is.Not.Null);
+
+                Vector3 localDockPosition = new(0f, 0.01f, -0.55f);
+                attach.Invoke(location, new object[] { partyCard, localDockPosition, 0.78f, true });
+
+                Assert.That(dockedParty.GetValue(location), Is.SameAs(partyCard));
+                Assert.That(partyCard.transform.parent, Is.SameAs(locationCard.transform));
+                Assert.That(partyCard.transform.localPosition, Is.EqualTo(localDockPosition));
+                Assert.That(partyCard.transform.localScale, Is.EqualTo(Vector3.one * 0.78f));
+
+                detach.Invoke(location, new object[] { partyCard });
+
+                Assert.That(dockedParty.GetValue(location), Is.Null);
+                Assert.That(partyCard.transform.parent, Is.Null);
+                Assert.That(partyCard.transform.localScale, Is.EqualTo(Vector3.one));
+            }
+            finally
+            {
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_PersonSlotCollapsesExpandsAndFloatsLikeEquipmentPanel()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            System.Type personSlotType = FindType("CryingSnow.StackCraft.WorldMapPersonSlot");
+            Assert.That(locationType, Is.Not.Null);
+            Assert.That(personSlotType, Is.Not.Null, "地点卡需要独立的人物槽组件管理驻扎人物的显示与交互");
+
+            Component locationCard = CreateUninitializedCard(null, "Location With Person Slot");
+            Component partyCard = CreateUninitializedCard(null, "Person Slot Occupant");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                Component personSlot = locationCard.GetComponent(personSlotType);
+                Assert.That(personSlot, Is.Not.Null);
+                Assert.That(location, Is.InstanceOf<IPointerClickHandler>(),
+                    "地点卡必须能通过点击统一控制选中状态和人物槽展开");
+
+                Vector3 dock = new(0f, 0.01f, -0.55f);
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, dock, 0.78f, true });
+
+                PropertyInfo isExpanded = personSlotType.GetProperty("IsExpanded");
+                PropertyInfo occupant = personSlotType.GetProperty("Occupant");
+                MethodInfo hideCards = personSlotType.GetMethod("HideCards");
+                MethodInfo showCards = personSlotType.GetMethod("ShowCards");
+                MethodInfo animateCards = personSlotType.GetMethod(
+                    "AnimateCards",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(isExpanded, Is.Not.Null);
+                Assert.That(occupant, Is.Not.Null);
+                Assert.That(hideCards, Is.Not.Null);
+                Assert.That(showCards, Is.Not.Null);
+                Assert.That(animateCards, Is.Not.Null);
+                Assert.That(occupant.GetValue(personSlot), Is.SameAs(partyCard));
+
+                Renderer partyRenderer = partyCard.GetComponent<Renderer>();
+                Collider partyCollider = partyCard.GetComponent<Collider>();
+                Assert.That(isExpanded.GetValue(personSlot), Is.False);
+                Assert.That(partyRenderer.enabled, Is.False,
+                    "人物卡进入地点后必须立即收进人物槽，不能依赖不确定的 Start 执行顺序");
+                Assert.That(partyCollider.enabled, Is.False, "隐藏人物卡不能继续拦截地点卡点击");
+                Assert.That(partyCard.transform.localPosition, Is.EqualTo(dock),
+                    "收起时人物卡应回到人物槽基准位置");
+
+                var click = new PointerEventData(null)
+                {
+                    button = PointerEventData.InputButton.Left,
+                };
+                ((IPointerClickHandler)location).OnPointerClick(click);
+                Assert.That(isExpanded.GetValue(personSlot), Is.True);
+                Assert.That(partyRenderer.enabled, Is.True);
+                Assert.That(partyCollider.enabled, Is.True);
+
+                animateCards.Invoke(personSlot, null);
+                Vector3 animatedOffset = partyCard.transform.localPosition - dock;
+                Assert.That(animatedOffset.y, Is.EqualTo(0f).Within(0.0001f));
+                Assert.That(animatedOffset.magnitude, Is.LessThanOrEqualTo(0.15f),
+                    "展开后的人物卡只能在人物槽附近轻微漂浮");
+
+                ((IPointerClickHandler)location).OnPointerClick(click);
+                Assert.That(isExpanded.GetValue(personSlot), Is.False);
+            }
+            finally
+            {
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_SelectedStateLiftsAndOutlinesLocationAndDockedParty()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Selectable Location");
+            Component partyCard = CreateUninitializedCard(null, "Outlined Docked Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, new Vector3(0f, 0.01f, -0.55f), 0.78f, true });
+
+                PropertyInfo isSelected = locationType.GetProperty("IsSelected");
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                Assert.That(isSelected, Is.Not.Null);
+                Assert.That(setSelected, Is.Not.Null,
+                    "地点卡需要可复用的选中状态入口来同步动画、地点框和人物框");
+
+                Vector3 restingPosition = locationCard.transform.localPosition;
+                setSelected.Invoke(location, new object[] { true, true });
+
+                Assert.That(isSelected.GetValue(location), Is.True);
+                Assert.That(locationCard.transform.localPosition.y,
+                    Is.GreaterThan(restingPosition.y + 0.01f),
+                    "地点选中后应从地图平面提起一点");
+                Assert.That(locationCard.transform.Find("Highlight"), Is.Not.Null,
+                    "地点选中后必须创建外轮廓");
+                Assert.That(locationCard.transform.Find("Highlight").gameObject.activeSelf, Is.True);
+                Assert.That(partyCard.transform.Find("Highlight"), Is.Not.Null,
+                    "地点内驻扎的人物卡需要同步获得外轮廓");
+                Assert.That(partyCard.transform.Find("Highlight").gameObject.activeSelf, Is.True);
+                Assert.That(partyCard.GetComponent<Renderer>().enabled, Is.True,
+                    "选中地点时人物槽应展开，确保人物框与人物卡一起可见");
+
+                setSelected.Invoke(location, new object[] { false, true });
+                Assert.That(isSelected.GetValue(location), Is.False);
+                Assert.That(locationCard.transform.localPosition, Is.EqualTo(restingPosition));
+                Assert.That(locationCard.transform.Find("Highlight").gameObject.activeSelf, Is.False);
+                Assert.That(partyCard.transform.Find("Highlight").gameObject.activeSelf, Is.False);
+                Assert.That(partyCard.GetComponent<Renderer>().enabled, Is.False);
+            }
+            finally
+            {
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_ClickSelectionMovesSelectionToTheNewLocation()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component firstCard = CreateUninitializedCard(null, "First Selectable Location");
+            Component secondCard = CreateUninitializedCard(null, "Second Selectable Location");
+            Component first = firstCard.gameObject.AddComponent(locationType);
+            Component second = secondCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(first, new object[] { 0, firstCard });
+                locationType.GetMethod("Initialize").Invoke(second, new object[] { 1, secondCard });
+                Assert.That(first, Is.InstanceOf<IPointerClickHandler>());
+                Assert.That(second, Is.InstanceOf<IPointerClickHandler>());
+
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                PropertyInfo isSelected = locationType.GetProperty("IsSelected");
+                setSelected.Invoke(first, new object[] { true, true });
+
+                var click = new PointerEventData(null)
+                {
+                    button = PointerEventData.InputButton.Left,
+                };
+                ((IPointerClickHandler)second).OnPointerClick(click);
+
+                Assert.That(isSelected.GetValue(first), Is.False,
+                    "选择新地点时旧地点必须取消选中");
+                Assert.That(isSelected.GetValue(second), Is.True);
+            }
+            finally
+            {
+                DestroyTestCard(firstCard);
+                DestroyTestCard(secondCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_SelectedPersonOutlineMovesToReplacementOccupant()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Selected Replacement Location");
+            Component firstParty = CreateUninitializedCard(null, "Previous Outlined Party");
+            Component secondParty = CreateUninitializedCard(null, "Replacement Outlined Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                MethodInfo attach = locationType.GetMethod("AttachParty");
+                MethodInfo setSelected = locationType.GetMethod(
+                    "SetSelected",
+                    new[] { typeof(bool), typeof(bool) });
+                Vector3 dock = new(0f, 0.01f, -0.55f);
+
+                attach.Invoke(location, new object[] { firstParty, dock, 0.78f, true });
+                setSelected.Invoke(location, new object[] { true, true });
+                attach.Invoke(location, new object[] { secondParty, dock, 0.78f, true });
+
+                Assert.That(firstParty.transform.Find("Highlight").gameObject.activeSelf, Is.False,
+                    "人物槽替换成员时必须关闭旧人物的驻扎框");
+                Assert.That(secondParty.transform.Find("Highlight"), Is.Not.Null);
+                Assert.That(secondParty.transform.Find("Highlight").gameObject.activeSelf, Is.True,
+                    "新驻扎人物应接管选中框");
+            }
+            finally
+            {
+                if (firstParty != null && firstParty.transform.parent != null)
+                    firstParty.transform.SetParent(null, true);
+                if (secondParty != null && secondParty.transform.parent != null)
+                    secondParty.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(firstParty);
+                DestroyTestCard(secondParty);
+            }
+        }
+
+        [Test]
+        public void WorldMapPartyController_DetachesFromPersonSlotWhenDragStarts()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locationSpawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyDefinition = serialized.FindProperty("partyDefinition");
+            SerializedProperty initialLocation = serialized.FindProperty("initialPartyLocationIndex");
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+            var locations = new List<Component>();
+            Component party = null;
+            try
+            {
+                for (int index = 0; index < locationSpawns.arraySize; index++)
+                {
+                    SerializedProperty spawn = locationSpawns.GetArrayElementAtIndex(index);
+                    Component locationCard = CreateUninitializedCard(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue,
+                        $"Drag Location {index}");
+                    SetTestCardStackPosition(
+                        locationCard,
+                        spawn.FindPropertyRelative("position").vector3Value);
+                    configure.Invoke(bootstrap, new object[] { locationCard });
+                    locations.Add(locationCard);
+                }
+
+                int startIndex = initialLocation.intValue;
+                party = CreateUninitializedCard(partyDefinition.objectReferenceValue, "Dragged Party");
+                SetTestCardStackPosition(
+                    party,
+                    locationSpawns.GetArrayElementAtIndex(startIndex)
+                        .FindPropertyRelative("position").vector3Value);
+                configure.Invoke(bootstrap, new object[] { party });
+
+                Component controller = party.GetComponent("WorldMapPartyController");
+                Component location = locations[startIndex].GetComponent("WorldMapLocation");
+                System.Type dragStartHandler = FindType("CryingSnow.StackCraft.ICardDragStartHandler");
+                Assert.That(dragStartHandler, Is.Not.Null);
+                Assert.That(dragStartHandler.IsAssignableFrom(controller.GetType()), Is.True,
+                    "人物卡拖拽开始时需要走统一回调解除人物槽挂载");
+
+                dragStartHandler.GetMethod("HandleDragStarted")
+                    .Invoke(controller, new object[] { party });
+
+                Assert.That(party.transform.parent, Is.Null);
+                Assert.That(
+                    location.GetType().GetProperty("DockedParty").GetValue(location),
+                    Is.Null,
+                    "人物卡被拿起后地点人物槽必须立即清空");
+                Assert.That(
+                    controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
+                    Is.EqualTo(startIndex),
+                    "拿起人物卡只解除视觉驻扎，投放前仍需保留出发地点");
+            }
+            finally
+            {
+                DestroyTestCard(party);
+                foreach (Component location in locations)
+                    DestroyTestCard(location);
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_RestoresPersonSlotWhenPartyLoadsBeforeLocations()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locationSpawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyDefinition = serialized.FindProperty("partyDefinition");
+            SerializedProperty initialLocation = serialized.FindProperty("initialPartyLocationIndex");
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+            int startIndex = initialLocation.intValue;
+            Component party = CreateUninitializedCard(
+                partyDefinition.objectReferenceValue,
+                "Party Restored Before Locations");
+            var locations = new List<Component>();
+            try
+            {
+                SetTestCardStackPosition(
+                    party,
+                    locationSpawns.GetArrayElementAtIndex(startIndex)
+                        .FindPropertyRelative("position").vector3Value);
+                configure.Invoke(bootstrap, new object[] { party });
+
+                for (int index = 0; index < locationSpawns.arraySize; index++)
+                {
+                    SerializedProperty spawn = locationSpawns.GetArrayElementAtIndex(index);
+                    Component locationCard = CreateUninitializedCard(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue,
+                        $"Late Location {index}");
+                    SetTestCardStackPosition(
+                        locationCard,
+                        spawn.FindPropertyRelative("position").vector3Value);
+                    configure.Invoke(bootstrap, new object[] { locationCard });
+                    locations.Add(locationCard);
+                }
+
+                Component restoredLocation = locations[startIndex].GetComponent("WorldMapLocation");
+                Assert.That(party.transform.parent, Is.SameAs(locations[startIndex].transform),
+                    "无论存档卡牌恢复顺序如何，小队最终都必须重新进入地点人物槽");
+                Assert.That(
+                    restoredLocation.GetType().GetProperty("DockedParty").GetValue(restoredLocation),
+                    Is.SameAs(party));
+            }
+            finally
+            {
+                DestroyTestCard(party);
+                foreach (Component location in locations)
+                    DestroyTestCard(location);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_NonInstantAttachKeepsItsWorldPositionUntilTweenRuns()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Animated Location");
+            Component partyCard = CreateUninitializedCard(null, "Returning Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                Vector3 droppedPosition = new(3f, 0f, -2f);
+                SetTestCardStackPosition(partyCard, droppedPosition);
+
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, new Vector3(0f, 0.01f, -0.55f), 0.78f, false });
+
+                MethodInfo update = locationCard.GetComponent("WorldMapPersonSlot").GetType().GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                update.Invoke(locationCard.GetComponent("WorldMapPersonSlot"), null);
+
+                Assert.That(partyCard.transform.position, Is.EqualTo(droppedPosition),
+                    "非即时驻扎应从投放位置播放回位动画，漂浮逻辑不能在 tween 前抢写位置");
+            }
+            finally
+            {
+                partyCard?.GetType().GetMethod("KillTweens")?.Invoke(partyCard, null);
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapLocation_ReplacesOccupantAndRestoresEachPartyOriginalScale()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Single Party Slot");
+            Component firstParty = CreateUninitializedCard(null, "First Party");
+            Component secondParty = CreateUninitializedCard(null, "Second Party");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            Vector3 firstScale = new(1.2f, 1.2f, 1.2f);
+            Vector3 secondScale = new(0.65f, 0.65f, 0.65f);
+            firstParty.transform.localScale = firstScale;
+            secondParty.transform.localScale = secondScale;
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                MethodInfo attach = locationType.GetMethod("AttachParty");
+                MethodInfo detach = locationType.GetMethod("DetachParty");
+                Vector3 dock = new(0f, 0.01f, -0.55f);
+
+                attach.Invoke(location, new object[] { firstParty, dock, 0.78f, true });
+                attach.Invoke(location, new object[] { secondParty, dock, 0.78f, true });
+
+                Assert.That(firstParty.transform.parent, Is.Null,
+                    "单一地点槽被新小队占用时必须完整释放旧小队");
+                Assert.That(firstParty.transform.localScale, Is.EqualTo(firstScale));
+
+                detach.Invoke(location, new object[] { secondParty });
+                Assert.That(secondParty.transform.localScale, Is.EqualTo(secondScale),
+                    "离开地点后必须恢复挂载前比例，而不是固定写回 1");
+            }
+            finally
+            {
+                if (firstParty != null && firstParty.transform.parent != null)
+                    firstParty.transform.SetParent(null, true);
+                if (secondParty != null && secondParty.transform.parent != null)
+                    secondParty.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(firstParty);
+                DestroyTestCard(secondParty);
+            }
+        }
+
+        [Test]
+        public void DestroyingWorldMapLocationReleasesPartyInsteadOfDestroyingIt()
+        {
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            Component locationCard = CreateUninitializedCard(null, "Disposable Location");
+            Component partyCard = CreateUninitializedCard(null, "Surviving Party");
+            Object locationSettings = (Object)locationCard.GetType().GetProperty("Settings").GetValue(locationCard);
+            Object partySettings = (Object)partyCard.GetType().GetProperty("Settings").GetValue(partyCard);
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, new Vector3(0f, 0.01f, -0.55f), 0.78f, true });
+
+                object locationStack = locationCard.GetType().GetProperty("Stack").GetValue(locationCard);
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
+                locationStack.GetType().GetMethod("DestroyCard")
+                    .Invoke(locationStack, new object[] { locationCard });
+
+                Assert.That(partyCard == null, Is.False,
+                    "地点卡销毁前必须先释放小队，不能把独立小队栈作为子对象一起删除");
+                Assert.That(partyCard.transform.parent, Is.Null);
+                Assert.That(partyCard.GetType().GetProperty("Stack").GetValue(partyCard), Is.Not.Null);
+            }
+            finally
+            {
+                if (locationCard != null)
+                    Object.DestroyImmediate(locationCard.gameObject);
+                if (partyCard != null)
+                    Object.DestroyImmediate(partyCard.gameObject);
+                if (locationSettings != null)
+                    Object.DestroyImmediate(locationSettings);
+                if (partySettings != null)
+                    Object.DestroyImmediate(partySettings);
+            }
+        }
+
+        [Test]
+        public void CardPhysicsSolver_DoesNotSeparatePartyDockedToItsLocation()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+
+            System.Type locationType = FindType("CryingSnow.StackCraft.WorldMapLocation");
+            System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
+            System.Type solverType = FindType("CryingSnow.StackCraft.CardPhysicsSolver");
+            Component locationCard = CreateUninitializedCard(null, "Solver Location");
+            Component partyCard = CreateUninitializedCard(null, "Solver Party");
+            Component nearbyCard = CreateUninitializedCard(null, "Nearby Stack");
+            Component location = locationCard.gameObject.AddComponent(locationType);
+            try
+            {
+                locationCard.GetType().GetProperty("Size").SetValue(locationCard, Vector2.one);
+                partyCard.GetType().GetProperty("Size").SetValue(partyCard, Vector2.one);
+                nearbyCard.GetType().GetProperty("Size").SetValue(nearbyCard, Vector2.one);
+                locationType.GetMethod("Initialize").Invoke(location, new object[] { 0, locationCard });
+                locationType.GetMethod("AttachParty").Invoke(
+                    location,
+                    new object[] { partyCard, new Vector3(0f, 0.01f, -0.2f), 0.78f, true });
+                SetTestCardStackPosition(nearbyCard, new Vector3(0f, 0f, -0.2f));
+
+                object locationStack = locationCard.GetType().GetProperty("Stack").GetValue(locationCard);
+                object partyStack = partyCard.GetType().GetProperty("Stack").GetValue(partyCard);
+                object nearbyStack = nearbyCard.GetType().GetProperty("Stack").GetValue(nearbyCard);
+                Vector3 dockPosition = (Vector3)stackType.GetProperty("TargetPosition").GetValue(partyStack);
+                System.Type listType = typeof(List<>).MakeGenericType(stackType);
+                var stacks = (IList)System.Activator.CreateInstance(listType);
+                stacks.Add(locationStack);
+                stacks.Add(partyStack);
+                stacks.Add(nearbyStack);
+
+                solverType.GetMethod("ResolveOverlaps").Invoke(
+                    null,
+                    new object[] { stacks, null, 8 });
+
+                Vector3 resolvedPosition = (Vector3)stackType.GetProperty("TargetPosition").GetValue(partyStack);
+                Assert.That(resolvedPosition, Is.EqualTo(dockPosition),
+                    "全局重叠求解不能把已挂载的小队从地点槽推开");
+            }
+            finally
+            {
+                if (partyCard != null && partyCard.transform.parent != null)
+                    partyCard.transform.SetParent(null, true);
+                DestroyTestCard(locationCard);
+                DestroyTestCard(partyCard);
+                DestroyTestCard(nearbyCard);
+            }
+        }
+
+        [Test]
+        public void WorldMapBootstrap_DocksConfiguredPartyIntoTheCurrentLocationSlot()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            var serialized = new SerializedObject(bootstrap);
+            SerializedProperty locationSpawns = serialized.FindProperty("locationSpawns");
+            SerializedProperty partyDefinition = serialized.FindProperty("partyDefinition");
+            SerializedProperty initialLocation = serialized.FindProperty("initialPartyLocationIndex");
+            SerializedProperty dockOffset = serialized.FindProperty("partyDockOffset");
+            SerializedProperty dockScale = serialized.FindProperty("partyDockScale");
+            Assert.That(locationSpawns, Is.Not.Null);
+            Assert.That(partyDefinition.objectReferenceValue, Is.Not.Null);
+            Assert.That(dockScale, Is.Not.Null);
+            Assert.That(dockScale.floatValue, Is.EqualTo(0.78f).Within(0.001f));
+
+            MethodInfo configure = bootstrap.GetType().GetMethod("ConfigureSpawnedCard");
+            var locations = new List<Component>();
+            Component party = null;
+            try
+            {
+                for (int index = 0; index < locationSpawns.arraySize; index++)
+                {
+                    SerializedProperty spawn = locationSpawns.GetArrayElementAtIndex(index);
+                    Component locationCard = CreateUninitializedCard(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue,
+                        $"Dock Location {index}");
+                    SetTestCardStackPosition(
+                        locationCard,
+                        spawn.FindPropertyRelative("position").vector3Value);
+                    configure.Invoke(bootstrap, new object[] { locationCard });
+                    locations.Add(locationCard);
+                }
+
+                int startIndex = initialLocation.intValue;
+                party = CreateUninitializedCard(partyDefinition.objectReferenceValue, "Docked Party");
+                Vector3 startPosition = locationSpawns.GetArrayElementAtIndex(startIndex)
+                    .FindPropertyRelative("position").vector3Value + dockOffset.vector3Value;
+                SetTestCardStackPosition(party, startPosition);
+                configure.Invoke(bootstrap, new object[] { party });
+
+                Component location = locations[startIndex].GetComponent("WorldMapLocation");
+                PropertyInfo dockedParty = location.GetType().GetProperty("DockedParty");
+                Assert.That(party.transform.parent, Is.SameAs(locations[startIndex].transform),
+                    "驻扎后小队需要像装备卡一样成为地点卡的视觉子对象");
+                Assert.That(dockedParty.GetValue(location), Is.SameAs(party));
+                Assert.That(party.transform.localPosition, Is.EqualTo(dockOffset.vector3Value));
+                Assert.That(party.transform.localRotation, Is.EqualTo(Quaternion.identity));
+                Assert.That(party.transform.localScale, Is.EqualTo(Vector3.one * dockScale.floatValue),
+                    "挂载状态需要按场景配置缩小小队卡，让地点卡保持视觉主体");
+            }
+            finally
+            {
+                DestroyTestCard(party);
+                foreach (Component location in locations)
+                    DestroyTestCard(location);
+            }
+        }
+
+        [Test]
         public void WorldMapBootstrap_DoesNotOverlayRuntimeLinesOnTheBakedRouteMap()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
@@ -732,7 +1338,12 @@ namespace CardColony.Tests
             System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
             System.Type settingsType = FindType("CryingSnow.StackCraft.CardSettings");
             var gameObject = new GameObject(name);
+            gameObject.AddComponent<MeshFilter>();
             Component card = gameObject.AddComponent(cardType);
+            cardType.GetField("_renderer", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(card, gameObject.GetComponent<MeshRenderer>());
+            cardType.GetField("_col", BindingFlags.Instance | BindingFlags.NonPublic)
+                ?.SetValue(card, gameObject.GetComponent<BoxCollider>());
             cardType.GetProperty("Definition").SetValue(card, definition);
             ScriptableObject settings = ScriptableObject.CreateInstance(settingsType);
             cardType.GetProperty("Settings").SetValue(card, settings);
@@ -749,6 +1360,13 @@ namespace CardColony.Tests
             Object.DestroyImmediate(card.gameObject);
             if (settings != null)
                 Object.DestroyImmediate(settings);
+        }
+
+        private static void SetTestCardStackPosition(Component card, Vector3 position)
+        {
+            object stack = card.GetType().GetProperty("Stack").GetValue(card);
+            stack.GetType().GetMethod("SetTargetPosition")
+                .Invoke(stack, new object[] { position, true });
         }
 
         private static System.Type FindType(string fullName)
