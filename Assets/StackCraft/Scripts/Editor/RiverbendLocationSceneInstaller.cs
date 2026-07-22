@@ -145,6 +145,7 @@ namespace CryingSnow.StackCraft.EditorTools
             controllerObject.FindProperty("backgroundShader").objectReferenceValue = Shader.Find("Unlit/Texture");
             controllerObject.ApplyModifiedPropertiesWithoutUndo();
 
+            DialogueUiInstaller.InstallIntoScene(scene);
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, LocationScenePath);
             AddSceneToBuildSettings();
@@ -236,6 +237,7 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("ambientWanderRadius").floatValue = 1f;
             serialized.FindProperty("ambientMoveSpeed").floatValue = 0.5f;
             serialized.FindProperty("ambientIdleRange").vector2Value = new Vector2(2f, 4f);
+            ConfigureBasicDialogue(serialized, spec.Id, isNpc);
             serialized.FindProperty("combatType").enumValueIndex = (int)CombatType.None;
             serialized.FindProperty("loot").ClearArray();
             serialized.FindProperty("isAggressive").boolValue = false;
@@ -256,6 +258,40 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(card);
             return card;
+        }
+
+        private static void ConfigureBasicDialogue(
+            SerializedObject serialized,
+            string cardId,
+            bool isNpc)
+        {
+            serialized.FindProperty("dialogueEnabled").boolValue = isNpc;
+            if (!isNpc)
+                return;
+
+            (string opening, string reply, string response) dialogue = cardId switch
+            {
+                "riverbend-village-chief" => (
+                    "年轻人，你们似乎不是本地人。先去杂货商那里看看吧。",
+                    "我该去哪里？",
+                    "沿着村里的小路往西走，杂货商会为旅途准备补给。"),
+                "riverbend-blacksmith" => (
+                    "要修装备就得有好材料，市场偶尔能淘到矿石。",
+                    "哪里能找到矿石？",
+                    "旧矿洞还能挖到，只是路上不太安全。"),
+                "riverbend-grocer" => (
+                    "出远门前先把口粮备足，空着肚子可走不远。",
+                    "有什么推荐？",
+                    "面包耐放，草药也该带上一些。"),
+                _ => (
+                    "河边和林地都能找到药草，别把它们当普通野草。",
+                    "药草有什么用？",
+                    "带两份药草来，我可以教你调制简单的治疗药水。")
+            };
+
+            serialized.FindProperty("dialogueOpeningText").stringValue = dialogue.opening;
+            serialized.FindProperty("dialogueReplyText").stringValue = dialogue.reply;
+            serialized.FindProperty("dialogueResponseText").stringValue = dialogue.response;
         }
 
         private static void EnsureArtMaskImportSettings(string artPath)

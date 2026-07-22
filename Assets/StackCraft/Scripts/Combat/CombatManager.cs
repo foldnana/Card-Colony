@@ -39,6 +39,29 @@ namespace CryingSnow.StackCraft
         public IEnumerable<CombatRect> ActiveCombatRects => _activeCombats
             .Where(task => task.Rect != null)
             .Select(task => task.Rect);
+
+        public CombatRect CreateInteractionRect(
+            List<CardInstance> firstSide,
+            List<CardInstance> secondSide)
+        {
+            if (combatRectPrefab == null ||
+                firstSide == null || secondSide == null ||
+                firstSide.Count == 0 || secondSide.Count == 0)
+                return null;
+
+            CombatRect rect = Instantiate(combatRectPrefab, WorldCanvas.Instance?.transform);
+            rect.Initialize(firstSide, secondSide);
+            return rect;
+        }
+
+        public CombatRect CreateInteractionRect(
+            IEnumerable<CardInstance> firstSide,
+            IEnumerable<CardInstance> secondSide)
+        {
+            List<CardInstance> first = firstSide?.Where(card => card != null).ToList() ?? new();
+            List<CardInstance> second = secondSide?.Where(card => card != null).ToList() ?? new();
+            return CreateInteractionRect(first, second);
+        }
         #endregion
 
         private readonly List<CombatTask> _activeCombats = new();
@@ -228,8 +251,8 @@ namespace CryingSnow.StackCraft
             // Do not create combat if one side is empty.
             if (attackers.Count == 0 || defenders.Count == 0) return null;
 
-            var rect = Instantiate(combatRectPrefab, WorldCanvas.Instance?.transform);
-            rect.Initialize(attackers, defenders);
+            CombatRect rect = CreateInteractionRect(attackers, defenders);
+            if (rect == null) return null;
             var task = new CombatTask(attackers, defenders, playerIsAttacker, rect);
 
             // Make every card aware that it is now in this specific combat.
@@ -238,8 +261,9 @@ namespace CryingSnow.StackCraft
 
             _activeCombats.Add(task);
 
-            // Ensure no world stacks are overlapping the new combat rect.
-            CardManager.Instance.ResolveOverlaps(rect);
+            // Preserve the original post-detach overlap pass for combat.
+            CardManager.Instance?.ResolveOverlaps(rect);
+
             return task;
         }
 

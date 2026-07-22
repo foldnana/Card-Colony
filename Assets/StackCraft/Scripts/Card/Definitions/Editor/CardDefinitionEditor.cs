@@ -15,6 +15,10 @@ namespace CryingSnow.StackCraft
         private SerializedProperty categoryProp;
         private SerializedProperty factionProp;
         private SerializedProperty combatTypeProp;
+        private SerializedProperty dialogueEnabledProp;
+        private SerializedProperty dialogueOpeningTextProp;
+        private SerializedProperty dialogueReplyTextProp;
+        private SerializedProperty dialogueResponseTextProp;
 
         private SerializedProperty lootProp;
 
@@ -58,6 +62,10 @@ namespace CryingSnow.StackCraft
             categoryProp = serializedObject.FindProperty("category");
             factionProp = serializedObject.FindProperty("faction");
             combatTypeProp = serializedObject.FindProperty("combatType");
+            dialogueEnabledProp = serializedObject.FindProperty("dialogueEnabled");
+            dialogueOpeningTextProp = serializedObject.FindProperty("dialogueOpeningText");
+            dialogueReplyTextProp = serializedObject.FindProperty("dialogueReplyText");
+            dialogueResponseTextProp = serializedObject.FindProperty("dialogueResponseText");
 
             lootProp = serializedObject.FindProperty("loot");
 
@@ -135,6 +143,7 @@ namespace CryingSnow.StackCraft
 
             DrawIdentificationSection(category);
             DrawClassificationSection(category);
+            DrawDialogueSection(category);
             DrawLootSection(category, lootProp);
             DrawAggressiveMobSection(category);
             DrawPassiveMobSection(category);
@@ -214,6 +223,26 @@ namespace CryingSnow.StackCraft
                 {
                     EditorGUILayout.PropertyField(factionProp);
                     EditorGUILayout.PropertyField(combatTypeProp);
+                }
+            }
+
+            EditorGUILayout.Space(6);
+        }
+
+        private void DrawDialogueSection(CardCategory category)
+        {
+            if (category != CardCategory.Character)
+                return;
+
+            EditorGUILayout.LabelField("Dialogue", EditorStyles.boldLabel);
+            using (new EditorGUI.IndentLevelScope())
+            {
+                EditorGUILayout.PropertyField(dialogueEnabledProp);
+                if (dialogueEnabledProp.boolValue)
+                {
+                    EditorGUILayout.PropertyField(dialogueOpeningTextProp);
+                    EditorGUILayout.PropertyField(dialogueReplyTextProp);
+                    EditorGUILayout.PropertyField(dialogueResponseTextProp);
                 }
             }
 

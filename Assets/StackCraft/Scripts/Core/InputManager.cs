@@ -8,8 +8,21 @@ namespace CryingSnow.StackCraft
         public static InputManager Instance { get; private set; }
 
         private readonly HashSet<object> inputLocks = new();
+        private readonly HashSet<object> cameraAllowedLocks = new();
 
         public bool IsInputEnabled => inputLocks.Count == 0;
+        public bool IsCameraInputEnabled
+        {
+            get
+            {
+                foreach (object requester in inputLocks)
+                {
+                    if (!cameraAllowedLocks.Contains(requester))
+                        return false;
+                }
+                return true;
+            }
+        }
 
         private void Awake()
         {
@@ -31,8 +44,22 @@ namespace CryingSnow.StackCraft
         /// <param name="requester">The object requesting the lock. Must be a unique object instance.</param>
         public void AddLock(object requester)
         {
-            if (requester != null)
-                inputLocks.Add(requester);
+            AddLock(requester, allowCameraInput: false);
+        }
+
+        /// <summary>
+        /// Adds a scoped input lock and optionally keeps map pan and zoom available.
+        /// </summary>
+        public void AddLock(object requester, bool allowCameraInput)
+        {
+            if (requester == null)
+                return;
+
+            inputLocks.Add(requester);
+            if (allowCameraInput)
+                cameraAllowedLocks.Add(requester);
+            else
+                cameraAllowedLocks.Remove(requester);
         }
 
         /// <summary>
@@ -46,7 +73,10 @@ namespace CryingSnow.StackCraft
         public void RemoveLock(object requester)
         {
             if (requester != null)
+            {
                 inputLocks.Remove(requester);
+                cameraAllowedLocks.Remove(requester);
+            }
         }
     }
 }

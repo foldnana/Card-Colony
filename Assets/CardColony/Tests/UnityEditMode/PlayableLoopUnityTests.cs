@@ -1531,6 +1531,311 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void RiverbendNpcDefinitions_ExposeBasicDialogueContent()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            int dialogueNpcCount = 0;
+
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                Object definition = spawns.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                var serializedCard = new SerializedObject(definition);
+                if (serializedCard.FindProperty("category").enumValueIndex != 2)
+                    continue;
+
+                dialogueNpcCount++;
+                SerializedProperty enabled = serializedCard.FindProperty("dialogueEnabled");
+                SerializedProperty opening = serializedCard.FindProperty("dialogueOpeningText");
+                SerializedProperty reply = serializedCard.FindProperty("dialogueReplyText");
+                SerializedProperty response = serializedCard.FindProperty("dialogueResponseText");
+
+                Assert.That(enabled, Is.Not.Null, "NPC 卡牌定义需要可扩展的对话开关");
+                Assert.That(opening, Is.Not.Null, "NPC 卡牌定义需要开场对白");
+                Assert.That(reply, Is.Not.Null, "NPC 卡牌定义需要基础回复选项");
+                Assert.That(response, Is.Not.Null, "NPC 卡牌定义需要回复后的对白");
+                Assert.That(enabled.boolValue, Is.True);
+                Assert.That(opening.stringValue, Is.Not.Empty);
+                Assert.That(reply.stringValue, Is.Not.Empty);
+                Assert.That(response.stringValue, Is.Not.Empty);
+            }
+
+            Assert.That(dialogueNpcCount, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void DialoguePanelPrefab_ContainsReferenceStyleConversationControls()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab");
+            Assert.That(prefab, Is.Not.Null, "需要把对话框制作成可复用的场景 UI 预制体");
+
+            System.Type viewType = FindType("CryingSnow.StackCraft.DialoguePanelView");
+            Assert.That(viewType, Is.Not.Null);
+            Assert.That(prefab.GetComponent(viewType), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "Portrait"), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "PortraitBackground"), Is.Not.Null,
+                "对话头像需要像卡牌一样叠加卡底，不能只显示白色线稿原图");
+            Assert.That(FindDescendant(prefab, "SpeakerName"), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "DialogueText"), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "ReplyButton"), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "GoodbyeButton"), Is.Not.Null);
+
+            RawImage portrait = FindDescendant(prefab, "Portrait").GetComponent<RawImage>();
+            Assert.That(portrait.color.r, Is.LessThan(0.4f),
+                "NPC 白色线稿应在对话头像中着色为卡牌使用的深色线稿");
+            Assert.That(prefab.activeSelf, Is.False, "对话框平时必须隐藏，只在对话时显示");
+        }
+
+        [Test]
+        public void DialogueManager_AcceptsPlayerAndNeutralDialogueNpcButNotBuildings()
+        {
+            System.Type managerType = FindType("CryingSnow.StackCraft.DialogueManager");
+            Assert.That(managerType, Is.Not.Null, "地点场景需要独立的基础对话管理器");
+            MethodInfo canStart = managerType.GetMethod(
+                "CanStartDialogue",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(canStart, Is.Not.Null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Dialogue Player");
+            Component chief = CreateUninitializedCard(chiefDefinition, "Dialogue Chief");
+            Component market = CreateUninitializedCard(marketDefinition, "Dialogue Market");
+            try
+            {
+                Assert.That(canStart.Invoke(null, new object[] { player, chief }), Is.True);
+                Assert.That(canStart.Invoke(null, new object[] { chief, player }), Is.True,
+                    "无论拖动人物还是 NPC，配对识别都应一致");
+                Assert.That(canStart.Invoke(null, new object[] { player, market }), Is.False,
+                    "建筑卡不能误触发人物对话");
+            }
+            finally
+            {
+                DestroyTestCard(player);
+                DestroyTestCard(chief);
+                DestroyTestCard(market);
+            }
+        }
+
+        [Test]
+        public void DialogueManager_StartAndEndMovesCardsThroughInteractionRectWithoutCombat()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);
+            string[] singletonTypes =
+            {
+                "CryingSnow.StackCraft.Board",
+                "CryingSnow.StackCraft.InputManager",
+                "CryingSnow.StackCraft.CardManager",
+                "CryingSnow.StackCraft.CombatManager",
+                "CryingSnow.StackCraft.DialogueManager"
+            };
+            foreach (string typeName in singletonTypes)
+            {
+                MonoBehaviour component = Object.FindObjectsOfType<MonoBehaviour>(true)
+                    .First(item => item.GetType().FullName == typeName);
+                component.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(component, null);
+            }
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Live Dialogue Player");
+            Component chief = CreateUninitializedCard(chiefDefinition, "Live Dialogue Chief");
+            Component hunter = null;
+            Component interactionRect = null;
+            try
+            {
+                player.GetType().GetProperty("Size").SetValue(player, Vector2.one);
+                chief.GetType().GetProperty("Size").SetValue(chief, Vector2.one);
+                SetTestCardStackPosition(player, new Vector3(-0.2f, 0f, 0f));
+                SetTestCardStackPosition(chief, new Vector3(0.2f, 0f, 0f));
+
+                System.Type cardManagerType = FindType("CryingSnow.StackCraft.CardManager");
+                object cardManager = cardManagerType.GetProperty("Instance").GetValue(null);
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+                object chiefStack = chief.GetType().GetProperty("Stack").GetValue(chief);
+                cardManagerType.GetMethod("RegisterStack").Invoke(cardManager, new[] { playerStack });
+                cardManagerType.GetMethod("RegisterStack").Invoke(cardManager, new[] { chiefStack });
+
+                System.Type combatantType = FindType("CryingSnow.StackCraft.CardCombatant");
+                Component playerCombatant = player.gameObject.AddComponent(combatantType);
+                Component chiefCombatant = chief.gameObject.AddComponent(combatantType);
+                combatantType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(playerCombatant, null);
+                combatantType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(chiefCombatant, null);
+                player.GetType().GetProperty("Combatant").SetValue(player, playerCombatant);
+                chief.GetType().GetProperty("Combatant").SetValue(chief, chiefCombatant);
+
+                System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+                Component activity = chief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[] { chief, chief.transform.position, 1f, 0.5f, new Vector2(2f, 3f) });
+
+                System.Type managerType = FindType("CryingSnow.StackCraft.DialogueManager");
+                object manager = managerType.GetProperty("Instance").GetValue(null);
+                bool started = (bool)managerType.GetMethod("StartDialogue")
+                    .Invoke(manager, new object[] { player, chief });
+                Assert.That(started, Is.True);
+                Assert.That(managerType.GetProperty("IsActive").GetValue(manager), Is.True);
+                Assert.That(player.GetType().GetProperty("Stack").GetValue(player), Is.Null);
+                Assert.That(chief.GetType().GetProperty("Stack").GetValue(chief), Is.Null);
+                Assert.That(combatantType.GetProperty("IsInCombat").GetValue(playerCombatant), Is.False);
+                Assert.That(combatantType.GetProperty("IsInCombat").GetValue(chiefCombatant), Is.False);
+                Assert.That(activityType.GetProperty("IsInteractionPaused").GetValue(activity), Is.True);
+                interactionRect = (Component)managerType.GetProperty("InteractionRect").GetValue(manager);
+                Assert.That(interactionRect, Is.Not.Null);
+                Image interactionVisual = interactionRect.GetComponentInChildren<Image>(true);
+                Assert.That(interactionVisual.material, Is.Not.Null);
+                Assert.That(interactionVisual.material.shader.name,
+                    Is.EqualTo("Crying Snow/StackCraft/InteractionTint"),
+                    "对话继续复用战斗框结构，但必须使用独立的绿色视觉，不得修改战斗红框");
+                Assert.That(
+                    managerType.GetProperty("HasActiveParticipantAnimation").GetValue(manager),
+                    Is.True,
+                    "进入对话后双方卡牌应启动 DOTween 悬浮动画");
+
+                var liveCards = ((IEnumerable)cardManagerType.GetProperty("AllCards")
+                        .GetValue(cardManager))
+                    .Cast<object>()
+                    .ToList();
+                Assert.That(liveCards, Does.Contain(player));
+                Assert.That(liveCards, Does.Contain(chief),
+                    "对话双方脱离卡堆后仍必须属于当前场景，避免存档或日结遗漏人物");
+
+                Object hunterDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Mobs/Card_Goblin.asset");
+                hunter = CreateUninitializedCard(hunterDefinition, "Dialogue Safety Hunter");
+                Component hunterCombatant = hunter.gameObject.AddComponent(combatantType);
+                combatantType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(hunterCombatant, null);
+                hunter.GetType().GetProperty("Combatant").SetValue(hunter, hunterCombatant);
+                System.Type aiType = FindType("CryingSnow.StackCraft.CardAI");
+                Component hunterAi = hunter.gameObject.AddComponent(aiType);
+                aiType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(hunterAi, null);
+                object huntedTarget = aiType.GetMethod(
+                        "FindClosestPlayerCard",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(hunterAi, new object[] { 100f });
+                Assert.That(huntedTarget, Is.Null,
+                    "攻击性 AI 不得选中临时脱离卡堆的对话人物，否则攻击阶段会访问空 Stack");
+
+                GameObject panel = GameObject.Find("DialoguePanel");
+                Assert.That(panel, Is.Not.Null);
+                Assert.That(panel.activeSelf, Is.True);
+
+                MethodInfo beforeSave = managerType.GetMethod(
+                    "HandleBeforeSave",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(beforeSave, Is.Not.Null,
+                    "保存前应主动结束临时对话，把双方恢复到可序列化的卡堆中");
+                beforeSave.Invoke(manager, new object[] { null });
+                Assert.That(managerType.GetProperty("IsActive").GetValue(manager), Is.False);
+                Assert.That(
+                    managerType.GetProperty("HasActiveParticipantAnimation").GetValue(manager),
+                    Is.False,
+                    "结束对话时必须清理悬浮动画，不能把 Tween 留在已恢复的卡牌上");
+                Assert.That(player.GetType().GetProperty("Stack").GetValue(player), Is.Not.Null);
+                Assert.That(chief.GetType().GetProperty("Stack").GetValue(chief), Is.Not.Null);
+                Assert.That(activityType.GetProperty("IsInteractionPaused").GetValue(activity), Is.False);
+            }
+            finally
+            {
+                DestroyTestCard(player);
+                DestroyTestCard(chief);
+                DestroyTestCard(hunter);
+                if (interactionRect != null)
+                    Object.DestroyImmediate(interactionRect.gameObject);
+            }
+        }
+
+        [Test]
+        public void LocationNpcActivity_InteractionPauseStopsAndResumesMovement()
+        {
+            System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            MethodInfo setPaused = activityType.GetMethod("SetInteractionPaused");
+            Assert.That(setPaused, Is.Not.Null,
+                "NPC 进入对话框后需要暂停散步，离开后再恢复");
+
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component chief = CreateUninitializedCard(chiefDefinition, "Paused Dialogue Chief");
+            try
+            {
+                Component activity = chief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[] { chief, Vector3.zero, 1f, 0.5f, new Vector2(2f, 3f) });
+                activityType.GetMethod("SetDestination").Invoke(
+                    activity,
+                    new object[] { new Vector3(1f, 0f, 0f) });
+
+                setPaused.Invoke(activity, new object[] { true });
+                activityType.GetMethod("Tick").Invoke(activity, new object[] { 1f });
+                Assert.That(chief.transform.position, Is.EqualTo(Vector3.zero));
+
+                setPaused.Invoke(activity, new object[] { false });
+                activityType.GetMethod("Tick").Invoke(activity, new object[] { 1f });
+                Assert.That(chief.transform.position.x, Is.GreaterThan(0f));
+            }
+            finally
+            {
+                DestroyTestCard(chief);
+            }
+        }
+
+        [Test]
+        public void InputManager_DialogueLockBlocksCardsButAllowsCameraInput()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            System.Type inputType = FindType("CryingSnow.StackCraft.InputManager");
+            var inputObject = new GameObject("Dialogue Camera Input Test");
+            Component input = inputObject.AddComponent(inputType);
+            object dialogueLock = new object();
+            object hardLock = new object();
+            try
+            {
+                inputType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(input, null);
+                MethodInfo addScopedLock = inputType.GetMethod(
+                    "AddLock",
+                    new[] { typeof(object), typeof(bool) });
+                Assert.That(addScopedLock, Is.Not.Null,
+                    "输入锁需要区分允许镜头的对话锁与完全禁止输入的硬锁");
+
+                addScopedLock.Invoke(input, new[] { dialogueLock, (object)true });
+                Assert.That(inputType.GetProperty("IsInputEnabled").GetValue(input), Is.False);
+                Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.True,
+                    "对话期间卡牌输入仍应锁定，但地图拖动与缩放应可用");
+
+                addScopedLock.Invoke(input, new[] { hardLock, (object)false });
+                Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.False,
+                    "转场等硬锁存在时不能被对话的镜头权限绕过");
+
+                inputType.GetMethod("RemoveLock").Invoke(input, new[] { hardLock });
+                Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.True);
+                inputType.GetMethod("RemoveLock").Invoke(input, new[] { dialogueLock });
+                Assert.That(inputType.GetProperty("IsInputEnabled").GetValue(input), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(inputObject);
+            }
+        }
+
+        [Test]
         public void LocationNpcActivity_PausesInsteadOfMovingAnAttachedCardStack()
         {
             System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
@@ -3128,6 +3433,165 @@ namespace CardColony.Tests
                 DestroyTestCard(locationCard);
                 DestroyTestCard(partyCard);
                 DestroyTestCard(nearbyCard);
+            }
+        }
+
+        [Test]
+        public void CardManager_ExplicitInteractionRectParticipatesInOverlapResolution()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.CardManager");
+            cardManager.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Component card = CreateUninitializedCard(playerDefinition, "Interaction Rect Overlap Card");
+            var rectObject = new GameObject("Explicit Interaction Rect", typeof(RectTransform));
+            Component interactionRect = rectObject.AddComponent(
+                FindType("CryingSnow.StackCraft.CombatRect"));
+            try
+            {
+                card.GetType().GetProperty("Size").SetValue(card, Vector2.one);
+                SetTestCardStackPosition(card, new Vector3(0.1f, 0f, 0.1f));
+                object stack = card.GetType().GetProperty("Stack").GetValue(card);
+                cardManager.GetType().GetMethod("RegisterStack").Invoke(cardManager, new[] { stack });
+
+                RectTransform rectTransform = rectObject.GetComponent<RectTransform>();
+                rectTransform.sizeDelta = new Vector2(2f, 2f);
+                interactionRect.GetType().GetProperty("Rect").SetValue(interactionRect, rectTransform);
+
+                MethodInfo resolveExplicit = cardManager.GetType().GetMethod(
+                    "ResolveOverlaps",
+                    new[] { interactionRect.GetType(), stack.GetType() });
+                resolveExplicit.Invoke(cardManager, new[] { interactionRect, null });
+
+                Vector3 resolved = (Vector3)stack.GetType()
+                    .GetProperty("TargetPosition").GetValue(stack);
+                Assert.That(resolved, Is.Not.EqualTo(new Vector3(0.1f, 0f, 0.1f)),
+                    "显式传入的对话/战斗框必须参与卡堆避让，不能只读取活动战斗列表");
+            }
+            finally
+            {
+                DestroyTestCard(card);
+                Object.DestroyImmediate(rectObject);
+            }
+        }
+
+        [Test]
+        public void CardManager_ExplicitInteractionRectHonorsIgnoredStack()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.CardManager");
+            cardManager.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Component card = CreateUninitializedCard(playerDefinition, "Ignored Interaction Stack");
+            var rectObject = new GameObject("Explicit Interaction Rect", typeof(RectTransform));
+            Component interactionRect = rectObject.AddComponent(
+                FindType("CryingSnow.StackCraft.CombatRect"));
+            try
+            {
+                card.GetType().GetProperty("Size").SetValue(card, Vector2.one);
+                Vector3 startPosition = new Vector3(0.1f, 0f, 0.1f);
+                SetTestCardStackPosition(card, startPosition);
+                object stack = card.GetType().GetProperty("Stack").GetValue(card);
+                cardManager.GetType().GetMethod("RegisterStack").Invoke(cardManager, new[] { stack });
+
+                RectTransform rectTransform = rectObject.GetComponent<RectTransform>();
+                rectTransform.sizeDelta = new Vector2(2f, 2f);
+                interactionRect.GetType().GetProperty("Rect").SetValue(interactionRect, rectTransform);
+
+                MethodInfo resolveExplicit = cardManager.GetType().GetMethod(
+                    "ResolveOverlaps",
+                    new[] { interactionRect.GetType(), stack.GetType() });
+                resolveExplicit.Invoke(cardManager, new[] { interactionRect, stack });
+
+                Vector3 resolved = (Vector3)stack.GetType()
+                    .GetProperty("TargetPosition").GetValue(stack);
+                Assert.That(resolved, Is.EqualTo(startPosition),
+                    "加入战斗时明确忽略的来源卡堆不能被互动框推开");
+            }
+            finally
+            {
+                DestroyTestCard(card);
+                Object.DestroyImmediate(rectObject);
+            }
+        }
+
+        [Test]
+        public void CombatManager_InteractionRectPreservesMutableCombatLists()
+        {
+            EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);
+            foreach (string typeName in new[]
+            {
+                "CryingSnow.StackCraft.Board",
+                "CryingSnow.StackCraft.CardManager"
+            })
+            {
+                MonoBehaviour singleton = Object.FindObjectsOfType<MonoBehaviour>(true)
+                    .First(component => component.GetType().FullName == typeName);
+                singleton.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(singleton, null);
+            }
+            MonoBehaviour combatManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName == "CryingSnow.StackCraft.CombatManager");
+            combatManager.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(combatManager, null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Component firstCard = CreateUninitializedCard(playerDefinition, "Combat List First");
+            Component secondCard = CreateUninitializedCard(playerDefinition, "Combat List Second");
+            Component interactionRect = null;
+            try
+            {
+                firstCard.GetType().GetProperty("Size").SetValue(firstCard, Vector2.one);
+                secondCard.GetType().GetProperty("Size").SetValue(secondCard, Vector2.one);
+                System.Type cardType = firstCard.GetType();
+                System.Type listType = typeof(List<>).MakeGenericType(cardType);
+                var firstSide = (IList)System.Activator.CreateInstance(listType);
+                var secondSide = (IList)System.Activator.CreateInstance(listType);
+                firstSide.Add(firstCard);
+                secondSide.Add(secondCard);
+
+                MethodInfo listOverload = combatManager.GetType().GetMethod(
+                    "CreateInteractionRect",
+                    new[] { listType, listType });
+                Assert.That(listOverload, Is.Not.Null,
+                    "战斗创建必须有保留可变列表引用的重载，不能把双方复制成快照");
+                interactionRect = (Component)listOverload.Invoke(
+                    combatManager,
+                    new object[] { firstSide, secondSide });
+                Assert.That(interactionRect, Is.Not.Null);
+
+                FieldInfo attackers = interactionRect.GetType().GetField(
+                    "_attackers",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                FieldInfo defenders = interactionRect.GetType().GetField(
+                    "_defenders",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(attackers.GetValue(interactionRect), Is.SameAs(firstSide));
+                Assert.That(defenders.GetValue(interactionRect), Is.SameAs(secondSide));
+            }
+            finally
+            {
+                DestroyTestCard(firstCard);
+                DestroyTestCard(secondCard);
+                if (interactionRect != null)
+                    Object.DestroyImmediate(interactionRect.gameObject);
             }
         }
 

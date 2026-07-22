@@ -18,10 +18,12 @@ namespace CryingSnow.StackCraft
         private Vector2 idleRange;
         private float idleTimeRemaining;
         private bool configured;
+        private bool interactionPaused;
 
         public LocationNpcActivityState State { get; private set; } = LocationNpcActivityState.Idle;
         public Vector3 HomePosition { get; private set; }
         public Vector3 Destination { get; private set; }
+        public bool IsInteractionPaused => interactionPaused;
 
         private void Awake()
         {
@@ -70,9 +72,15 @@ namespace CryingSnow.StackCraft
                 : LocationNpcActivityState.Moving;
         }
 
+        public void SetInteractionPaused(bool paused)
+        {
+            interactionPaused = paused;
+        }
+
         public void Tick(float deltaTime)
         {
             if (!configured ||
+                interactionPaused ||
                 deltaTime <= 0f ||
                 card == null ||
                 card.Stack == null ||

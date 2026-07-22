@@ -25,6 +25,10 @@ MonoBehaviour:
   ambientWanderRadius: 1
   ambientMoveSpeed: 0.5
   ambientIdleRange: {x: 2, y: 4}
+  dialogueEnabled: 1
+  dialogueOpeningText: "要修装备就得有好材料，市场偶尔能淘到矿石。"
+  dialogueReplyText: "哪里能找到矿石？"
+  dialogueResponseText: "旧矿洞还能挖到，只是路上不太安全。"
   combatType: 0
   loot: []
   isAggressive: 0

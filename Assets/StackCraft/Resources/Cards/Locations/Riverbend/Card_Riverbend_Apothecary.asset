@@ -25,6 +25,10 @@ MonoBehaviour:
   ambientWanderRadius: 1
   ambientMoveSpeed: 0.5
   ambientIdleRange: {x: 2, y: 4}
+  dialogueEnabled: 1
+  dialogueOpeningText: "河边和林地都能找到药草，别把它们当普通野草。"
+  dialogueReplyText: "药草有什么用？"
+  dialogueResponseText: "带两份药草来，我可以教你调制简单的治疗药水。"
   combatType: 0
   loot: []
   isAggressive: 0

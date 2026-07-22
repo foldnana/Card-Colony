@@ -125,3 +125,4 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   margin: {x: 0.1, y: 0.1}
+  interactionTintShader: {fileID: 4800000, guid: 6fbcb7ec432b4cf5aa8c9e2f276fe0b1, type: 3}

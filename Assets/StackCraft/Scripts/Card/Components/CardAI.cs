@@ -162,7 +162,8 @@ namespace CryingSnow.StackCraft
         {
             CardInstance target = FindClosestPlayerCard(_card.Definition.AggroRadius);
 
-            if (target == null) return false;
+            if (target == null || target.Stack == null || _card.Stack == null)
+                return false;
 
             float distanceToTarget = Vector3.Distance(transform.position, target.transform.position);
 
@@ -218,8 +219,11 @@ namespace CryingSnow.StackCraft
         {
             return CardManager.Instance.AllCards
                 .Where(c => c != null &&
+                            c.Stack != null &&
                             c.Definition.Faction == CardFaction.Player &&
-                            !c.Combatant.IsInCombat)
+                            c.Combatant != null &&
+                            !c.Combatant.IsInCombat &&
+                            !(DialogueManager.Instance?.IsCardInDialogue(c) ?? false))
                 .OrderBy(c => Vector3.Distance(transform.position, c.transform.position))
                 .FirstOrDefault();
         }

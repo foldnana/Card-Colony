@@ -47,6 +47,19 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Minimum and maximum idle time between ambient NPC movements.")]
         private Vector2 ambientIdleRange = new(2f, 4f);
 
+        [Header("Dialogue")]
+        [SerializeField, Tooltip("Allows a player character to start a basic conversation with this neutral NPC.")]
+        private bool dialogueEnabled;
+
+        [SerializeField, TextArea(2, 4), Tooltip("First line shown when this NPC enters a conversation.")]
+        private string dialogueOpeningText;
+
+        [SerializeField, Tooltip("The player's single basic reply option used by the first dialogue implementation.")]
+        private string dialogueReplyText;
+
+        [SerializeField, TextArea(2, 4), Tooltip("NPC line shown after the player chooses the basic reply.")]
+        private string dialogueResponseText;
+
         [SerializeField, Tooltip("The combat type for Rock-Paper-Scissors advantage.")]
         private CombatType combatType = CombatType.None;
 
@@ -138,6 +151,10 @@ namespace CryingSnow.StackCraft
         public float AmbientWanderRadius => ambientWanderRadius;
         public float AmbientMoveSpeed => ambientMoveSpeed;
         public Vector2 AmbientIdleRange => ambientIdleRange;
+        public bool DialogueEnabled => dialogueEnabled;
+        public string DialogueOpeningText => dialogueOpeningText;
+        public string DialogueReplyText => dialogueReplyText;
+        public string DialogueResponseText => dialogueResponseText;
         public CombatType CombatType => combatType;
 
         public bool IsAggressive => isAggressive;

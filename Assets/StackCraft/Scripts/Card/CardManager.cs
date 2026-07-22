@@ -63,15 +63,20 @@ namespace CryingSnow.StackCraft
         {
             get
             {
-                var stackedCards = stacks.SelectMany(s => s.Cards);
+                IEnumerable<CardInstance> cards = stacks.SelectMany(s => s.Cards);
 
-                if (CombatManager.Instance == null) return stackedCards;
+                if (CombatManager.Instance != null)
+                {
+                    IEnumerable<CardInstance> combatCards = CombatManager.Instance.ActiveCombats
+                        .Where(c => c.IsOngoing)
+                        .SelectMany(c => c.Attackers.Concat(c.Defenders));
+                    cards = cards.Concat(combatCards);
+                }
 
-                var combatCards = CombatManager.Instance.ActiveCombats
-                    .Where(c => c.IsOngoing)
-                    .SelectMany(c => c.Attackers.Concat(c.Defenders));
+                if (DialogueManager.Instance != null && DialogueManager.Instance.IsActive)
+                    cards = cards.Concat(DialogueManager.Instance.Participants);
 
-                return stackedCards.Concat(combatCards);
+                return cards.Where(card => card != null).Distinct();
             }
         }
 
@@ -387,6 +392,8 @@ namespace CryingSnow.StackCraft
 
         private void HandleBeforeSave(GameData gameData)
         {
+            DialogueManager.Instance?.EndDialogue();
+
             if (gameData.TryGetScene(out var sceneData))
             {
                 sceneData.SaveStacks(stacks);
@@ -647,9 +654,12 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void ResolveOverlaps()
         {
-            var combatRects = CombatManager.Instance != null
-                ? CombatManager.Instance.ActiveCombatRects
-                : null;
+            List<CombatRect> combatRects = CombatManager.Instance != null
+                ? CombatManager.Instance.ActiveCombatRects.Where(rect => rect != null).ToList()
+                : new List<CombatRect>();
+            CombatRect dialogueRect = DialogueManager.Instance?.InteractionRect;
+            if (dialogueRect != null && !combatRects.Contains(dialogueRect))
+                combatRects.Add(dialogueRect);
 
             CardPhysicsSolver.ResolveOverlaps(
                 stacks,
@@ -666,12 +676,21 @@ namespace CryingSnow.StackCraft
         /// <param name="stackToIgnore">A specific stack to ignore during the overlap resolution process.</param>
         public void ResolveOverlaps(CombatRect combatRect, CardStack stackToIgnore = null)
         {
-            var combatRects = CombatManager.Instance != null
-                ? CombatManager.Instance.ActiveCombatRects
-                : null;
+            List<CombatRect> combatRects = CombatManager.Instance != null
+                ? CombatManager.Instance.ActiveCombatRects.Where(rect => rect != null).ToList()
+                : new List<CombatRect>();
+            CombatRect dialogueRect = DialogueManager.Instance?.InteractionRect;
+            if (dialogueRect != null && !combatRects.Contains(dialogueRect))
+                combatRects.Add(dialogueRect);
+            if (combatRect != null && !combatRects.Contains(combatRect))
+                combatRects.Add(combatRect);
+
+            IList<CardStack> stacksToResolve = stackToIgnore == null
+                ? stacks
+                : stacks.Where(stack => stack != stackToIgnore).ToList();
 
             CardPhysicsSolver.ResolveOverlaps(
-                stacks,
+                stacksToResolve,
                 combatRects,
                 cardSettings.MaxIterations
             );

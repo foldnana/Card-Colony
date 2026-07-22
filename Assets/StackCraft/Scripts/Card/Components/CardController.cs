@@ -223,6 +223,7 @@ namespace CryingSnow.StackCraft
             {
                 TryTradeWithNearbyZone,
                 TryEquipOnNearbyCharacter,
+                TryInitiateDialogueWithNearbyNpc,
                 TryJoinCombatWithExistingTask,
                 TryInitiateCombatWithNearbyEnemy
             };
@@ -396,6 +397,14 @@ namespace CryingSnow.StackCraft
             }
 
             return false;
+        }
+
+        private bool TryInitiateDialogueWithNearbyNpc()
+        {
+            return DialogueManager.Instance != null &&
+                DialogueManager.Instance.TryStartDialogueFromDrop(
+                    _card,
+                    _card.Settings.AttachRadius);
         }
 
         private bool TryJoinCombatWithExistingTask()

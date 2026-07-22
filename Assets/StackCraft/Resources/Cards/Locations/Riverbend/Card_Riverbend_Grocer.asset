@@ -25,6 +25,10 @@ MonoBehaviour:
   ambientWanderRadius: 1
   ambientMoveSpeed: 0.5
   ambientIdleRange: {x: 2, y: 4}
+  dialogueEnabled: 1
+  dialogueOpeningText: "出远门前先把口粮备足，空着肚子可走不远。"
+  dialogueReplyText: "有什么推荐？"
+  dialogueResponseText: "面包耐放，草药也该带上一些。"
   combatType: 0
   loot: []
   isAggressive: 0

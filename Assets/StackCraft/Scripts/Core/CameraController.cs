@@ -78,7 +78,8 @@ namespace CryingSnow.StackCraft
 
         private void Update()
         {
-            if (!InputManager.Instance.IsInputEnabled) return;
+            if (InputManager.Instance != null && !InputManager.Instance.IsCameraInputEnabled)
+                return;
 
             HandlePan();
             HandleZoom();

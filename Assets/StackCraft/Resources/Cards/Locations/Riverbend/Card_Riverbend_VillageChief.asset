@@ -25,6 +25,10 @@ MonoBehaviour:
   ambientWanderRadius: 1
   ambientMoveSpeed: 0.5
   ambientIdleRange: {x: 2, y: 4}
+  dialogueEnabled: 1
+  dialogueOpeningText: "年轻人，你们似乎不是本地人。先去杂货商那里看看吧。"
+  dialogueReplyText: "我该去哪里？"
+  dialogueResponseText: "沿着村里的小路往西走，杂货商会为旅途准备补给。"
   combatType: 0
   loot: []
   isAggressive: 0

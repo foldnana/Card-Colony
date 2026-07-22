@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace CryingSnow.StackCraft
 {
@@ -11,7 +12,10 @@ namespace CryingSnow.StackCraft
 
         public RectTransform Rect { get; private set; }
 
+        [SerializeField] private Shader interactionTintShader;
+
         private Vector2 cellSize;
+        private Material runtimeVisualMaterial;
 
         private List<CardInstance> _attackers;
         private List<CardInstance> _defenders;
@@ -44,6 +48,42 @@ namespace CryingSnow.StackCraft
             CardManager.Instance.ResolveOverlaps(this);
 
             ArrangeCards();
+        }
+
+        public bool ConfigureInteractionTint(Color color)
+        {
+            Image visual = GetComponentInChildren<Image>(true);
+            Shader shader = interactionTintShader != null
+                ? interactionTintShader
+                : Shader.Find("Crying Snow/StackCraft/InteractionTint");
+            if (visual == null || shader == null)
+                return false;
+
+            ReleaseRuntimeVisualMaterial();
+            runtimeVisualMaterial = new Material(shader)
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            runtimeVisualMaterial.SetColor("_TintColor", color);
+            visual.material = runtimeVisualMaterial;
+            return true;
+        }
+
+        private void OnDestroy()
+        {
+            ReleaseRuntimeVisualMaterial();
+        }
+
+        private void ReleaseRuntimeVisualMaterial()
+        {
+            if (runtimeVisualMaterial == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(runtimeVisualMaterial);
+            else
+                DestroyImmediate(runtimeVisualMaterial);
+            runtimeVisualMaterial = null;
         }
 
         /// <summary>
@@ -161,7 +201,10 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void Close()
         {
-            Destroy(gameObject);
+            if (Application.isPlaying)
+                Destroy(gameObject);
+            else
+                DestroyImmediate(gameObject);
         }
     }
 }
