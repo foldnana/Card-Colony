@@ -232,7 +232,7 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("faction").enumValueIndex = (int)CardFaction.Neutral;
             serialized.FindProperty("isLocationStatic").boolValue = true;
             bool isNpc = spec.Category == CardCategory.Character;
-            serialized.FindProperty("playerDraggable").boolValue = isNpc;
+            serialized.FindProperty("playerDraggable").boolValue = false;
             serialized.FindProperty("ambientNpcAiEnabled").boolValue = isNpc;
             serialized.FindProperty("ambientWanderRadius").floatValue = 1f;
             serialized.FindProperty("ambientMoveSpeed").floatValue = 0.5f;

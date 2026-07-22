@@ -1,0 +1,47 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c7f5a4d4a14b09a7d9fd4b1fc9aa11, type: 3}
+  m_Name: Location_RiverbendInn
+  m_EditorClassIdentifier: 
+  id: riverbend-inn
+  displayName: "\u6CB3\u6E7E\u65C5\u9986"
+  backgroundTexture: {fileID: 2800000, guid: 37b02afab15cb8045b1bc7c5be3e8d6d, type: 3}
+  mapSize: {x: 18.4, y: 10.35}
+  cameraMinDistance: 3
+  cameraMaxDistance: 20
+  cameraInitialDistance: 7
+  cameraZoomSpeed: 3
+  expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  partySpawnPosition: {x: 0, y: 0, z: -3.7}
+  partyMemberSpacing: 0.9
+  initialCardSpawns:
+  - definition: {fileID: 11400000, guid: 449d9bfc354fea740911decbd549df77, type: 2}
+    position: {x: 3.15, y: 0, z: -2.45}
+  - definition: {fileID: 11400000, guid: 40b868863323a6e469b7548100d9e507, type: 2}
+    position: {x: 3.15, y: 0, z: -1.35}
+  - definition: {fileID: 11400000, guid: 9985c44fb4daab64197ac8401e6646c7, type: 2}
+    position: {x: -2.8, y: 0, z: -1.85}
+  - definition: {fileID: 11400000, guid: 9985c44fb4daab64197ac8401e6646c7, type: 2}
+    position: {x: -0.35, y: 0, z: -1.85}
+  - definition: {fileID: 11400000, guid: 9985c44fb4daab64197ac8401e6646c7, type: 2}
+    position: {x: -2.8, y: 0, z: 0.45}
+  - definition: {fileID: 11400000, guid: d41ae32ab715a294485d46ae6533522f, type: 2}
+    position: {x: -0.35, y: 0, z: 0.45}
+  - definition: {fileID: 11400000, guid: 63810f280fa7d4b48964bda4c36328c8, type: 2}
+    position: {x: -6.15, y: 0, z: 1.8}
+  - definition: {fileID: 11400000, guid: 63810f280fa7d4b48964bda4c36328c8, type: 2}
+    position: {x: -6.15, y: 0, z: -1.65}
+  - definition: {fileID: 11400000, guid: 63810f280fa7d4b48964bda4c36328c8, type: 2}
+    position: {x: 6.15, y: 0, z: 1.8}
+  - definition: {fileID: 11400000, guid: 63810f280fa7d4b48964bda4c36328c8, type: 2}
+    position: {x: 6.15, y: 0, z: -1.65}
+  entrances: []

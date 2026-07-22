@@ -61,6 +61,7 @@ namespace CryingSnow.StackCraft
             if (!InputManager.Instance.IsInputEnabled) return;
 
             WorldMapLocation.NotifyCardClicked(_card);
+            LocationEntrance.NotifyCardClicked(_card);
 
             if (!CanBeDragged) return;
 
@@ -221,6 +222,7 @@ namespace CryingSnow.StackCraft
 
             var terminalActions = new System.Func<bool>[]
             {
+                TryDockAtNearbyBuilding,
                 TryTradeWithNearbyZone,
                 TryEquipOnNearbyCharacter,
                 TryInitiateDialogueWithNearbyNpc,
@@ -265,6 +267,14 @@ namespace CryingSnow.StackCraft
 
             CardManager.Instance?.ResolveOverlaps();
             _card.OriginalCraftingStack = null;
+        }
+
+        private bool TryDockAtNearbyBuilding()
+        {
+            LocationEntrance entrance = LocationEntrance.FindNearby(
+                _card,
+                _card.Settings.AttachRadius);
+            return entrance != null && entrance.OnStack(_card.Stack);
         }
         #endregion
 

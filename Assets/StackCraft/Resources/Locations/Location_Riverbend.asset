@@ -38,3 +38,6 @@ MonoBehaviour:
     position: {x: -3.2, y: 0, z: -1.6}
   - definition: {fileID: 11400000, guid: 6ad8567ae2e4f7e40a4ea5a8d8389f19, type: 2}
     position: {x: 3.2, y: 0, z: -3.6}
+  entrances:
+  - sourceCardDefinition: {fileID: 11400000, guid: a4a04f35feea8c64d8f952857fe1a7e6, type: 2}
+    destinationLocationId: riverbend-inn

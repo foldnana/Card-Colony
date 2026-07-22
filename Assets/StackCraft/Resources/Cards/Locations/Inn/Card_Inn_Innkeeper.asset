@@ -10,25 +10,25 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
-  m_Name: Card_Riverbend_Blacksmith
+  m_Name: Card_Inn_Innkeeper
   m_EditorClassIdentifier: 
-  id: riverbend-blacksmith
-  displayName: "\u94C1\u5320"
-  description: "\u8D1F\u8D23\u6253\u9020\u548C\u4FEE\u7406\u88C5\u5907\u7684\u94C1\u5320\u3002"
-  artTexture: {fileID: 2800000, guid: 3a04846ef6aacd44ebd1152aa0ca63fe, type: 3}
+  id: riverbend-innkeeper
+  displayName: "\u65C5\u5E97\u8001\u677F"
+  description: "\u7ECF\u8425\u6CB3\u6E7E\u65C5\u9986\uFF0C\u719F\u6089\u6765\u5F80\u65C5\u5BA2\u4E0E\u6751\u91CC\u7684\u6D88\u606F\u3002"
+  artTexture: {fileID: 2800000, guid: c909532dfda46b242879872b834d319b, type: 3}
   baseTextureOverride: {fileID: 2800000, guid: 1778b882b79e6fc4aa1ad7916922c280, type: 3}
   category: 2
   faction: 0
   isLocationStatic: 1
   playerDraggable: 0
-  ambientNpcAiEnabled: 1
-  ambientWanderRadius: 1
-  ambientMoveSpeed: 0.5
-  ambientIdleRange: {x: 2, y: 4}
+  ambientNpcAiEnabled: 0
+  ambientWanderRadius: 0
+  ambientMoveSpeed: 0.45
+  ambientIdleRange: {x: 2.5, y: 5}
   dialogueEnabled: 1
-  dialogueOpeningText: "要修装备就得有好材料，市场偶尔能淘到矿石。"
-  dialogueReplyText: "哪里能找到矿石？"
-  dialogueResponseText: "旧矿洞还能挖到，只是路上不太安全。"
+  dialogueOpeningText: "\u6B22\u8FCE\u6765\u5230\u6CB3\u6E7E\u65C5\u9986\u3002\u60F3\u4F4F\u5E97\uFF0C\u8FD8\u662F\u6253\u542C\u4E9B\u8DEF\u4E0A\u7684\u6D88\u606F\uFF1F"
+  dialogueReplyText: "\u6700\u8FD1\u6709\u4EC0\u4E48\u65B0\u9C9C\u4E8B\uFF1F"
+  dialogueResponseText: "\u5F80\u68EE\u6797\u53BB\u7684\u4EBA\u591A\u4E86\uFF0C\u4F46\u5E73\u5B89\u56DE\u6765\u7684\u5374\u4E0D\u7B97\u591A\u3002\u51FA\u53D1\u524D\u6700\u597D\u5148\u5907\u597D\u8865\u7ED9\u3002"
   combatType: 0
   loot: []
   isAggressive: 0

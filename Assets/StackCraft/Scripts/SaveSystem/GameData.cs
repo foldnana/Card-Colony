@@ -9,6 +9,7 @@ namespace CryingSnow.StackCraft
         public int SlotNumber;
         public string CurrentScene;
         public string ActiveLocationId;
+        public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
         public GameplayPrefs GameplayPrefs;
         public Dictionary<string, SceneData> SavedScenes = new();
@@ -16,6 +17,9 @@ namespace CryingSnow.StackCraft
         public HashSet<string> DiscoveredRecipes = new();
         public HashSet<string> SeenItems = new();
         public System.DateTime LastSaved;
+
+        [System.NonSerialized]
+        private bool locationPartyTransferPending;
 
         public GameData() { }
 
@@ -43,6 +47,39 @@ namespace CryingSnow.StackCraft
             return CurrentScene == "Location" && !string.IsNullOrWhiteSpace(ActiveLocationId)
                 ? $"Location/{ActiveLocationId}"
                 : CurrentScene;
+        }
+
+        public void PushLocation(string locationId)
+        {
+            if (string.IsNullOrWhiteSpace(locationId))
+                return;
+
+            LocationHistory ??= new List<string>();
+            LocationHistory.Add(locationId);
+        }
+
+        public bool TryPopLocation(out string locationId)
+        {
+            locationId = null;
+            if (LocationHistory == null || LocationHistory.Count == 0)
+                return false;
+
+            int lastIndex = LocationHistory.Count - 1;
+            locationId = LocationHistory[lastIndex];
+            LocationHistory.RemoveAt(lastIndex);
+            return true;
+        }
+
+        public void MarkLocationPartyTransferPending()
+        {
+            locationPartyTransferPending = true;
+        }
+
+        public bool ConsumeLocationPartyTransferPending()
+        {
+            bool wasPending = locationPartyTransferPending;
+            locationPartyTransferPending = false;
+            return wasPending;
         }
     }
 

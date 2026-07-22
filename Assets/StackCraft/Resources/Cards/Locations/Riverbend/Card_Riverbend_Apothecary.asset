@@ -20,7 +20,7 @@ MonoBehaviour:
   category: 2
   faction: 0
   isLocationStatic: 1
-  playerDraggable: 1
+  playerDraggable: 0
   ambientNpcAiEnabled: 1
   ambientWanderRadius: 1
   ambientMoveSpeed: 0.5

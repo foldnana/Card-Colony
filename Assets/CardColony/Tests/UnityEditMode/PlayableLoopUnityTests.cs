@@ -1211,8 +1211,17 @@ namespace CardColony.Tests
             var serializedController = new SerializedObject(controller);
             SerializedProperty definitions = serializedController.FindProperty("locationDefinitions");
             Assert.That(definitions, Is.Not.Null);
-            Assert.That(definitions.arraySize, Is.EqualTo(1));
-            Object riverbend = definitions.GetArrayElementAtIndex(0).objectReferenceValue;
+            Object riverbend = null;
+            for (int index = 0; index < definitions.arraySize; index++)
+            {
+                Object candidate = definitions.GetArrayElementAtIndex(index).objectReferenceValue;
+                if (candidate != null &&
+                    new SerializedObject(candidate).FindProperty("id").stringValue == "riverbend")
+                {
+                    riverbend = candidate;
+                    break;
+                }
+            }
             Assert.That(riverbend, Is.Not.Null);
             var serializedDefinition = new SerializedObject(riverbend);
             Assert.That(serializedDefinition.FindProperty("id").stringValue, Is.EqualTo("riverbend"));
@@ -1434,7 +1443,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void RiverbendLocation_BuildingsAreFixedAndNpcsRemainPlayerDraggable()
+        public void RiverbendLocation_BuildingsAndNpcsCannotBeDraggedByPlayer()
         {
             Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
                 "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
@@ -1449,22 +1458,19 @@ namespace CardColony.Tests
                     .FindPropertyRelative("definition").objectReferenceValue;
                 var serializedCard = new SerializedObject(definition);
                 string displayName = serializedCard.FindProperty("displayName").stringValue;
-                bool isBuilding = serializedCard.FindProperty("category").enumValueIndex == 6;
                 SerializedProperty playerDraggable = serializedCard.FindProperty("playerDraggable");
 
                 Assert.That(playerDraggable, Is.Not.Null,
                     $"{displayName} 需要显式配置玩家能否拖动");
-                Assert.That(playerDraggable.boolValue, Is.EqualTo(!isBuilding),
-                    isBuilding
-                        ? $"{displayName} 是固定建筑，不能被玩家拖动"
-                        : $"{displayName} 仍需允许玩家拖动以支持后续交互");
+                Assert.That(playerDraggable.boolValue, Is.False,
+                    $"{displayName} 是地点固定内容，不能被玩家随意拖动");
 
                 if (displayName == "市场") marketDefinition = definition;
                 if (displayName == "村长") villageChiefDefinition = definition;
             }
 
             Component market = CreateUninitializedCard(marketDefinition, "Fixed Market");
-            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Draggable Village Chief");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Fixed Village Chief");
             try
             {
                 System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
@@ -1485,9 +1491,9 @@ namespace CardColony.Tests
                 Assert.That(chiefStack.GetType().GetProperty("IsLocked").GetValue(chiefStack), Is.False,
                     "村长卡堆不应锁定");
                 Assert.That(villageChiefDefinition.GetType().GetProperty("PlayerDraggable")
-                    .GetValue(villageChiefDefinition), Is.True, "村长定义的运行时拖动开关应为开启");
-                Assert.That(canBeDragged.GetValue(chiefController), Is.True,
-                    "村长配置为可拖动，CardController 也必须允许拖动");
+                    .GetValue(villageChiefDefinition), Is.False, "村长定义的运行时拖动开关应为关闭");
+                Assert.That(canBeDragged.GetValue(chiefController), Is.False,
+                    "NPC 即使卡堆未锁定，CardController 也不能允许玩家拖动");
             }
             finally
             {
@@ -1910,20 +1916,20 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void RiverbendLocation_CardsStackedOnBuildingsCanStillBeDraggedAway()
+        public void RiverbendLocation_PlayerCardsStackedOnBuildingsCanStillBeDraggedAway()
         {
             Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
                 "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
-            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
-                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
             Component market = CreateUninitializedCard(marketDefinition, "Stacked Market");
-            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Chief On Market");
+            Component player = CreateUninitializedCard(playerDefinition, "Player On Market");
             try
             {
                 System.Type cardType = market.GetType();
                 System.Array cards = System.Array.CreateInstance(cardType, 2);
                 cards.SetValue(market, 0);
-                cards.SetValue(villageChief, 1);
+                cards.SetValue(player, 1);
                 System.Type locationControllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
                 locationControllerType.GetMethods(BindingFlags.Public | BindingFlags.Static)
                     .First(method => method.Name == "ConfigureLocationCardBehaviours" &&
@@ -1931,21 +1937,21 @@ namespace CardColony.Tests
                     .Invoke(null, new object[] { cards });
 
                 object marketStack = market.GetType().GetProperty("Stack").GetValue(market);
-                object chiefStack = villageChief.GetType().GetProperty("Stack").GetValue(villageChief);
-                marketStack.GetType().GetMethod("MergeWith").Invoke(marketStack, new[] { chiefStack });
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+                marketStack.GetType().GetMethod("MergeWith").Invoke(marketStack, new[] { playerStack });
 
                 System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
-                Component controller = villageChief.gameObject.AddComponent(controllerType);
+                Component controller = player.gameObject.AddComponent(controllerType);
                 controllerType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
                     .Invoke(controller, null);
 
                 Assert.That(controllerType.GetProperty("CanBeDragged").GetValue(controller), Is.True,
-                    "普通卡叠到建筑上后仍需允许拖出，建筑固定不能通过锁死整堆实现");
+                    "玩家卡叠到建筑上后仍需允许拖出，建筑固定不能通过锁死整堆实现");
             }
             finally
             {
                 DestroyTestCard(market);
-                DestroyTestCard(villageChief);
+                DestroyTestCard(player);
             }
         }
 
@@ -4034,6 +4040,757 @@ namespace CardColony.Tests
             {
                 Object.DestroyImmediate(driverObject);
                 Object.DestroyImmediate(ui);
+            }
+        }
+
+        [Test]
+        public void RiverbendInnInterior_UsesGeneratedBackgroundAndFiveCardArts()
+        {
+            string[] requiredTextures =
+            {
+                "Assets/CardColony/Art/Backgrounds/Inn/RiverbendInnInteriorBackground.png",
+                "Assets/CardColony/Art/CardArts/Inn/Innkeeper.png",
+                "Assets/CardColony/Art/CardArts/Inn/Waiter.png",
+                "Assets/CardColony/Art/CardArts/Inn/Reception.png",
+                "Assets/CardColony/Art/CardArts/Inn/Table.png",
+                "Assets/CardColony/Art/CardArts/Inn/Bed.png"
+            };
+
+            foreach (string path in requiredTextures)
+            {
+                Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+                Assert.That(texture, Is.Not.Null, $"旅馆视觉资源尚未导入：{path}");
+                Assert.That(texture.width, Is.GreaterThanOrEqualTo(1024));
+                Assert.That(texture.height, Is.GreaterThanOrEqualTo(900));
+            }
+        }
+
+        [Test]
+        public void RiverbendInnBackground_PreservesSixteenByNineImportAspect()
+        {
+            const string path =
+                "Assets/CardColony/Art/Backgrounds/Inn/RiverbendInnInteriorBackground.png";
+            Texture2D texture = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+            TextureImporter importer = AssetImporter.GetAtPath(path) as TextureImporter;
+
+            Assert.That(texture, Is.Not.Null);
+            Assert.That(importer, Is.Not.Null);
+            Assert.That(importer.npotScale, Is.EqualTo(TextureImporterNPOTScale.None),
+                "旅馆底图不能被 Unity 强制缩放成 2:1");
+            Assert.That((float)texture.width / texture.height, Is.EqualTo(16f / 9f).Within(0.01f));
+        }
+
+        [Test]
+        public void RiverbendInnLocation_ConfiguresReceptionStaffTablesAndFourBeds()
+        {
+            Object definition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_RiverbendInn.asset");
+            Assert.That(definition, Is.Not.Null, "旅馆内部必须拥有独立 LocationDefinition");
+
+            var serialized = new SerializedObject(definition);
+            Assert.That(serialized.FindProperty("id").stringValue, Is.EqualTo("riverbend-inn"));
+            Assert.That(serialized.FindProperty("displayName").stringValue, Is.EqualTo("河湾旅馆"));
+            Assert.That(serialized.FindProperty("backgroundTexture").objectReferenceValue, Is.Not.Null);
+
+            SerializedProperty spawns = serialized.FindProperty("initialCardSpawns");
+            Assert.That(spawns, Is.Not.Null);
+            Assert.That(spawns.arraySize, Is.EqualTo(10),
+                "内部应为前台、老板、三张桌子、小二和四张床，共十张固定内容卡");
+
+            var ids = new List<string>();
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                Object card = spawns.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                Assert.That(card, Is.Not.Null);
+                ids.Add(new SerializedObject(card).FindProperty("id").stringValue);
+            }
+
+            Assert.That(ids.Count(id => id == "riverbend-inn-reception"), Is.EqualTo(1));
+            Assert.That(ids.Count(id => id == "riverbend-innkeeper"), Is.EqualTo(1));
+            Assert.That(ids.Count(id => id == "riverbend-inn-table"), Is.EqualTo(3));
+            Assert.That(ids.Count(id => id == "riverbend-inn-waiter"), Is.EqualTo(1));
+            Assert.That(ids.Count(id => id == "riverbend-inn-bed"), Is.EqualTo(4));
+        }
+
+        [Test]
+        public void RiverbendLocation_MapsInnBuildingCardToInnInterior()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Assert.That(riverbend, Is.Not.Null);
+
+            SerializedProperty entrances = new SerializedObject(riverbend)
+                .FindProperty("entrances");
+            Assert.That(entrances, Is.Not.Null, "LocationDefinition 需要声明建筑入口");
+            Assert.That(entrances.arraySize, Is.EqualTo(1));
+
+            SerializedProperty entrance = entrances.GetArrayElementAtIndex(0);
+            Object sourceCard = entrance.FindPropertyRelative("sourceCardDefinition")
+                .objectReferenceValue;
+            Assert.That(sourceCard, Is.Not.Null);
+            Assert.That(
+                new SerializedObject(sourceCard).FindProperty("id").stringValue,
+                Is.EqualTo("riverbend-inn"));
+            Assert.That(
+                entrance.FindPropertyRelative("destinationLocationId").stringValue,
+                Is.EqualTo("riverbend-inn"));
+        }
+
+        [Test]
+        public void GameData_LocationHistoryUsesLastEnteredLocationAsReturnTarget()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Assert.That(gameDataType, Is.Not.Null);
+            object gameData = System.Activator.CreateInstance(gameDataType);
+
+            MethodInfo push = gameDataType.GetMethod("PushLocation");
+            MethodInfo tryPop = gameDataType.GetMethod("TryPopLocation");
+            Assert.That(push, Is.Not.Null);
+            Assert.That(tryPop, Is.Not.Null);
+
+            push.Invoke(gameData, new object[] { "riverbend" });
+            push.Invoke(gameData, new object[] { "riverbend-inn" });
+
+            object[] firstPop = { null };
+            Assert.That(tryPop.Invoke(gameData, firstPop), Is.True);
+            Assert.That(firstPop[0], Is.EqualTo("riverbend-inn"));
+
+            object[] secondPop = { null };
+            Assert.That(tryPop.Invoke(gameData, secondPop), Is.True);
+            Assert.That(secondPop[0], Is.EqualTo("riverbend"));
+
+            object[] emptyPop = { null };
+            Assert.That(tryPop.Invoke(gameData, emptyPop), Is.False);
+            Assert.That(emptyPop[0], Is.Null);
+        }
+
+        [Test]
+        public void GameData_PendingLocationPartyTransferIsConsumedOnce()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            MethodInfo mark = gameDataType.GetMethod("MarkLocationPartyTransferPending");
+            MethodInfo consume = gameDataType.GetMethod("ConsumeLocationPartyTransferPending");
+            Assert.That(mark, Is.Not.Null);
+            Assert.That(consume, Is.Not.Null);
+
+            mark.Invoke(gameData, null);
+            Assert.That(consume.Invoke(gameData, null), Is.True);
+            Assert.That(consume.Invoke(gameData, null), Is.False);
+        }
+
+        [Test]
+        public void LocationSceneController_ReplacesRestoredParentPartyWithoutRollingBackStats()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType = FindType("CryingSnow.StackCraft.GameDirector");
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject("Test GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(FindType("CryingSnow.StackCraft.GameplayPrefs")));
+            gameDirector.GetType().GetProperty("GameData")
+                .SetValue(gameDirector, gameData);
+
+            MonoBehaviour sceneBoard = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.Board");
+            sceneBoard.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(sceneBoard, null);
+
+            MonoBehaviour sceneCardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            sceneCardManager.GetType().GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, sceneCardManager);
+            sceneCardManager.GetType().GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(sceneCardManager, null);
+            sceneCardManager.GetType().GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(sceneCardManager, null);
+
+            MonoBehaviour controller = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.LocationSceneController");
+            Object riverbendDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            controller.GetType().GetField(
+                    "activeDefinition",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .SetValue(controller, riverbendDefinition);
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object playerData = System.Activator.CreateInstance(cardDataType);
+            Object villagerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            cardDataType.GetField("Id").SetValue(
+                playerData,
+                new SerializedObject(villagerDefinition).FindProperty("id").stringValue);
+            cardDataType.GetField("UsesLeft").SetValue(playerData, 3);
+            cardDataType.GetField("CurrentHealth").SetValue(playerData, 7);
+            cardDataType.GetField("CurrentNutrition").SetValue(playerData, 2);
+
+            System.Array party = System.Array.CreateInstance(cardDataType, 1);
+            party.SetValue(playerData, 0);
+            MethodInfo replace = controller.GetType().GetMethod("ReplacePlayerParty");
+            Assert.That(replace, Is.Not.Null);
+            LogAssert.Expect(
+                LogType.Error,
+                "Instantiating material due to calling renderer.material during edit mode. This will leak materials into the scene. You most likely want to use renderer.sharedMaterial instead.");
+            replace.Invoke(controller, new object[] { party });
+
+            System.Type cardManagerType = FindType("CryingSnow.StackCraft.CardManager");
+            MonoBehaviour cardManager = (MonoBehaviour)cardManagerType
+                .GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .GetValue(null);
+            Assert.That(cardManager, Is.Not.Null);
+            var cards = ((System.Collections.IEnumerable)cardManager.GetType()
+                    .GetProperty("AllCards").GetValue(cardManager))
+                .Cast<Component>()
+                .Where(card =>
+                {
+                    Object definition = (Object)card.GetType().GetProperty("Definition").GetValue(card);
+                    var serialized = new SerializedObject(definition);
+                    return serialized.FindProperty("category").enumValueIndex == 2 &&
+                        serialized.FindProperty("faction").enumValueIndex == 1;
+                })
+                .ToList();
+
+            Assert.That(cards, Has.Count.EqualTo(1));
+            Component restored = cards[0];
+            Assert.That(restored.GetType().GetProperty("CurrentHealth").GetValue(restored), Is.EqualTo(7));
+            Assert.That(restored.GetType().GetProperty("CurrentNutrition").GetValue(restored), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void LocationEntrance_AcceptsOnlyPlayerCharacterStacks()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            Assert.That(entranceType, Is.Not.Null);
+            MethodInfo canAccept = entranceType.GetMethod(
+                "CanAccept",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(canAccept, Is.Not.Null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object neutralDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Grocer.asset");
+            Object structureDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Entrance Player");
+            Component neutral = CreateUninitializedCard(neutralDefinition, "Entrance Neutral");
+            Component structure = CreateUninitializedCard(structureDefinition, "Entrance Structure");
+            try
+            {
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+                object neutralStack = neutral.GetType().GetProperty("Stack").GetValue(neutral);
+                object structureStack = structure.GetType().GetProperty("Stack").GetValue(structure);
+
+                Assert.That(canAccept.Invoke(null, new[] { playerStack }), Is.True);
+                Assert.That(canAccept.Invoke(null, new[] { neutralStack }), Is.False);
+                Assert.That(canAccept.Invoke(null, new[] { structureStack }), Is.False);
+            }
+            finally
+            {
+                DestroyTestCard(structure);
+                DestroyTestCard(neutral);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void LocationEntrance_DocksOnePlayerAndWaitsForExplicitEnterRequest()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Docked Entrance Player");
+            Component inn = CreateUninitializedCard(innDefinition, "Dockable Inn Entrance");
+            try
+            {
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+
+                Assert.That(entranceType.GetMethod("OnStack").Invoke(
+                    entrance,
+                    new[] { playerStack }), Is.True,
+                    "放入人物槽只应完成收纳，不应依赖 GameDirector 立即切换场景");
+                Assert.That(entranceType.GetProperty("Occupant").GetValue(entrance), Is.SameAs(player));
+                Assert.That(entranceType.GetProperty("CanEnter").GetValue(entrance), Is.True);
+                Assert.That(entranceType.GetMethod("TryEnter").Invoke(entrance, null), Is.False,
+                    "没有 GameDirector 时显式进入请求应失败，证明堆叠本身没有触发切图");
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void LocationEntrance_SinglePersonSlotRejectsAnotherPlayerUntilDetached()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component firstPlayer = CreateUninitializedCard(playerDefinition, "First Slot Player");
+            Component secondPlayer = CreateUninitializedCard(playerDefinition, "Second Slot Player");
+            Component inn = CreateUninitializedCard(innDefinition, "Single Slot Inn");
+            try
+            {
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                object firstStack = firstPlayer.GetType().GetProperty("Stack").GetValue(firstPlayer);
+                object secondStack = secondPlayer.GetType().GetProperty("Stack").GetValue(secondPlayer);
+
+                Assert.That(entranceType.GetMethod("OnStack").Invoke(entrance, new[] { firstStack }), Is.True);
+                Assert.That(entranceType.GetMethod("OnStack").Invoke(entrance, new[] { secondStack }), Is.False);
+                Assert.That(entranceType.GetProperty("Occupant").GetValue(entrance), Is.SameAs(firstPlayer));
+
+                entranceType.GetMethod("Detach").Invoke(entrance, new object[] { firstPlayer });
+                Assert.That(entranceType.GetMethod("OnStack").Invoke(entrance, new[] { secondStack }), Is.True);
+                Assert.That(entranceType.GetProperty("Occupant").GetValue(entrance), Is.SameAs(secondPlayer));
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+                DestroyTestCard(secondPlayer);
+                DestroyTestCard(firstPlayer);
+            }
+        }
+
+        [Test]
+        public void CardPhysicsSolver_TreatsBuildingSlotOccupantAsDockedStack()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            System.Type solverType = FindType("CryingSnow.StackCraft.CardPhysicsSolver");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Physics Docked Player");
+            Component inn = CreateUninitializedCard(innDefinition, "Physics Docking Inn");
+            try
+            {
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+                entranceType.GetMethod("OnStack").Invoke(entrance, new[] { playerStack });
+
+                MethodInfo isDocked = solverType.GetMethod(
+                    "IsDockedPartyStack",
+                    BindingFlags.Static | BindingFlags.NonPublic);
+                Assert.That(isDocked, Is.Not.Null);
+                Assert.That(isDocked.Invoke(null, new[] { playerStack }), Is.True,
+                    "建筑人物槽中的卡堆必须和世界地图停靠小队一样退出碰撞分离");
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void LocationEntrance_SelectionPersistsOnBlankAndClearsOnAnotherCard()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            EventInfo selectionChanged = entranceType.GetEvent("SelectionChanged");
+            Assert.That(selectionChanged, Is.Not.Null);
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Component inn = CreateUninitializedCard(innDefinition, "Selectable Inn");
+            Component otherCard = CreateUninitializedCard(playerDefinition, "Other Clicked Card");
+            Component entrance = inn.gameObject.AddComponent(entranceType);
+            object lastSelection = new object();
+            System.Action<Component> handler = selected => lastSelection = selected;
+            System.Delegate runtimeHandler = System.Delegate.CreateDelegate(
+                selectionChanged.EventHandlerType,
+                handler.Target,
+                handler.Method);
+            selectionChanged.AddEventHandler(null, runtimeHandler);
+            try
+            {
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                entranceType.GetMethod("SetSelected").Invoke(entrance, new object[] { true, true });
+                Assert.That(lastSelection, Is.SameAs(entrance));
+
+                entranceType.GetMethod("NotifyCardClicked", BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { null });
+                Assert.That(entranceType.GetProperty("IsSelected").GetValue(entrance), Is.True,
+                    "点击空白区域不应取消建筑选择");
+
+                entranceType.GetMethod("NotifyCardClicked", BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { otherCard });
+                Assert.That(entranceType.GetProperty("IsSelected").GetValue(entrance), Is.False);
+                Assert.That(lastSelection, Is.Null);
+            }
+            finally
+            {
+                selectionChanged.RemoveEventHandler(null, runtimeHandler);
+                DestroyTestCard(otherCard);
+                DestroyTestCard(inn);
+            }
+        }
+
+        [Test]
+        public void OriginalUiRoot_SelectedBuildingShowsBuildingDetailsAndEnterButton()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            Component player = null;
+            Component inn = null;
+            try
+            {
+                Component locationView = FindDescendant(uiInstance, "LocationView")
+                    .GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView");
+                locationView.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+
+                Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+                Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+                player = CreateUninitializedCard(playerDefinition, "Sidebar Building Player");
+                inn = CreateUninitializedCard(innDefinition, "Sidebar Inn Building");
+                System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                object playerStack = player.GetType().GetProperty("Stack").GetValue(player);
+                entranceType.GetMethod("OnStack").Invoke(entrance, new[] { playerStack });
+                entranceType.GetMethod("SetSelected").Invoke(entrance, new object[] { true, true });
+
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationToggle").GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("建筑"));
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationTitle").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("旅馆"));
+                Assert.That(
+                    FindDescendant(uiInstance, "LocationTypeAndDanger").GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("建筑"));
+                Button enterButton = FindDescendant(uiInstance, "EnterLocationButton").GetComponent<Button>();
+                Assert.That(enterButton.interactable, Is.True);
+                Assert.That(enterButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
+                    Is.EqualTo("进入旅馆"));
+            }
+            finally
+            {
+                Component locationView = FindDescendant(uiInstance, "LocationView")
+                    ?.GetComponents<MonoBehaviour>()
+                    .FirstOrDefault(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.WorldMapLocationView");
+                locationView?.GetType().GetMethod(
+                    "OnDestroy",
+                    BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
+                DestroyTestCard(inn);
+                DestroyTestCard(player);
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void RiverbendAndInn_NpcCardsAreNotPlayerDraggable()
+        {
+            string[] locationPaths =
+            {
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset",
+                "Assets/StackCraft/Resources/Locations/Location_RiverbendInn.asset"
+            };
+
+            foreach (string locationPath in locationPaths)
+            {
+                Object location = AssetDatabase.LoadAssetAtPath<Object>(locationPath);
+                SerializedProperty spawns = new SerializedObject(location)
+                    .FindProperty("initialCardSpawns");
+                for (int index = 0; index < spawns.arraySize; index++)
+                {
+                    Object definition = spawns.GetArrayElementAtIndex(index)
+                        .FindPropertyRelative("definition").objectReferenceValue;
+                    var serializedCard = new SerializedObject(definition);
+                    bool isNeutralCharacter =
+                        serializedCard.FindProperty("category").enumValueIndex == 2 &&
+                        serializedCard.FindProperty("faction").enumValueIndex == 0;
+                    if (!isNeutralCharacter)
+                        continue;
+
+                    Assert.That(serializedCard.FindProperty("playerDraggable").boolValue, Is.False,
+                        $"{serializedCard.FindProperty("displayName").stringValue} 是 NPC，不能被玩家拖动");
+                }
+            }
+        }
+
+        [Test]
+        public void LocationEntrance_FindsConfiguredEntranceNearDroppedPlayer()
+        {
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            MethodInfo findNearby = entranceType.GetMethod(
+                "FindNearby",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(findNearby, Is.Not.Null);
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Nearby Entrance Player");
+            Component inn = CreateUninitializedCard(innDefinition, "Nearby Inn Entrance");
+            try
+            {
+                player.gameObject.AddComponent<BoxCollider>();
+                inn.gameObject.AddComponent<BoxCollider>();
+                player.transform.position = Vector3.zero;
+                inn.transform.position = new Vector3(0.5f, 0f, 0f);
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(entrance, new object[] { "riverbend-inn" });
+                Physics.SyncTransforms();
+
+                Assert.That(
+                    findNearby.Invoke(null, new object[] { player, 1.25f }),
+                    Is.SameAs(entrance));
+
+                inn.transform.position = new Vector3(5f, 0f, 0f);
+                Physics.SyncTransforms();
+                Assert.That(findNearby.Invoke(null, new object[] { player, 1.25f }), Is.Null);
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void CardController_DocksAtBuildingOnlyWithinNormalCardAttachRadius()
+        {
+            System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+            System.Type entranceType = FindType("CryingSnow.StackCraft.LocationEntrance");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Attach Radius Player");
+            Component inn = CreateUninitializedCard(innDefinition, "Attach Radius Inn");
+            try
+            {
+                Component controller = player.gameObject.AddComponent(controllerType);
+                controllerType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(controller, null);
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(
+                    entrance,
+                    new object[] { "riverbend-inn" });
+                MethodInfo tryDock = controllerType.GetMethod(
+                    "TryDockAtNearbyBuilding",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(tryDock, Is.Not.Null);
+
+                player.transform.position = Vector3.zero;
+                inn.transform.position = new Vector3(0.9f, 0f, 0f);
+                Physics.SyncTransforms();
+
+                Assert.That(tryDock.Invoke(controller, null), Is.False,
+                    "建筑人物槽不能在普通卡牌堆叠范围之外吸入人物卡");
+                Assert.That(entranceType.GetProperty("Occupant").GetValue(entrance), Is.Null);
+
+                inn.transform.position = new Vector3(0.6f, 0f, 0f);
+                Physics.SyncTransforms();
+                Assert.That(tryDock.Invoke(controller, null), Is.True,
+                    "人物卡进入普通卡牌堆叠范围后应能放入建筑人物槽");
+                Assert.That(entranceType.GetProperty("Occupant").GetValue(entrance), Is.SameAs(player));
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void LocationSceneController_ConfiguresInnBuildingAsRiverbendEntrance()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Assert.That(riverbend, Is.Not.Null);
+            Assert.That(innDefinition, Is.Not.Null);
+
+            Component innCard = CreateUninitializedCard(innDefinition, "Configured Inn Entrance");
+            try
+            {
+                System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+                System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+                System.Type locationDefinitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+                System.Array cards = System.Array.CreateInstance(cardType, 1);
+                cards.SetValue(innCard, 0);
+                MethodInfo configure = controllerType.GetMethod(
+                    "ConfigureLocationCardBehaviours",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[]
+                    {
+                        typeof(IEnumerable<>).MakeGenericType(cardType),
+                        locationDefinitionType
+                    },
+                    null);
+                Assert.That(configure, Is.Not.Null);
+                configure.Invoke(null, new object[] { cards, riverbend });
+
+                Component entrance = innCard.GetComponent("LocationEntrance");
+                Assert.That(entrance, Is.Not.Null);
+                Assert.That(
+                    entrance.GetType().GetProperty("DestinationLocationId").GetValue(entrance),
+                    Is.EqualTo("riverbend-inn"));
+            }
+            finally
+            {
+                DestroyTestCard(innCard);
+            }
+        }
+
+        [Test]
+        public void LocationScene_RegistersRiverbendAndInnDefinitions()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            MonoBehaviour controller = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.LocationSceneController");
+            Assert.That(controller, Is.Not.Null);
+
+            SerializedProperty definitions = new SerializedObject(controller)
+                .FindProperty("locationDefinitions");
+            var ids = new List<string>();
+            for (int index = 0; index < definitions.arraySize; index++)
+            {
+                Object definition = definitions.GetArrayElementAtIndex(index).objectReferenceValue;
+                if (definition != null)
+                    ids.Add(new SerializedObject(definition).FindProperty("id").stringValue);
+            }
+
+            Assert.That(ids, Does.Contain("riverbend"));
+            Assert.That(ids, Does.Contain("riverbend-inn"));
+        }
+
+        [Test]
+        public void LocationSceneController_ReturnLabelNamesParentLocation()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetMethod("PushLocation").Invoke(gameData, new object[] { "riverbend" });
+
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Object inn = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_RiverbendInn.asset");
+            System.Array definitions = System.Array.CreateInstance(definitionType, 2);
+            definitions.SetValue(riverbend, 0);
+            definitions.SetValue(inn, 1);
+
+            MethodInfo getLabel = controllerType.GetMethod(
+                "GetReturnButtonLabel",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(getLabel, Is.Not.Null);
+            Assert.That(
+                getLabel.Invoke(null, new object[] { gameData, definitions }),
+                Is.EqualTo("返回河湾村"));
+
+            object[] popArguments = { null };
+            gameDataType.GetMethod("TryPopLocation").Invoke(gameData, popArguments);
+            Assert.That(
+                getLabel.Invoke(null, new object[] { gameData, definitions }),
+                Is.EqualTo("返回世界地图"));
+        }
+
+        [Test]
+        public void RiverbendInnInstaller_UpsertsWithoutDeletingFutureLocationContent()
+        {
+            System.Type installerType = FindType(
+                "CryingSnow.StackCraft.EditorTools.RiverbendInnInstaller");
+            MethodInfo upsertEntrance = installerType?.GetMethod(
+                "UpsertEntrance",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo upsertDefinition = installerType?.GetMethod(
+                "UpsertDefinition",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(upsertEntrance, Is.Not.Null);
+            Assert.That(upsertDefinition, Is.Not.Null);
+
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            ScriptableObject temporaryLocation = ScriptableObject.CreateInstance(definitionType);
+            GameObject controllerObject = new GameObject("Temporary Location Controller");
+            Component controller = controllerObject.AddComponent(
+                FindType("CryingSnow.StackCraft.LocationSceneController"));
+            try
+            {
+                Object market = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+                Object innBuilding = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+                Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+                Object inn = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Locations/Location_RiverbendInn.asset");
+
+                var serializedLocation = new SerializedObject(temporaryLocation);
+                SerializedProperty entrances = serializedLocation.FindProperty("entrances");
+                entrances.InsertArrayElementAtIndex(0);
+                entrances.GetArrayElementAtIndex(0)
+                    .FindPropertyRelative("sourceCardDefinition").objectReferenceValue = market;
+                entrances.GetArrayElementAtIndex(0)
+                    .FindPropertyRelative("destinationLocationId").stringValue = "future-market";
+                serializedLocation.ApplyModifiedPropertiesWithoutUndo();
+
+                upsertEntrance.Invoke(
+                    null,
+                    new object[] { temporaryLocation, innBuilding, "riverbend-inn" });
+                serializedLocation.Update();
+                Assert.That(entrances.arraySize, Is.EqualTo(2));
+                Assert.That(entrances.GetArrayElementAtIndex(0)
+                    .FindPropertyRelative("destinationLocationId").stringValue, Is.EqualTo("future-market"));
+
+                var serializedController = new SerializedObject(controller);
+                SerializedProperty definitions = serializedController.FindProperty("locationDefinitions");
+                definitions.InsertArrayElementAtIndex(0);
+                definitions.GetArrayElementAtIndex(0).objectReferenceValue = riverbend;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+                upsertDefinition.Invoke(null, new object[] { controller, inn });
+                upsertDefinition.Invoke(null, new object[] { controller, inn });
+                serializedController.Update();
+                Assert.That(definitions.arraySize, Is.EqualTo(2));
+                Assert.That(definitions.GetArrayElementAtIndex(0).objectReferenceValue, Is.SameAs(riverbend));
+                Assert.That(definitions.GetArrayElementAtIndex(1).objectReferenceValue, Is.SameAs(inn));
+            }
+            finally
+            {
+                Object.DestroyImmediate(controllerObject);
+                Object.DestroyImmediate(temporaryLocation);
             }
         }
 

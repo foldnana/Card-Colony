@@ -25,6 +25,7 @@ namespace CryingSnow.StackCraft
         private CanvasGroup canvasGroup;
 
         public WorldMapLocation SelectedLocation { get; private set; }
+        public LocationEntrance SelectedBuilding { get; private set; }
 
         private void Awake()
         {
@@ -32,9 +33,12 @@ namespace CryingSnow.StackCraft
             locationToggle?.onValueChanged.AddListener(ToggleView);
             enterLocationButton?.onClick.AddListener(PerformLocationAction);
             WorldMapLocation.SelectionChanged += HandleSelectionChanged;
+            LocationEntrance.SelectionChanged += HandleBuildingSelectionChanged;
             WorldMapBootstrap.PartyMapStateChanged += HandlePartyMapStateChanged;
 
-            if (WorldMapLocation.ActiveSelection != null)
+            if (LocationEntrance.ActiveSelection != null)
+                ShowBuilding(LocationEntrance.ActiveSelection);
+            else if (WorldMapLocation.ActiveSelection != null)
                 ShowLocation(WorldMapLocation.ActiveSelection);
             else
             {
@@ -46,6 +50,7 @@ namespace CryingSnow.StackCraft
         private void OnDestroy()
         {
             WorldMapLocation.SelectionChanged -= HandleSelectionChanged;
+            LocationEntrance.SelectionChanged -= HandleBuildingSelectionChanged;
             WorldMapBootstrap.PartyMapStateChanged -= HandlePartyMapStateChanged;
             locationToggle?.onValueChanged.RemoveListener(ToggleView);
             enterLocationButton?.onClick.RemoveListener(PerformLocationAction);
@@ -57,6 +62,8 @@ namespace CryingSnow.StackCraft
                 return;
 
             SelectedLocation = location;
+            SelectedBuilding = null;
+            SetLocationTabLabel("地点");
             WorldMapLocationDetails details = location.Details ??
                 WorldMapLocationDetails.CreateFallback(location.Card.Definition);
 
@@ -76,6 +83,40 @@ namespace CryingSnow.StackCraft
             descriptionLabel.text = string.IsNullOrWhiteSpace(details.description)
                 ? location.Card.Definition?.Description ?? string.Empty
                 : details.description;
+            RefreshLocationAction();
+
+            if (locationToggle != null)
+            {
+                locationToggle.interactable = true;
+                locationToggle.isOn = true;
+            }
+            else
+                ToggleView(true);
+        }
+
+        public void ShowBuilding(LocationEntrance building)
+        {
+            if (building == null || building.Card == null)
+                return;
+
+            SelectedBuilding = building;
+            SelectedLocation = null;
+            SetLocationTabLabel("建筑");
+
+            CardDefinition definition = building.Card.Definition;
+            string displayName = definition != null
+                ? definition.DisplayName
+                : building.Card.gameObject.name;
+            titleLabel.text = displayName;
+            artImage.texture = definition?.ArtTexture;
+            artImage.enabled = artImage.texture != null;
+            typeAndDangerLabel.text = "建筑 · 可进入";
+            discoveryLabel.text = "● 已开放";
+            travelTimeLabel.text = building.Occupant == null
+                ? "人物槽    空"
+                : $"人物槽    {building.Occupant.Definition?.DisplayName ?? "已占用"}";
+            resourcesLabel.text = "可用服务\n• 进入建筑";
+            descriptionLabel.text = definition?.Description ?? string.Empty;
             RefreshLocationAction();
 
             if (locationToggle != null)
@@ -113,6 +154,25 @@ namespace CryingSnow.StackCraft
                 ToggleView(false);
         }
 
+        private void HandleBuildingSelectionChanged(LocationEntrance building)
+        {
+            if (building != null)
+            {
+                ShowBuilding(building);
+                return;
+            }
+
+            if (SelectedBuilding == null)
+                return;
+
+            SelectedBuilding = null;
+            ShowEmptyState();
+            if (locationToggle != null && locationToggle.isOn && questsToggle != null)
+                questsToggle.isOn = true;
+            else
+                ToggleView(false);
+        }
+
         private void HandlePartyMapStateChanged()
         {
             RefreshLocationAction();
@@ -120,6 +180,13 @@ namespace CryingSnow.StackCraft
 
         private void PerformLocationAction()
         {
+            if (SelectedBuilding != null)
+            {
+                SelectedBuilding.TryEnter();
+                RefreshLocationAction();
+                return;
+            }
+
             if (SelectedLocation == null)
                 return;
 
@@ -141,6 +208,20 @@ namespace CryingSnow.StackCraft
                 return;
 
             TMP_Text actionLabel = enterLocationButton.GetComponentInChildren<TMP_Text>(true);
+            if (SelectedBuilding != null)
+            {
+                string buildingName = SelectedBuilding.Card?.Definition?.DisplayName ?? "建筑";
+                if (actionLabel != null)
+                {
+                    actionLabel.text = SelectedBuilding.CanEnter
+                        ? $"进入{buildingName}"
+                        : "请先放入人物";
+                }
+
+                enterLocationButton.interactable = SelectedBuilding.CanEnter;
+                return;
+            }
+
             WorldMapBootstrap worldMap = WorldMapBootstrap.Instance;
             if (SelectedLocation == null || worldMap == null)
             {
@@ -170,6 +251,7 @@ namespace CryingSnow.StackCraft
         private void ShowEmptyState()
         {
             SelectedLocation = null;
+            SelectedBuilding = null;
             locationToggle.interactable = false;
             RefreshLocationAction();
             titleLabel.text = "请选择地点";
@@ -180,6 +262,13 @@ namespace CryingSnow.StackCraft
             travelTimeLabel.text = string.Empty;
             resourcesLabel.text = string.Empty;
             descriptionLabel.text = "点选世界地图上的地点卡以查看详情。";
+        }
+
+        private void SetLocationTabLabel(string text)
+        {
+            TMP_Text label = locationToggle?.GetComponentInChildren<TMP_Text>(true);
+            if (label != null)
+                label.text = text;
         }
     }
 }

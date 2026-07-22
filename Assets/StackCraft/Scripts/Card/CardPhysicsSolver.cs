@@ -107,7 +107,11 @@ namespace CryingSnow.StackCraft
                 return false;
 
             WorldMapLocation location = card.transform.parent.GetComponent<WorldMapLocation>();
-            return location != null && location.DockedParty == card;
+            if (location != null && location.DockedParty == card)
+                return true;
+
+            LocationEntrance entrance = card.transform.parent.GetComponent<LocationEntrance>();
+            return entrance != null && entrance.Occupant == card;
         }
 
         private static bool IsImmovableStack(CardStack stack)

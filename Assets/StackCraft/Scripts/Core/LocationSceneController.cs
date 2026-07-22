@@ -53,7 +53,16 @@ namespace CryingSnow.StackCraft
             }
 
             if (returnButton != null)
+            {
                 returnButton.interactable = true;
+                TMP_Text returnLabel = returnButton.GetComponentInChildren<TMP_Text>(true);
+                if (returnLabel != null)
+                {
+                    returnLabel.text = GetReturnButtonLabel(
+                        GameDirector.Instance?.GameData,
+                        locationDefinitions);
+                }
+            }
 
             if (locationTitleLabel != null)
                 locationTitleLabel.text = activeDefinition.DisplayName;
@@ -62,6 +71,9 @@ namespace CryingSnow.StackCraft
             InfoPanel.Instance?.SetWorldMapSuppressed(false);
             WorldMapPartyStatusView.Instance?.Hide();
 
+            bool hasIncomingParty = GameDirector.Instance.GameData
+                .ConsumeLocationPartyTransferPending();
+
             if (!wasLoaded)
             {
                 SpawnInitialLocationCards();
@@ -69,7 +81,7 @@ namespace CryingSnow.StackCraft
             }
             else
             {
-                StartCoroutine(EnsureInitialLocationCardsAfterRestore());
+                StartCoroutine(EnsureInitialLocationCardsAfterRestore(hasIncomingParty));
             }
         }
 
@@ -126,6 +138,17 @@ namespace CryingSnow.StackCraft
                 if (card?.Definition == null)
                     continue;
 
+                LocationEntranceDefinition configuredEntrance = locationDefinition?.Entrances
+                    .FirstOrDefault(entrance => entrance.SourceCardDefinition != null &&
+                        entrance.SourceCardDefinition.Id == card.Definition.Id) ?? default;
+                if (configuredEntrance.SourceCardDefinition != null)
+                {
+                    LocationEntrance entrance = card.GetComponent<LocationEntrance>();
+                    if (entrance == null)
+                        entrance = card.gameObject.AddComponent<LocationEntrance>();
+                    entrance.Configure(configuredEntrance.DestinationLocationId);
+                }
+
                 if (!card.Definition.AmbientNpcAiEnabled)
                     continue;
 
@@ -164,12 +187,30 @@ namespace CryingSnow.StackCraft
                 .ToList();
         }
 
-        private IEnumerator EnsureInitialLocationCardsAfterRestore()
+        public static string GetReturnButtonLabel(
+            GameData gameData,
+            IEnumerable<LocationDefinition> definitions)
+        {
+            string parentId = gameData?.LocationHistory?.LastOrDefault();
+            if (string.IsNullOrWhiteSpace(parentId))
+                return "返回世界地图";
+
+            string parentName = definitions?
+                .FirstOrDefault(definition => definition != null && definition.Id == parentId)?
+                .DisplayName;
+            return string.IsNullOrWhiteSpace(parentName)
+                ? "返回上一地点"
+                : $"返回{parentName}";
+        }
+
+        private IEnumerator EnsureInitialLocationCardsAfterRestore(bool replacePlayerParty)
         {
             // CardManager restores saved stacks from the same scene-ready event.
             // Wait one frame so migration only fills cards missing from older saves.
             yield return null;
             SpawnInitialLocationCards();
+            if (replacePlayerParty)
+                ReplacePlayerParty(GameDirector.Instance.GameData.PartyMembers);
         }
 
         public IReadOnlyList<CardInstance> SpawnExpandedPartyMembers(IEnumerable<CardData> memberData)
@@ -196,27 +237,35 @@ namespace CryingSnow.StackCraft
             for (int index = 0; index < members.Count; index++)
             {
                 CardData data = members[index];
-                CardDefinition definition = CardManager.Instance.GetDefinitionById(data.Id) ??
-                    activeDefinition.ExpandedPartyMemberDefinition;
-                if (definition == null)
-                    continue;
-
                 Vector3 position = activeDefinition.PartySpawnPosition +
                     Vector3.right * (index * activeDefinition.PartyMemberSpacing);
-                CardInstance member = CardManager.Instance.CreateCardInstance(
-                    definition,
-                    position,
-                    CardStack.RefuseAll);
+                data.EquippedItems ??= new List<CardData>();
+                CardInstance member = CardManager.Instance.RestoreCardFromData(data, position);
                 if (member == null)
                     continue;
 
-                member.RestoreSavedStats(data);
                 member.Stack.IsLocked = false;
                 spawnedMembers.Add(member);
             }
 
             CardManager.Instance.NotifyStatsChanged();
             return spawnedMembers;
+        }
+
+        public IReadOnlyList<CardInstance> ReplacePlayerParty(IEnumerable<CardData> memberData)
+        {
+            if (CardManager.Instance == null)
+                return System.Array.Empty<CardInstance>();
+
+            List<CardInstance> existingParty = CardManager.Instance.AllCards
+                .Where(card => card?.Definition != null &&
+                    card.Definition.Category == CardCategory.Character &&
+                    card.Definition.Faction == CardFaction.Player)
+                .ToList();
+            foreach (CardInstance card in existingParty)
+                card.Stack?.DestroyCard(card);
+
+            return SpawnExpandedPartyMembers(memberData);
         }
 
         private void ResolveActiveDefinition()
@@ -247,7 +296,7 @@ namespace CryingSnow.StackCraft
                         card.Definition.Faction == CardFaction.Player)
                     .Select(card => new CardData(card))
                     .ToList();
-            GameDirector.Instance.ReturnToWorldMap(partyMembers);
+            GameDirector.Instance.ReturnFromLocation(partyMembers);
         }
 
         private void ApplyBackground(Texture2D texture)

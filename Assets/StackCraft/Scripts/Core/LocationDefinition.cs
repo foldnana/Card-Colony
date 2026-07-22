@@ -14,6 +14,16 @@ namespace CryingSnow.StackCraft
         public Vector3 Position => position;
     }
 
+    [Serializable]
+    public struct LocationEntranceDefinition
+    {
+        [SerializeField] private CardDefinition sourceCardDefinition;
+        [SerializeField] private string destinationLocationId;
+
+        public CardDefinition SourceCardDefinition => sourceCardDefinition;
+        public string DestinationLocationId => destinationLocationId;
+    }
+
     [CreateAssetMenu(menuName = "StackCraft/World/Location Definition", fileName = "Location_")]
     public sealed class LocationDefinition : ScriptableObject
     {
@@ -29,6 +39,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Vector3 partySpawnPosition = new(0f, 0f, -1.2f);
         [SerializeField, Min(0.1f)] private float partyMemberSpacing = 0.9f;
         [SerializeField] private List<LocationCardSpawn> initialCardSpawns = new();
+        [SerializeField] private List<LocationEntranceDefinition> entrances = new();
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -42,5 +53,6 @@ namespace CryingSnow.StackCraft
         public Vector3 PartySpawnPosition => partySpawnPosition;
         public float PartyMemberSpacing => partyMemberSpacing;
         public IReadOnlyList<LocationCardSpawn> InitialCardSpawns => initialCardSpawns;
+        public IReadOnlyList<LocationEntranceDefinition> Entrances => entrances;
     }
 }

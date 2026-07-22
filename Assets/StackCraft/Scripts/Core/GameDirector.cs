@@ -132,12 +132,42 @@ namespace CryingSnow.StackCraft
             if (GameData == null || string.IsNullOrWhiteSpace(locationId))
                 return false;
 
+            bool enteringFromLocation = SceneManager.GetActiveScene().name == locationScene &&
+                !string.IsNullOrWhiteSpace(GameData.ActiveLocationId);
+            SaveGame();
+            if (enteringFromLocation)
+                GameData.PushLocation(GameData.ActiveLocationId);
+            else
+                GameData.LocationHistory?.Clear();
+
             GameData.ActiveLocationId = locationId;
             GameData.PartyMembers = partyMembers != null
                 ? new List<CardData>(partyMembers)
                 : new List<CardData>();
-            SaveGame();
+            GameData.MarkLocationPartyTransferPending();
             StartCoroutine(TravelSequence(locationScene, null));
+            return true;
+        }
+
+        public bool ReturnFromLocation(IEnumerable<CardData> partyMembers)
+        {
+            if (GameData == null)
+                return false;
+
+            if (partyMembers != null)
+                GameData.PartyMembers = new List<CardData>(partyMembers);
+
+            SaveGame();
+            if (GameData.TryPopLocation(out string parentLocationId))
+            {
+                GameData.ActiveLocationId = parentLocationId;
+                GameData.MarkLocationPartyTransferPending();
+                StartCoroutine(TravelSequence(locationScene, null));
+                return true;
+            }
+
+            GameData.ActiveLocationId = null;
+            StartCoroutine(TravelSequence(defaultScene, null));
             return true;
         }
 
@@ -150,6 +180,8 @@ namespace CryingSnow.StackCraft
                 GameData.PartyMembers = new List<CardData>(partyMembers);
 
             SaveGame();
+            GameData.LocationHistory?.Clear();
+            GameData.ActiveLocationId = null;
             StartCoroutine(TravelSequence(defaultScene, null));
             return true;
         }
