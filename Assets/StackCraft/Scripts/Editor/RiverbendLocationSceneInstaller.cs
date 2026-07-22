@@ -16,8 +16,99 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string LocationScenePath = "Assets/StackCraft/Scenes/Location.unity";
         private const string DefinitionPath = "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset";
         private const string VillagerPath = "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset";
+        private const string RiverbendCardsFolder =
+            "Assets/StackCraft/Resources/Cards/Locations/Riverbend";
         private const string BackgroundPath =
             "Assets/CardColony/Art/Backgrounds/RiverbendVillageBackground_v3.png";
+        private const string StructureBasePath =
+            "Assets/CardColony/Art/CardBases/Riverbend/Riverbend_StructureBase.png";
+        private const string CharacterBasePath =
+            "Assets/CardColony/Art/CardBases/Riverbend/Riverbend_CharacterBase.png";
+
+        private sealed class InitialCardSpec
+        {
+            public string AssetName;
+            public string Id;
+            public string DisplayName;
+            public string Description;
+            public string ArtPath;
+            public CardCategory Category;
+            public Vector3 Position;
+        }
+
+        private static readonly InitialCardSpec[] InitialCards =
+        {
+            new()
+            {
+                AssetName = "Card_Riverbend_Market",
+                Id = "riverbend-market",
+                DisplayName = "市场",
+                Description = "河湾村交换食物与日用品的露天市场。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_Market.png",
+                Category = CardCategory.Structure,
+                Position = new Vector3(0f, 0f, 2.8f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_BlacksmithShop",
+                Id = "riverbend-blacksmith-shop",
+                DisplayName = "铁匠铺",
+                Description = "传来锤击声与炉火热浪的铁匠铺。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_BlacksmithShop.png",
+                Category = CardCategory.Structure,
+                Position = new Vector3(-4.4f, 0f, 1f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_Inn",
+                Id = "riverbend-inn",
+                DisplayName = "旅馆",
+                Description = "旅行者可以落脚休息的河畔旅馆。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_Inn.png",
+                Category = CardCategory.Structure,
+                Position = new Vector3(4.4f, 0f, 1f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_VillageChief",
+                Id = "riverbend-village-chief",
+                DisplayName = "村长",
+                Description = "熟悉河湾村与周边道路的村长。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_VillageChief.png",
+                Category = CardCategory.Character,
+                Position = new Vector3(-1f, 0f, -0.6f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_Blacksmith",
+                Id = "riverbend-blacksmith",
+                DisplayName = "铁匠",
+                Description = "负责打造和修理装备的铁匠。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_Blacksmith.png",
+                Category = CardCategory.Character,
+                Position = new Vector3(3.2f, 0f, -1.6f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_Grocer",
+                Id = "riverbend-grocer",
+                DisplayName = "杂货商",
+                Description = "经营旅行补给与日常杂货的商人。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_Grocer.png",
+                Category = CardCategory.Character,
+                Position = new Vector3(-3.2f, 0f, -1.6f)
+            },
+            new()
+            {
+                AssetName = "Card_Riverbend_Apothecary",
+                Id = "riverbend-apothecary",
+                DisplayName = "药师",
+                Description = "了解草药与药剂配制方法的药师。",
+                ArtPath = "Assets/CardColony/Art/CardArts/Riverbend/Riverbend_Apothecary.png",
+                Category = CardCategory.Character,
+                Position = new Vector3(3.2f, 0f, -3.6f)
+            }
+        };
 
         [MenuItem("Tools/Card Colony/Install Riverbend Location Scene")]
         public static void Install()
@@ -61,6 +152,15 @@ namespace CryingSnow.StackCraft.EditorTools
             AssetDatabase.Refresh();
         }
 
+        [MenuItem("Tools/Card Colony/Install Riverbend Initial Cards")]
+        public static void InstallInitialCards()
+        {
+            EnsureFolder("Assets/StackCraft/Resources/Locations");
+            CreateOrUpdateDefinition();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
         private static LocationDefinition CreateOrUpdateDefinition()
         {
             LocationDefinition definition = AssetDatabase.LoadAssetAtPath<LocationDefinition>(DefinitionPath);
@@ -75,18 +175,91 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("displayName").stringValue = "河湾村";
             serialized.FindProperty("backgroundTexture").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath);
-            serialized.FindProperty("mapSize").vector2Value = new Vector2(46f, 25.875f);
-            serialized.FindProperty("cameraMinDistance").floatValue = 5f;
-            serialized.FindProperty("cameraMaxDistance").floatValue = 52f;
-            serialized.FindProperty("cameraInitialDistance").floatValue = 22f;
+            serialized.FindProperty("mapSize").vector2Value = new Vector2(18.4f, 10.35f);
+            serialized.FindProperty("cameraMinDistance").floatValue = 3f;
+            serialized.FindProperty("cameraMaxDistance").floatValue = 24f;
+            serialized.FindProperty("cameraInitialDistance").floatValue = 7f;
             serialized.FindProperty("cameraZoomSpeed").floatValue = 3f;
             serialized.FindProperty("expandedPartyMemberDefinition").objectReferenceValue =
                 AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath);
-            serialized.FindProperty("partySpawnPosition").vector3Value = new Vector3(0f, 0f, -1.2f);
+            serialized.FindProperty("partySpawnPosition").vector3Value = new Vector3(0f, 0f, -0.48f);
             serialized.FindProperty("partyMemberSpacing").floatValue = 0.9f;
+            ConfigureInitialCardSpawns(serialized);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(definition);
             return definition;
+        }
+
+        private static void ConfigureInitialCardSpawns(SerializedObject location)
+        {
+            EnsureFolder(RiverbendCardsFolder);
+            SerializedProperty spawns = location.FindProperty("initialCardSpawns");
+            spawns.ClearArray();
+
+            for (int index = 0; index < InitialCards.Length; index++)
+            {
+                InitialCardSpec spec = InitialCards[index];
+                CardDefinition card = CreateOrUpdateCard(spec);
+                spawns.InsertArrayElementAtIndex(index);
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                spawn.FindPropertyRelative("definition").objectReferenceValue = card;
+                spawn.FindPropertyRelative("position").vector3Value = spec.Position;
+            }
+        }
+
+        private static CardDefinition CreateOrUpdateCard(InitialCardSpec spec)
+        {
+            EnsureArtMaskImportSettings(spec.ArtPath);
+            string path = $"{RiverbendCardsFolder}/{spec.AssetName}.asset";
+            CardDefinition card = AssetDatabase.LoadAssetAtPath<CardDefinition>(path);
+            if (card == null)
+            {
+                card = ScriptableObject.CreateInstance<CardDefinition>();
+                AssetDatabase.CreateAsset(card, path);
+            }
+
+            var serialized = new SerializedObject(card);
+            serialized.FindProperty("id").stringValue = spec.Id;
+            serialized.FindProperty("displayName").stringValue = spec.DisplayName;
+            serialized.FindProperty("description").stringValue = spec.Description;
+            serialized.FindProperty("artTexture").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<Texture2D>(spec.ArtPath);
+            serialized.FindProperty("baseTextureOverride").objectReferenceValue =
+                AssetDatabase.LoadAssetAtPath<Texture2D>(
+                    spec.Category == CardCategory.Structure ? StructureBasePath : CharacterBasePath);
+            serialized.FindProperty("category").enumValueIndex = (int)spec.Category;
+            serialized.FindProperty("faction").enumValueIndex = (int)CardFaction.Neutral;
+            serialized.FindProperty("isLocationStatic").boolValue = true;
+            serialized.FindProperty("combatType").enumValueIndex = (int)CombatType.None;
+            serialized.FindProperty("loot").ClearArray();
+            serialized.FindProperty("isAggressive").boolValue = false;
+            serialized.FindProperty("isSellable").boolValue = false;
+            serialized.FindProperty("hasDurability").boolValue = false;
+            serialized.FindProperty("uses").intValue = 1;
+            serialized.FindProperty("nutrition").intValue = 0;
+            serialized.FindProperty("maxHealth").intValue = 15;
+            serialized.FindProperty("attack").intValue = 0;
+            serialized.FindProperty("defense").intValue = 0;
+            serialized.FindProperty("attackSpeed").intValue = 100;
+            serialized.FindProperty("accuracy").intValue = 95;
+            serialized.FindProperty("dodge").intValue = 5;
+            serialized.FindProperty("criticalChance").intValue = 5;
+            serialized.FindProperty("criticalMultiplier").intValue = 150;
+            serialized.FindProperty("statModifiers").ClearArray();
+            serialized.FindProperty("classChangeResult").objectReferenceValue = null;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(card);
+            return card;
+        }
+
+        private static void EnsureArtMaskImportSettings(string artPath)
+        {
+            if (AssetImporter.GetAtPath(artPath) is not TextureImporter importer ||
+                importer.alphaSource == TextureImporterAlphaSource.FromGrayScale)
+                return;
+
+            importer.alphaSource = TextureImporterAlphaSource.FromGrayScale;
+            importer.SaveAndReimport();
         }
 
         private static Button CreateReturnButton(Transform canvas)

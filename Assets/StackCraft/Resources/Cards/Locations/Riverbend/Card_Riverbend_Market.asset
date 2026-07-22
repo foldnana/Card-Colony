@@ -1,0 +1,45 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_Riverbend_Market
+  m_EditorClassIdentifier: 
+  id: riverbend-market
+  displayName: "\u5E02\u573A"
+  description: "\u6CB3\u6E7E\u6751\u4EA4\u6362\u98DF\u7269\u4E0E\u65E5\u7528\u54C1\u7684\u9732\u5929\u5E02\u573A\u3002"
+  artTexture: {fileID: 2800000, guid: 6a078073f36766e4ab010e9754444c6e, type: 3}
+  baseTextureOverride: {fileID: 2800000, guid: 0b295f4dbce32834c8f32a5e82526f9e, type: 3}
+  category: 6
+  faction: 0
+  isLocationStatic: 1
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 0
+  defense: 0
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

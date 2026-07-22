@@ -1,7 +1,19 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace CryingSnow.StackCraft
 {
+    [Serializable]
+    public struct LocationCardSpawn
+    {
+        [SerializeField] private CardDefinition definition;
+        [SerializeField] private Vector3 position;
+
+        public CardDefinition Definition => definition;
+        public Vector3 Position => position;
+    }
+
     [CreateAssetMenu(menuName = "StackCraft/World/Location Definition", fileName = "Location_")]
     public sealed class LocationDefinition : ScriptableObject
     {
@@ -16,6 +28,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private CardDefinition expandedPartyMemberDefinition;
         [SerializeField] private Vector3 partySpawnPosition = new(0f, 0f, -1.2f);
         [SerializeField, Min(0.1f)] private float partyMemberSpacing = 0.9f;
+        [SerializeField] private List<LocationCardSpawn> initialCardSpawns = new();
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -28,5 +41,6 @@ namespace CryingSnow.StackCraft
         public CardDefinition ExpandedPartyMemberDefinition => expandedPartyMemberDefinition;
         public Vector3 PartySpawnPosition => partySpawnPosition;
         public float PartyMemberSpacing => partyMemberSpacing;
+        public IReadOnlyList<LocationCardSpawn> InitialCardSpawns => initialCardSpawns;
     }
 }

@@ -749,9 +749,7 @@ namespace CryingSnow.StackCraft
         {
             var allCards = AllCards.ToList();
 
-            var characterCards = allCards
-                .Where(card => card.Definition.Category == CardCategory.Character)
-                .ToList();
+            var characterCards = GetSurvivalCharacters(allCards).ToList();
 
             var consumableCards = allCards
                 .Where(card => card.Definition.Category == CardCategory.Consumable &&
@@ -855,9 +853,7 @@ namespace CryingSnow.StackCraft
 
         private int CalculateNutritionNeed(List<CardInstance> allCards)
         {
-            return allCards
-                .Where(card => card.Definition.Category == CardCategory.Character)
-                .Count() * cardSettings.HungerPerCharacter;
+            return GetSurvivalCharacters(allCards).Count() * cardSettings.HungerPerCharacter;
         }
 
         private int CalculateCurrency(List<CardInstance> allCards)
@@ -878,10 +874,7 @@ namespace CryingSnow.StackCraft
 
         private int CalculateCardsOwned(List<CardInstance> allCards)
         {
-            return allCards
-                .Where(card => !(card is PackInstance))
-                .Where(card => card.Definition.Category != CardCategory.Currency)
-                .Count();
+            return GetCardsCountingTowardLimit(allCards).Count();
         }
 
         private int CalculateTotalBoost(List<CardInstance> allCards)
@@ -901,9 +894,28 @@ namespace CryingSnow.StackCraft
 
         private int CalculateCharacter(List<CardInstance> allCards)
         {
-            return allCards
-                .Where(card => card.Definition.Category == CardCategory.Character)
-                .Count();
+            return GetSurvivalCharacters(allCards).Count();
+        }
+
+        public static IEnumerable<CardInstance> GetSurvivalCharacters(
+            IEnumerable<CardInstance> cards)
+        {
+            return cards?.Where(card =>
+                    card?.Definition != null &&
+                    card.Definition.Category == CardCategory.Character &&
+                    !card.Definition.IsLocationStatic) ??
+                Enumerable.Empty<CardInstance>();
+        }
+
+        public static IEnumerable<CardInstance> GetCardsCountingTowardLimit(
+            IEnumerable<CardInstance> cards)
+        {
+            return cards?.Where(card =>
+                    card?.Definition != null &&
+                    card is not PackInstance &&
+                    card.Definition.Category != CardCategory.Currency &&
+                    !card.Definition.IsLocationStatic) ??
+                Enumerable.Empty<CardInstance>();
         }
         #endregion
     }

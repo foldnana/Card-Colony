@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using TMPro;
@@ -62,17 +63,78 @@ namespace CryingSnow.StackCraft
             WorldMapPartyStatusView.Instance?.Hide();
 
             if (!wasLoaded)
+            {
+                SpawnInitialLocationCards();
                 SpawnExpandedPartyMembers(GameDirector.Instance.GameData.PartyMembers);
+            }
+            else
+            {
+                StartCoroutine(EnsureInitialLocationCardsAfterRestore());
+            }
+        }
+
+        public IReadOnlyList<CardInstance> SpawnInitialLocationCards()
+        {
+            ResolveActiveDefinition();
+            if (activeDefinition == null || CardManager.Instance == null)
+                return System.Array.Empty<CardInstance>();
+
+            IEnumerable<string> existingCardIds = CardManager.Instance.AllCards
+                .Where(card => card?.Definition != null)
+                .Select(card => card.Definition.Id);
+            IReadOnlyList<LocationCardSpawn> missingSpawns = FindMissingInitialCardSpawns(
+                activeDefinition,
+                existingCardIds);
+
+            var spawnedCards = new List<CardInstance>();
+            foreach (LocationCardSpawn spawn in missingSpawns)
+            {
+                if (spawn.Definition == null)
+                    continue;
+
+                CardInstance card = CardManager.Instance.CreateCardInstance(
+                    spawn.Definition,
+                    spawn.Position,
+                    CardStack.RefuseAll);
+                if (card == null)
+                    continue;
+
+                card.Stack.IsLocked = false;
+                spawnedCards.Add(card);
+            }
+
+            CardManager.Instance.ResolveOverlaps();
+            CardManager.Instance.NotifyStatsChanged();
+            return spawnedCards;
+        }
+
+        public static IReadOnlyList<LocationCardSpawn> FindMissingInitialCardSpawns(
+            LocationDefinition definition,
+            IEnumerable<string> existingCardIds)
+        {
+            if (definition == null)
+                return System.Array.Empty<LocationCardSpawn>();
+
+            var existing = new HashSet<string>(
+                existingCardIds?.Where(id => !string.IsNullOrWhiteSpace(id)) ??
+                Enumerable.Empty<string>());
+            return definition.InitialCardSpawns
+                .Where(spawn => spawn.Definition != null &&
+                    !existing.Contains(spawn.Definition.Id))
+                .ToList();
+        }
+
+        private IEnumerator EnsureInitialLocationCardsAfterRestore()
+        {
+            // CardManager restores saved stacks from the same scene-ready event.
+            // Wait one frame so migration only fills cards missing from older saves.
+            yield return null;
+            SpawnInitialLocationCards();
         }
 
         public IReadOnlyList<CardInstance> SpawnExpandedPartyMembers(IEnumerable<CardData> memberData)
         {
-            if (activeDefinition == null)
-            {
-                string locationId = GameDirector.Instance?.GameData?.ActiveLocationId;
-                activeDefinition = locationDefinitions.FirstOrDefault(definition =>
-                    definition != null && definition.Id == locationId);
-            }
+            ResolveActiveDefinition();
 
             if (activeDefinition == null || CardManager.Instance == null)
                 return System.Array.Empty<CardInstance>();
@@ -115,6 +177,16 @@ namespace CryingSnow.StackCraft
 
             CardManager.Instance.NotifyStatsChanged();
             return spawnedMembers;
+        }
+
+        private void ResolveActiveDefinition()
+        {
+            if (activeDefinition != null)
+                return;
+
+            string locationId = GameDirector.Instance?.GameData?.ActiveLocationId;
+            activeDefinition = locationDefinitions.FirstOrDefault(definition =>
+                definition != null && definition.Id == locationId);
         }
 
         public void ReturnToWorldMap()

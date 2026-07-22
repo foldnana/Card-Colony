@@ -19,12 +19,18 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Card art displayed in the card GameObject.")]
         private Texture2D artTexture;
 
+        [SerializeField, Tooltip("Optional card base used only for this definition's visual presentation.")]
+        private Texture2D baseTextureOverride;
+
         // Classification
         [SerializeField, Tooltip("Category that defines this card's type and gameplay behavior.")]
         private CardCategory category;
 
         [SerializeField, Tooltip("Faction this card belongs to (e.g., Player, Mob, Neutral).")]
         private CardFaction faction;
+
+        [SerializeField, Tooltip("Static location content is saved on the local board but does not consume player survival resources or card capacity.")]
+        private bool isLocationStatic;
 
         [SerializeField, Tooltip("The combat type for Rock-Paper-Scissors advantage.")]
         private CombatType combatType = CombatType.None;
@@ -107,9 +113,11 @@ namespace CryingSnow.StackCraft
         public string DisplayName => ChineseLocalization.CardName(displayName);
         public string Description => ChineseLocalization.CardDescription(displayName, description);
         public Texture2D ArtTexture => artTexture;
+        public Texture2D BaseTextureOverride => baseTextureOverride;
 
         public CardCategory Category => category;
         public CardFaction Faction => faction;
+        public bool IsLocationStatic => isLocationStatic;
         public CombatType CombatType => combatType;
 
         public bool IsAggressive => isAggressive;

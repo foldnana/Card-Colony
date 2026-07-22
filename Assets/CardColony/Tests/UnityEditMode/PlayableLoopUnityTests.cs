@@ -1239,6 +1239,372 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void RiverbendLocation_ConfiguresThreeBuildingsAndFourNpcCards()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Assert.That(riverbend, Is.Not.Null);
+
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            Assert.That(spawns, Is.Not.Null,
+                "地点定义需要拥有可复用的初始卡牌配置，而不是把河湾村卡牌写死在场景里");
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
+
+            var expectedCategories = new Dictionary<string, int>
+            {
+                ["市场"] = 6,
+                ["铁匠铺"] = 6,
+                ["旅馆"] = 6,
+                ["村长"] = 2,
+                ["铁匠"] = 2,
+                ["杂货商"] = 2,
+                ["药师"] = 2
+            };
+            var actualNames = new HashSet<string>();
+            var positions = new HashSet<Vector2>();
+            var artPaths = new HashSet<string>();
+
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                Object definition = spawn.FindPropertyRelative("definition").objectReferenceValue;
+                Assert.That(definition, Is.Not.Null);
+
+                var serializedCard = new SerializedObject(definition);
+                string displayName = serializedCard.FindProperty("displayName").stringValue;
+                Assert.That(expectedCategories.ContainsKey(displayName), Is.True,
+                    $"河湾村出现了未计划的初始卡牌：{displayName}");
+                Assert.That(
+                    serializedCard.FindProperty("category").enumValueIndex,
+                    Is.EqualTo(expectedCategories[displayName]));
+                Object artTexture = serializedCard.FindProperty("artTexture").objectReferenceValue;
+                Assert.That(artTexture, Is.Not.Null,
+                    $"{displayName} 需要有可辨认的专用卡面图");
+                string artPath = AssetDatabase.GetAssetPath(artTexture);
+                Assert.That(
+                    artPath,
+                    Does.StartWith("Assets/CardColony/Art/CardArts/Riverbend/"),
+                    $"{displayName} 不应继续使用通用占位美术");
+                Assert.That(artPaths.Add(artPath), Is.True,
+                    $"{displayName} 应使用独立卡面图");
+
+                if (expectedCategories[displayName] == 2)
+                {
+                    Assert.That(serializedCard.FindProperty("faction").enumValueIndex, Is.Zero,
+                        $"{displayName} 是村庄中立 NPC，不能被当作玩家小队成员保存");
+                }
+
+                SerializedProperty isLocationStatic =
+                    serializedCard.FindProperty("isLocationStatic");
+                Assert.That(isLocationStatic, Is.Not.Null);
+                Assert.That(isLocationStatic.boolValue, Is.True,
+                    $"{displayName} 现阶段不应参与玩家生存结算或占用卡牌容量");
+
+                Assert.That(actualNames.Add(displayName), Is.True, $"重复配置了 {displayName}");
+                Vector3 position = spawn.FindPropertyRelative("position").vector3Value;
+                Assert.That(positions.Add(new Vector2(position.x, position.z)), Is.True,
+                    $"{displayName} 与另一张初始卡重叠");
+            }
+
+            Assert.That(actualNames, Is.EquivalentTo(expectedCategories.Keys));
+            Assert.That(artPaths, Has.Count.EqualTo(7));
+            Assert.That(
+                FindType("CryingSnow.StackCraft.LocationSceneController").GetMethod(
+                    "SpawnInitialLocationCards"),
+                Is.Not.Null,
+                "首次进入河湾村时需要把地点定义中的建筑和 NPC 真正生成到桌面");
+        }
+
+        [Test]
+        public void RiverbendLocation_ArtUsesCardShaderMaskConvention()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                Object definition = spawns.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                var serializedCard = new SerializedObject(definition);
+                string displayName = serializedCard.FindProperty("displayName").stringValue;
+                Texture2D art = serializedCard.FindProperty("artTexture").objectReferenceValue as Texture2D;
+                string artPath = AssetDatabase.GetAssetPath(art);
+                var importer = AssetImporter.GetAtPath(artPath) as TextureImporter;
+                Assert.That(importer, Is.Not.Null, $"{displayName} 的卡图缺少纹理导入器");
+                Assert.That(importer.alphaSource, Is.EqualTo(TextureImporterAlphaSource.FromGrayScale),
+                    $"{displayName} 的黑底必须在导入时转换为透明遮罩，否则 Card Shader 会把卡面覆盖成黑色");
+                var mask = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                try
+                {
+                    Assert.That(ImageConversion.LoadImage(mask, File.ReadAllBytes(artPath)), Is.True);
+                    Color32[] corners =
+                    {
+                        mask.GetPixel(0, 0),
+                        mask.GetPixel(mask.width - 1, 0),
+                        mask.GetPixel(0, mask.height - 1),
+                        mask.GetPixel(mask.width - 1, mask.height - 1)
+                    };
+                    Assert.That(corners.All(pixel => pixel.r < 16 && pixel.g < 16 && pixel.b < 16),
+                        Is.True,
+                        $"{displayName} 的卡图必须使用黑底遮罩；白底会被 Card Shader 显示成深色卡面");
+                    Assert.That(mask.GetPixels32().Any(pixel =>
+                            pixel.r > 240 && pixel.g > 240 && pixel.b > 240),
+                        Is.True,
+                        $"{displayName} 的线稿需要保留白色高亮，才能由 Card Shader 转成深色图案");
+                }
+                finally
+                {
+                    Object.DestroyImmediate(mask);
+                }
+            }
+        }
+
+        [Test]
+        public void RiverbendLocation_CardsUseWhiteBodyBaseTextures()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            var baseTexturePaths = new HashSet<string>();
+            Object firstDefinition = null;
+            Texture2D firstBaseTexture = null;
+
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                Object definition = spawns.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                firstDefinition ??= definition;
+                var serializedCard = new SerializedObject(definition);
+                string displayName = serializedCard.FindProperty("displayName").stringValue;
+                SerializedProperty baseTextureProperty =
+                    serializedCard.FindProperty("baseTextureOverride");
+                Assert.That(baseTextureProperty, Is.Not.Null,
+                    "地点卡需要可选底板覆盖，不能修改全局人物或建筑卡材质");
+                Texture2D baseTexture = baseTextureProperty.objectReferenceValue as Texture2D;
+                Assert.That(baseTexture, Is.Not.Null, $"{displayName} 缺少浅色地点卡底板");
+                firstBaseTexture ??= baseTexture;
+                baseTexturePaths.Add(AssetDatabase.GetAssetPath(baseTexture));
+
+                var readableTexture = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+                try
+                {
+                    Assert.That(ImageConversion.LoadImage(
+                        readableTexture,
+                        File.ReadAllBytes(AssetDatabase.GetAssetPath(baseTexture))), Is.True);
+                    Color bodyColor = readableTexture.GetPixel(
+                        readableTexture.width / 2,
+                        readableTexture.height / 2);
+                    Assert.That(bodyColor.r, Is.GreaterThan(0.94f), $"{displayName} 卡面不是白色");
+                    Assert.That(bodyColor.g, Is.GreaterThan(0.94f), $"{displayName} 卡面不是白色");
+                    Assert.That(bodyColor.b, Is.GreaterThan(0.94f), $"{displayName} 卡面不是白色");
+                }
+                finally
+                {
+                    Object.DestroyImmediate(readableTexture);
+                }
+            }
+
+            Assert.That(baseTexturePaths, Has.Count.EqualTo(2),
+                "建筑和 NPC 应共享两套统一白底模板，只保留标题栏类别色差异");
+
+            System.Type cardInstanceType = FindType("CryingSnow.StackCraft.CardInstance");
+            MethodInfo applyVisualTextures = cardInstanceType.GetMethod(
+                "ApplyVisualTextures",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(applyVisualTextures, Is.Not.Null,
+                "CardInstance 必须把地点卡的专用底板应用到材质实例");
+
+            Material sourceMaterial = AssetDatabase.LoadAssetAtPath<Material>(
+                "Assets/StackCraft/Materials/Cards/Character.mat");
+            var material = new Material(sourceMaterial);
+            try
+            {
+                applyVisualTextures.Invoke(null, new[] { material, firstDefinition });
+                Assert.That(material.GetTexture("_BaseTex"), Is.SameAs(firstBaseTexture));
+            }
+            finally
+            {
+                Object.DestroyImmediate(material);
+            }
+        }
+
+        [Test]
+        public void RiverbendLocation_MissingInitialCardsCanBeMigratedWithoutDuplicates()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+            MethodInfo findMissing = controllerType.GetMethod(
+                "FindMissingInitialCardSpawns",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(findMissing, Is.Not.Null,
+                "旧存档中的河湾村也需要补齐新增卡牌，同时不能重复生成已有卡牌");
+
+            string[] existing = { "riverbend-market", "riverbend-inn" };
+            var missing = ((IEnumerable)findMissing.Invoke(null, new object[] { riverbend, existing }))
+                .Cast<object>()
+                .ToList();
+            Assert.That(missing.Count, Is.EqualTo(5));
+
+            var missingIds = missing.Select(spawn =>
+            {
+                object definition = spawn.GetType().GetProperty("Definition").GetValue(spawn);
+                return (string)definition.GetType().GetProperty("Id").GetValue(definition);
+            });
+            Assert.That(missingIds, Does.Not.Contain("riverbend-market"));
+            Assert.That(missingIds, Does.Not.Contain("riverbend-inn"));
+
+            string[] allExisting =
+            {
+                "riverbend-market",
+                "riverbend-blacksmith-shop",
+                "riverbend-inn",
+                "riverbend-village-chief",
+                "riverbend-blacksmith",
+                "riverbend-grocer",
+                "riverbend-apothecary"
+            };
+            var noneMissing = ((IEnumerable)findMissing.Invoke(
+                    null,
+                    new object[] { riverbend, allExisting }))
+                .Cast<object>();
+            Assert.That(noneMissing, Is.Empty);
+        }
+
+        [Test]
+        public void RiverbendLocation_KeepsOriginalCardScaleAndUsesCompactBoard()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Assert.That(riverbend, Is.Not.Null);
+
+            var serializedLocation = new SerializedObject(riverbend);
+            Assert.That(serializedLocation.FindProperty("partyMemberScale"), Is.Null,
+                "Location maps must not resize the original card prefab.");
+            Vector2 mapSize = serializedLocation.FindProperty("mapSize").vector2Value;
+            Assert.That(mapSize.x, Is.EqualTo(18.4f).Within(0.01f));
+            Assert.That(mapSize.y, Is.EqualTo(10.35f).Within(0.01f));
+            Assert.That(
+                serializedLocation.FindProperty("cameraInitialDistance").floatValue,
+                Is.EqualTo(7f).Within(0.01f),
+                "The camera should frame the smaller board without scaling cards.");
+            Assert.That(
+                serializedLocation.FindProperty("partySpawnPosition").vector3Value,
+                Is.EqualTo(new Vector3(0f, 0f, -0.48f)));
+            Assert.That(
+                serializedLocation.FindProperty("partyMemberSpacing").floatValue,
+                Is.EqualTo(0.9f).Within(0.01f));
+
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                Assert.That(spawn.FindPropertyRelative("scale"), Is.Null,
+                    "Initial location cards must remain at the original one-to-one scale.");
+            }
+
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            Assert.That(cardType.GetMethod("SetPresentationScale"), Is.Null,
+                "Card scaling was the source of stack and collider regressions and must be removed.");
+        }
+
+        [Test]
+        public void CardManager_VillageNpcsAreInertButBabiesRemainSurvivalCharacters()
+        {
+            Object travelerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object babyDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Baby.asset");
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component traveler = CreateUninitializedCard(travelerDefinition, "Player Traveler");
+            Component baby = CreateUninitializedCard(babyDefinition, "Neutral Baby");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Neutral Village Chief");
+            try
+            {
+                System.Type cardManagerType = FindType("CryingSnow.StackCraft.CardManager");
+                MethodInfo getSurvivalCharacters = cardManagerType.GetMethod(
+                    "GetSurvivalCharacters",
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.That(getSurvivalCharacters, Is.Not.Null,
+                    "地点 NPC 需要显式退出生存结算，不能简单按 Neutral 阵营排除婴儿");
+
+                System.Type cardType = traveler.GetType();
+                System.Array cards = System.Array.CreateInstance(cardType, 3);
+                cards.SetValue(traveler, 0);
+                cards.SetValue(baby, 1);
+                cards.SetValue(villageChief, 2);
+                var survivalCharacters = ((IEnumerable)getSurvivalCharacters.Invoke(
+                        null,
+                        new object[] { cards }))
+                    .Cast<object>()
+                    .ToList();
+
+                Assert.That(survivalCharacters, Has.Count.EqualTo(2));
+                Assert.That(survivalCharacters, Does.Contain(traveler));
+                Assert.That(survivalCharacters, Does.Contain(baby));
+                Assert.That(
+                    survivalCharacters.Any(card => ReferenceEquals(card, villageChief)),
+                    Is.False);
+            }
+            finally
+            {
+                DestroyTestCard(traveler);
+                DestroyTestCard(baby);
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
+        public void CardManager_StaticVillageCardsDoNotConsumePlayerCardCapacity()
+        {
+            Object travelerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component traveler = CreateUninitializedCard(travelerDefinition, "Player Traveler");
+            Component market = CreateUninitializedCard(marketDefinition, "Static Market");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Static Village Chief");
+            try
+            {
+                System.Type cardManagerType = FindType("CryingSnow.StackCraft.CardManager");
+                MethodInfo getCapacityCards = cardManagerType.GetMethod(
+                    "GetCardsCountingTowardLimit",
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.That(getCapacityCards, Is.Not.Null,
+                    "固定地点卡不能挤占玩家卡牌上限，否则进入河湾村会平白减少容量");
+
+                System.Type cardType = traveler.GetType();
+                System.Array cards = System.Array.CreateInstance(cardType, 3);
+                cards.SetValue(traveler, 0);
+                cards.SetValue(market, 1);
+                cards.SetValue(villageChief, 2);
+                var capacityCards = ((IEnumerable)getCapacityCards.Invoke(
+                        null,
+                        new object[] { cards }))
+                    .Cast<object>()
+                    .ToList();
+
+                Assert.That(capacityCards, Has.Count.EqualTo(1));
+                Assert.That(capacityCards[0], Is.SameAs(traveler));
+            }
+            finally
+            {
+                DestroyTestCard(traveler);
+                DestroyTestCard(market);
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
         public void RiverbendLocation_UsesCompactWideBoardAndDedicatedSketchBackground()
         {
             const string scenePath = "Assets/StackCraft/Scenes/Location.unity";
@@ -1258,8 +1624,8 @@ namespace CardColony.Tests
             SerializedProperty mapSize = serializedDefinition.FindProperty("mapSize");
             Assert.That(mapSize, Is.Not.Null,
                 "地点定义需要独立地图尺寸，未来地点才能复用同一场景而不共享固定大小");
-            Assert.That(mapSize.vector2Value.x, Is.EqualTo(46f).Within(0.01f));
-            Assert.That(mapSize.vector2Value.y, Is.EqualTo(25.875f).Within(0.01f));
+            Assert.That(mapSize.vector2Value.x, Is.EqualTo(18.4f).Within(0.01f));
+            Assert.That(mapSize.vector2Value.y, Is.EqualTo(10.35f).Within(0.01f));
 
             Texture2D expectedBackground = AssetDatabase.LoadAssetAtPath<Texture2D>(backgroundPath);
             Assert.That(expectedBackground, Is.Not.Null);
@@ -1287,14 +1653,14 @@ namespace CardColony.Tests
                 .Invoke(controller, new object[] { expectedBackground });
 
             Bounds worldBounds = (Bounds)board.GetType().GetProperty("WorldBounds").GetValue(board);
-            Assert.That(worldBounds.size.x, Is.EqualTo(46f).Within(0.01f));
-            Assert.That(worldBounds.size.z, Is.EqualTo(25.875f).Within(0.01f));
+            Assert.That(worldBounds.size.x, Is.EqualTo(18.4f).Within(0.01f));
+            Assert.That(worldBounds.size.z, Is.EqualTo(10.35f).Within(0.01f));
             Assert.That(board.GetComponent<SkinnedMeshRenderer>().enabled, Is.False,
                 "地点背景接管桌面后应隐藏旧模板棋盘，避免边框与新地图尺寸不一致");
 
             Transform background = GameObject.Find("Background").transform;
-            Assert.That(background.localScale.x, Is.EqualTo(4.6f).Within(0.01f));
-            Assert.That(background.localScale.z, Is.EqualTo(2.5875f).Within(0.01f));
+            Assert.That(background.localScale.x, Is.EqualTo(1.84f).Within(0.01f));
+            Assert.That(background.localScale.z, Is.EqualTo(1.035f).Within(0.01f));
         }
 
         [Test]
@@ -1326,9 +1692,9 @@ namespace CardColony.Tests
             Assert.That(cameraInitialDistance, Is.Not.Null);
             Assert.That(cameraZoomSpeed, Is.Not.Null,
                 "Each location needs its own mouse-wheel zoom sensitivity.");
-            Assert.That(cameraMinDistance.floatValue, Is.EqualTo(5f).Within(0.01f));
-            Assert.That(cameraMaxDistance.floatValue, Is.EqualTo(52f).Within(0.01f));
-            Assert.That(cameraInitialDistance.floatValue, Is.EqualTo(22f).Within(0.01f));
+            Assert.That(cameraMinDistance.floatValue, Is.EqualTo(3f).Within(0.01f));
+            Assert.That(cameraMaxDistance.floatValue, Is.EqualTo(24f).Within(0.01f));
+            Assert.That(cameraInitialDistance.floatValue, Is.EqualTo(7f).Within(0.01f));
             Assert.That(cameraZoomSpeed.floatValue, Is.EqualTo(3f).Within(0.01f));
 
             MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
@@ -1362,8 +1728,8 @@ namespace CardColony.Tests
                     "maxDistance",
                     BindingFlags.Instance | BindingFlags.NonPublic)
                 .GetValue(cameraController);
-            Assert.That(minDistance, Is.EqualTo(5f).Within(0.01f));
-            Assert.That(maxDistance, Is.EqualTo(52f).Within(0.01f));
+            Assert.That(minDistance, Is.EqualTo(3f).Within(0.01f));
+            Assert.That(maxDistance, Is.EqualTo(24f).Within(0.01f));
             float zoomSpeed = (float)cameraController.GetType().GetField(
                     "zoomSpeed",
                     BindingFlags.Instance | BindingFlags.NonPublic)
@@ -1378,9 +1744,9 @@ namespace CardColony.Tests
             Assert.That(
                 ground.Raycast(new Ray(cameraTransform.position, cameraTransform.forward), out float distance),
                 Is.True);
-            Assert.That(distance, Is.EqualTo(22f).Within(0.1f),
+            Assert.That(distance, Is.EqualTo(7f).Within(0.1f),
                 "进入河湾村时应先看到较大范围，而不是沿用模板的近距离视角");
-            Assert.That(cameraTransform.GetComponent<Camera>().farClipPlane, Is.GreaterThanOrEqualTo(104f),
+            Assert.That(cameraTransform.GetComponent<Camera>().farClipPlane, Is.GreaterThanOrEqualTo(48f),
                 "扩大缩放上限后必须同步提高远裁剪面，避免地图在远景被裁掉");
 
             Vector3 initialFocus = new Ray(cameraTransform.position, cameraTransform.forward)

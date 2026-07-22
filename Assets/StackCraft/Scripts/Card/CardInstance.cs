@@ -99,8 +99,7 @@ namespace CryingSnow.StackCraft
 
             UpdateStatDisplays();
 
-            if (Definition.ArtTexture != null)
-                _renderer.material.SetTexture("_OverlayTex", Definition.ArtTexture);
+            ApplyVisualTextures(_renderer.material, Definition);
 
             Stack = new CardStack(this, transform.position);
             CardManager.Instance?.RegisterStack(Stack);
@@ -548,8 +547,20 @@ namespace CryingSnow.StackCraft
             Definition = newDefinition;
             Stats = Definition.CreateCombatStats();
             if (titleText != null) titleText.text = Definition.DisplayName;
-            if (Definition.ArtTexture != null && _renderer != null)
-                _renderer.material.SetTexture("_OverlayTex", Definition.ArtTexture);
+            if (_renderer != null)
+                ApplyVisualTextures(_renderer.material, Definition);
+        }
+
+        public static void ApplyVisualTextures(Material material, CardDefinition definition)
+        {
+            if (material == null || definition == null)
+                return;
+
+            if (definition.ArtTexture != null)
+                material.SetTexture("_OverlayTex", definition.ArtTexture);
+
+            if (definition.BaseTextureOverride != null)
+                material.SetTexture("_BaseTex", definition.BaseTextureOverride);
         }
 
         /// <summary>
