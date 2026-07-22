@@ -247,8 +247,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b31f93186fe86a1449d77679e4de572f, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   allEncounters:
   - {fileID: 11400000, guid: 88a10cbfdcae7f14a931cd5203395b42, type: 2}
   - {fileID: 11400000, guid: 01390f6125abd6c41a8e1228fe2c3e79, type: 2}
@@ -281,8 +281,8 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c45495d99eba443479779710299f86dc, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
+  m_Name:
+  m_EditorClassIdentifier:
   advantageMultiplier: 1.5
   disadvantageMultiplier: 0.75
   combatRectPrefab: {fileID: 8122051869140798555, guid: d7f97b1703c8e0c47a6962638643c572, type: 3}
@@ -585,62 +585,67 @@ MonoBehaviour:
   locationDetails:
   - locationId: riverbend
     localMapImplemented: 1
-    locationType: 村庄
+    locationType: "\u6751\u5E84"
     dangerLevel: 1
-    travelTime: 当前所在地
+    travelTime: "\u5F53\u524D\u6240\u5728\u5730"
     possibleResources:
-    - 食物
-    - 委托
-    - 商店
+    - "\u98DF\u7269"
+    - "\u59D4\u6258"
+    - "\u5546\u5E97"
     explorationProgress: 1
-    description: 沿河建立的安静村庄，是小队整备、交易和接受委托的起点。
+    description: "\u6CBF\u6CB3\u5EFA\u7ACB\u7684\u5B89\u9759\u6751\u5E84\uFF0C\u662F\u5C0F\u961F\u6574\u5907\u3001\u4EA4\u6613\u548C\u63A5\u53D7\u59D4\u6258\u7684\u8D77\u70B9\u3002"
   - locationId: white-stone-city
-    locationType: 城镇
+    localMapImplemented: 0
+    locationType: "\u57CE\u9547"
     dangerLevel: 3
-    travelTime: 1秒（临时）
+    travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"
     possibleResources:
-    - 装备
-    - 商店
-    - 委托
+    - "\u88C5\u5907"
+    - "\u5546\u5E97"
+    - "\u59D4\u6258"
     explorationProgress: 0.2
-    description: 建在白色岩山上的城镇，防备森严，也流通着更好的装备。
+    description: "\u5EFA\u5728\u767D\u8272\u5CA9\u5C71\u4E0A\u7684\u57CE\u9547\uFF0C\u9632\u5907\u68EE\u4E25\uFF0C\u4E5F\u6D41\u901A\u7740\u66F4\u597D\u7684\u88C5\u5907\u3002"
   - locationId: old-mine
-    locationType: 遗迹
+    localMapImplemented: 0
+    locationType: "\u9057\u8FF9"
     dangerLevel: 2
-    travelTime: 1秒（临时）
+    travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"
     possibleResources:
-    - 石材
-    - 矿石
-    - 未知
+    - "\u77F3\u6750"
+    - "\u77FF\u77F3"
+    - "\u672A\u77E5"
     explorationProgress: 0.1
-    description: 废弃矿道通向更深的地下，仍能找到矿石，也可能惊动潜伏者。
+    description: "\u5E9F\u5F03\u77FF\u9053\u901A\u5411\u66F4\u6DF1\u7684\u5730\u4E0B\uFF0C\u4ECD\u80FD\u627E\u5230\u77FF\u77F3\uFF0C\u4E5F\u53EF\u80FD\u60CA\u52A8\u6F5C\u4F0F\u8005\u3002"
   - locationId: whispering-forest
-    locationType: 森林
+    localMapImplemented: 0
+    locationType: "\u68EE\u6797"
     dangerLevel: 2
-    travelTime: 1秒（临时）
+    travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"
     possibleResources:
-    - 草药
-    - 木材
-    - 未知
+    - "\u8349\u836F"
+    - "\u6728\u6750"
+    - "\u672A\u77E5"
     explorationProgress: 0.35
-    description: 雾气笼罩的古老森林，适合采集草药，也潜藏着未知危险。
+    description: "\u96FE\u6C14\u7B3C\u7F69\u7684\u53E4\u8001\u68EE\u6797\uFF0C\u9002\u5408\u91C7\u96C6\u8349\u836F\uFF0C\u4E5F\u6F5C\u85CF\u7740\u672A\u77E5\u5371\u9669\u3002"
   - locationId: caravan
-    locationType: 营地设施
+    localMapImplemented: 0
+    locationType: "\u8425\u5730\u8BBE\u65BD"
     dangerLevel: 1
-    travelTime: 1秒（临时）
+    travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"
     possibleResources:
-    - 仓储
-    - 补给
+    - "\u4ED3\u50A8"
+    - "\u8865\u7ED9"
     explorationProgress: 1
-    description: 随队移动的马车，可用于存放物资并为接下来的旅程做准备。
+    description: "\u968F\u961F\u79FB\u52A8\u7684\u9A6C\u8F66\uFF0C\u53EF\u7528\u4E8E\u5B58\u653E\u7269\u8D44\u5E76\u4E3A\u63A5\u4E0B\u6765\u7684\u65C5\u7A0B\u505A\u51C6\u5907\u3002"
   - locationId: demon-castle
-    locationType: 禁区
+    localMapImplemented: 0
+    locationType: "\u7981\u533A"
     dangerLevel: 5
-    travelTime: 未知
+    travelTime: "\u672A\u77E5"
     possibleResources:
-    - 未知
+    - "\u672A\u77E5"
     explorationProgress: 0
-    description: 被黑暗力量笼罩的城堡，目前还没有安全进入的方法。
+    description: "\u88AB\u9ED1\u6697\u529B\u91CF\u7B3C\u7F69\u7684\u57CE\u5821\uFF0C\u76EE\u524D\u8FD8\u6CA1\u6709\u5B89\u5168\u8FDB\u5165\u7684\u65B9\u6CD5\u3002"
   routes:
   - fromLocationIndex: 0
     toLocationIndex: 1
@@ -670,6 +675,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 1f43e740a8b65554c84bd5888659eb25, type: 2}
   worldMapTexture: {fileID: 2800000, guid: a8ab002c8db220747a0d08c6616cb3a3, type: 3}
   worldMapShader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}
+  backgroundSurfaceOffset: -0.01
 --- !u!1 &1192909442
 GameObject:
   m_ObjectHideFlags: 0
@@ -1315,6 +1321,30 @@ PrefabInstance:
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 5828425806553082866, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 5832408725127311523, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: m_AnchoredPosition.y
       value: 0
       objectReference: {fileID: 0}

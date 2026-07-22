@@ -104,8 +104,48 @@ namespace CryingSnow.StackCraft
             }
 
             CardManager.Instance.ResolveOverlaps();
+            ConfigureLocationCardBehaviours(CardManager.Instance.AllCards, activeDefinition);
             CardManager.Instance.NotifyStatsChanged();
             return spawnedCards;
+        }
+
+        public static void ConfigureLocationCardBehaviours(IEnumerable<CardInstance> cards)
+        {
+            ConfigureLocationCardBehaviours(cards, null);
+        }
+
+        public static void ConfigureLocationCardBehaviours(
+            IEnumerable<CardInstance> cards,
+            LocationDefinition locationDefinition)
+        {
+            if (cards == null)
+                return;
+
+            foreach (CardInstance card in cards)
+            {
+                if (card?.Definition == null)
+                    continue;
+
+                if (!card.Definition.AmbientNpcAiEnabled)
+                    continue;
+
+                LocationNpcActivity activity = card.GetComponent<LocationNpcActivity>();
+                if (activity == null)
+                    activity = card.gameObject.AddComponent<LocationNpcActivity>();
+
+                LocationCardSpawn configuredSpawn = locationDefinition?.InitialCardSpawns
+                    .FirstOrDefault(spawn => spawn.Definition != null &&
+                        spawn.Definition.Id == card.Definition.Id) ?? default;
+                Vector3 homePosition = configuredSpawn.Definition != null
+                    ? configuredSpawn.Position
+                    : card.Stack?.TargetPosition ?? card.transform.position;
+                activity.Configure(
+                    card,
+                    homePosition,
+                    card.Definition.AmbientWanderRadius,
+                    card.Definition.AmbientMoveSpeed,
+                    card.Definition.AmbientIdleRange);
+            }
         }
 
         public static IReadOnlyList<LocationCardSpawn> FindMissingInitialCardSpawns(

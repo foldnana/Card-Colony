@@ -1434,6 +1434,267 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void RiverbendLocation_BuildingsAreFixedAndNpcsRemainPlayerDraggable()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            Object marketDefinition = null;
+            Object villageChiefDefinition = null;
+
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                Object definition = spawns.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                var serializedCard = new SerializedObject(definition);
+                string displayName = serializedCard.FindProperty("displayName").stringValue;
+                bool isBuilding = serializedCard.FindProperty("category").enumValueIndex == 6;
+                SerializedProperty playerDraggable = serializedCard.FindProperty("playerDraggable");
+
+                Assert.That(playerDraggable, Is.Not.Null,
+                    $"{displayName} 需要显式配置玩家能否拖动");
+                Assert.That(playerDraggable.boolValue, Is.EqualTo(!isBuilding),
+                    isBuilding
+                        ? $"{displayName} 是固定建筑，不能被玩家拖动"
+                        : $"{displayName} 仍需允许玩家拖动以支持后续交互");
+
+                if (displayName == "市场") marketDefinition = definition;
+                if (displayName == "村长") villageChiefDefinition = definition;
+            }
+
+            Component market = CreateUninitializedCard(marketDefinition, "Fixed Market");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Draggable Village Chief");
+            try
+            {
+                System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+                Component marketController = market.gameObject.AddComponent(controllerType);
+                Component chiefController = villageChief.gameObject.AddComponent(controllerType);
+                MethodInfo controllerAwake = controllerType.GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                controllerAwake.Invoke(marketController, null);
+                controllerAwake.Invoke(chiefController, null);
+                PropertyInfo canBeDragged = controllerType.GetProperty("CanBeDragged");
+
+                Assert.That(canBeDragged.GetValue(marketController), Is.False);
+                Assert.That(villageChief.GetType().GetProperty("Definition").GetValue(villageChief),
+                    Is.SameAs(villageChiefDefinition), "村长测试卡没有保留定义");
+                object chiefStack = villageChief.GetType().GetProperty("Stack").GetValue(villageChief);
+                Assert.That(chiefStack, Is.Not.Null, "村长测试卡缺少卡堆");
+                Assert.That(chiefStack.GetType().GetProperty("IsLocked").GetValue(chiefStack), Is.False,
+                    "村长卡堆不应锁定");
+                Assert.That(villageChiefDefinition.GetType().GetProperty("PlayerDraggable")
+                    .GetValue(villageChiefDefinition), Is.True, "村长定义的运行时拖动开关应为开启");
+                Assert.That(canBeDragged.GetValue(chiefController), Is.True,
+                    "村长配置为可拖动，CardController 也必须允许拖动");
+            }
+            finally
+            {
+                DestroyTestCard(market);
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
+        public void LocationNpcActivity_MovesTowardCommandsWithoutLeavingItsHomeRadius()
+        {
+            System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Assert.That(activityType, Is.Not.Null,
+                "地点 NPC 需要独立的轻量活动状态机，作为巡逻、散步和日程行为的基础");
+
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Ambient Village Chief");
+            try
+            {
+                Component activity = villageChief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[] { villageChief, Vector3.zero, 1f, 0.5f, new Vector2(2f, 3f) });
+                activityType.GetMethod("SetDestination").Invoke(
+                    activity,
+                    new object[] { new Vector3(5f, 0f, 0f) });
+
+                Vector3 destination = (Vector3)activityType.GetProperty("Destination").GetValue(activity);
+                Assert.That(Vector3.Distance(Vector3.zero, destination), Is.LessThanOrEqualTo(1.001f));
+                Assert.That(activityType.GetProperty("State").GetValue(activity).ToString(), Is.EqualTo("Moving"));
+
+                activityType.GetMethod("Tick").Invoke(activity, new object[] { 1f });
+                Assert.That(villageChief.transform.position.x, Is.GreaterThan(0f));
+                Assert.That(villageChief.transform.position.x, Is.LessThanOrEqualTo(0.501f));
+            }
+            finally
+            {
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
+        public void LocationNpcActivity_PausesInsteadOfMovingAnAttachedCardStack()
+        {
+            System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Attached Village Chief");
+            Component market = CreateUninitializedCard(marketDefinition, "Attached Market");
+            try
+            {
+                Component activity = villageChief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[] { villageChief, Vector3.zero, 1f, 0.5f, new Vector2(2f, 3f) });
+                activityType.GetMethod("SetDestination").Invoke(
+                    activity,
+                    new object[] { new Vector3(1f, 0f, 0f) });
+
+                object chiefStack = villageChief.GetType().GetProperty("Stack").GetValue(villageChief);
+                object marketStack = market.GetType().GetProperty("Stack").GetValue(market);
+                chiefStack.GetType().GetMethod("MergeWith").Invoke(chiefStack, new[] { marketStack });
+
+                activityType.GetMethod("Tick").Invoke(activity, new object[] { 1f });
+                Assert.That(villageChief.transform.position, Is.EqualTo(Vector3.zero),
+                    "NPC 与其他卡堆叠时应暂停环境活动，不能带着整堆卡一起散步");
+            }
+            finally
+            {
+                DestroyTestCard(villageChief);
+                DestroyTestCard(market);
+            }
+        }
+
+        [Test]
+        public void LocationSceneController_AddsAmbientAiOnlyToConfiguredNpcCards()
+        {
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component market = CreateUninitializedCard(marketDefinition, "AI Excluded Market");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "AI Enabled Village Chief");
+            try
+            {
+                System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+                MethodInfo configure = controllerType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .FirstOrDefault(method => method.Name == "ConfigureLocationCardBehaviours" &&
+                        method.GetParameters().Length == 1);
+                Assert.That(configure, Is.Not.Null);
+
+                System.Type cardType = market.GetType();
+                System.Array cards = System.Array.CreateInstance(cardType, 2);
+                cards.SetValue(market, 0);
+                cards.SetValue(villageChief, 1);
+                configure.Invoke(null, new object[] { cards });
+
+                System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+                Assert.That(market.GetComponent(activityType), Is.Null);
+                Assert.That(villageChief.GetComponent(activityType), Is.Not.Null);
+                object marketStack = market.GetType().GetProperty("Stack").GetValue(market);
+                Assert.That(marketStack.GetType().GetProperty("IsLocked").GetValue(marketStack), Is.False,
+                    "建筑不能锁死整个卡堆，否则叠在建筑上的普通卡无法拆出");
+                Assert.That(marketStack.GetType().GetProperty("IsAnchored").GetValue(marketStack), Is.True,
+                    "固定建筑卡堆应作为物理解算锚点，而不是输入锁");
+            }
+            finally
+            {
+                DestroyTestCard(market);
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
+        public void RiverbendLocation_CardsStackedOnBuildingsCanStillBeDraggedAway()
+        {
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Object villageChiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component market = CreateUninitializedCard(marketDefinition, "Stacked Market");
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Chief On Market");
+            try
+            {
+                System.Type cardType = market.GetType();
+                System.Array cards = System.Array.CreateInstance(cardType, 2);
+                cards.SetValue(market, 0);
+                cards.SetValue(villageChief, 1);
+                System.Type locationControllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+                locationControllerType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .First(method => method.Name == "ConfigureLocationCardBehaviours" &&
+                        method.GetParameters().Length == 1)
+                    .Invoke(null, new object[] { cards });
+
+                object marketStack = market.GetType().GetProperty("Stack").GetValue(market);
+                object chiefStack = villageChief.GetType().GetProperty("Stack").GetValue(villageChief);
+                marketStack.GetType().GetMethod("MergeWith").Invoke(marketStack, new[] { chiefStack });
+
+                System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+                Component controller = villageChief.gameObject.AddComponent(controllerType);
+                controllerType.GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(controller, null);
+
+                Assert.That(controllerType.GetProperty("CanBeDragged").GetValue(controller), Is.True,
+                    "普通卡叠到建筑上后仍需允许拖出，建筑固定不能通过锁死整堆实现");
+            }
+            finally
+            {
+                DestroyTestCard(market);
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
+        public void LocationSceneController_RestoredNpcKeepsConfiguredSpawnAsItsHome()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            var serializedLocation = new SerializedObject(riverbend);
+            SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
+            Object villageChiefDefinition = null;
+            Vector3 configuredHome = Vector3.zero;
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                Object definition = spawn.FindPropertyRelative("definition").objectReferenceValue;
+                var serializedCard = new SerializedObject(definition);
+                if (serializedCard.FindProperty("displayName").stringValue != "村长")
+                    continue;
+
+                villageChiefDefinition = definition;
+                configuredHome = spawn.FindPropertyRelative("position").vector3Value;
+                break;
+            }
+
+            Component villageChief = CreateUninitializedCard(villageChiefDefinition, "Restored Village Chief");
+            try
+            {
+                SetTestCardStackPosition(villageChief, configuredHome + new Vector3(0.8f, 0f, 0.4f));
+                System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+                MethodInfo configure = controllerType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .FirstOrDefault(method => method.Name == "ConfigureLocationCardBehaviours" &&
+                        method.GetParameters().Length == 2);
+                Assert.That(configure, Is.Not.Null,
+                    "读档配置地点行为时需要地点定义，不能把 NPC 当前存档位置当作永久出生点");
+
+                System.Type cardType = villageChief.GetType();
+                System.Array cards = System.Array.CreateInstance(cardType, 1);
+                cards.SetValue(villageChief, 0);
+                configure.Invoke(null, new object[] { cards, riverbend });
+
+                System.Type activityType = FindType("CryingSnow.StackCraft.LocationNpcActivity");
+                Component activity = villageChief.GetComponent(activityType);
+                Assert.That(activityType.GetProperty("HomePosition").GetValue(activity),
+                    Is.EqualTo(configuredHome),
+                    "NPC 读档后仍应围绕地点策划配置的出生点活动");
+            }
+            finally
+            {
+                DestroyTestCard(villageChief);
+            }
+        }
+
+        [Test]
         public void RiverbendLocation_MissingInitialCardsCanBeMigratedWithoutDuplicates()
         {
             Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(

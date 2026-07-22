@@ -33,7 +33,7 @@ namespace CryingSnow.StackCraft
                 {
                     foreach (var stack in stacks)
                     {
-                        if (stack.IsLocked || IsDockedPartyStack(stack)) continue;
+                        if (IsImmovableStack(stack)) continue;
 
                         if (CheckAndSeparate(stack, combatRect))
                         {
@@ -78,8 +78,8 @@ namespace CryingSnow.StackCraft
                 return false;
 
             // Apply Separation based on Locks
-            bool aLocked = a.IsLocked || IsDockedPartyStack(a);
-            bool bLocked = b.IsLocked || IsDockedPartyStack(b);
+            bool aLocked = IsImmovableStack(a);
+            bool bLocked = IsImmovableStack(b);
 
             if (aLocked && bLocked) return false;
 
@@ -110,10 +110,16 @@ namespace CryingSnow.StackCraft
             return location != null && location.DockedParty == card;
         }
 
+        private static bool IsImmovableStack(CardStack stack)
+        {
+            return stack != null &&
+                (stack.IsLocked || stack.IsAnchored || IsDockedPartyStack(stack));
+        }
+
         private static bool CheckAndSeparate(CardStack stack, CombatRect combatRect)
         {
             if (stack == null || combatRect == null) return false;
-            if (stack.IsLocked || IsDockedPartyStack(stack)) return false;
+            if (IsImmovableStack(stack)) return false;
 
             // Get Stack Bounds
             GetStackBounds(stack, out Vector2 stackPos, out Vector2 stackHalf);

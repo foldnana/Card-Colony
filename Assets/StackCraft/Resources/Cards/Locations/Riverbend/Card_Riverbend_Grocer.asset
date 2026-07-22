@@ -20,6 +20,11 @@ MonoBehaviour:
   category: 2
   faction: 0
   isLocationStatic: 1
+  playerDraggable: 1
+  ambientNpcAiEnabled: 1
+  ambientWanderRadius: 1
+  ambientMoveSpeed: 0.5
+  ambientIdleRange: {x: 2, y: 4}
   combatType: 0
   loot: []
   isAggressive: 0

@@ -230,6 +230,12 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("category").enumValueIndex = (int)spec.Category;
             serialized.FindProperty("faction").enumValueIndex = (int)CardFaction.Neutral;
             serialized.FindProperty("isLocationStatic").boolValue = true;
+            bool isNpc = spec.Category == CardCategory.Character;
+            serialized.FindProperty("playerDraggable").boolValue = isNpc;
+            serialized.FindProperty("ambientNpcAiEnabled").boolValue = isNpc;
+            serialized.FindProperty("ambientWanderRadius").floatValue = 1f;
+            serialized.FindProperty("ambientMoveSpeed").floatValue = 0.5f;
+            serialized.FindProperty("ambientIdleRange").vector2Value = new Vector2(2f, 4f);
             serialized.FindProperty("combatType").enumValueIndex = (int)CombatType.None;
             serialized.FindProperty("loot").ClearArray();
             serialized.FindProperty("isAggressive").boolValue = false;

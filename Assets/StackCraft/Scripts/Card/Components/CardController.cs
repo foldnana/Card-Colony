@@ -33,7 +33,10 @@ namespace CryingSnow.StackCraft
         private bool inCombat => _combatant != null && _combatant.IsInCombat;
         private CardInstance equipperCard => _equipmentComponent?.Equipper;
 
-        public bool CanBeDragged => _card != null && _card.Stack != null && !_card.Stack.IsLocked;
+        public bool CanBeDragged => _card != null &&
+            (_card.Definition == null || _card.Definition.PlayerDraggable) &&
+            _card.Stack != null &&
+            !_card.Stack.IsLocked;
 
         private void Awake()
         {

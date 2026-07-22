@@ -32,6 +32,21 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Static location content is saved on the local board but does not consume player survival resources or card capacity.")]
         private bool isLocationStatic;
 
+        [SerializeField, Tooltip("Whether the player can pick up and drag this card.")]
+        private bool playerDraggable = true;
+
+        [SerializeField, Tooltip("Enables lightweight idle and wandering behaviour for a location NPC.")]
+        private bool ambientNpcAiEnabled;
+
+        [SerializeField, Min(0.1f), Tooltip("Maximum distance the location NPC may wander from its home position.")]
+        private float ambientWanderRadius = 1f;
+
+        [SerializeField, Min(0.05f), Tooltip("Movement speed used by the location NPC activity state machine.")]
+        private float ambientMoveSpeed = 0.5f;
+
+        [SerializeField, Tooltip("Minimum and maximum idle time between ambient NPC movements.")]
+        private Vector2 ambientIdleRange = new(2f, 4f);
+
         [SerializeField, Tooltip("The combat type for Rock-Paper-Scissors advantage.")]
         private CombatType combatType = CombatType.None;
 
@@ -118,6 +133,11 @@ namespace CryingSnow.StackCraft
         public CardCategory Category => category;
         public CardFaction Faction => faction;
         public bool IsLocationStatic => isLocationStatic;
+        public bool PlayerDraggable => playerDraggable;
+        public bool AmbientNpcAiEnabled => ambientNpcAiEnabled;
+        public float AmbientWanderRadius => ambientWanderRadius;
+        public float AmbientMoveSpeed => ambientMoveSpeed;
+        public Vector2 AmbientIdleRange => ambientIdleRange;
         public CombatType CombatType => combatType;
 
         public bool IsAggressive => isAggressive;

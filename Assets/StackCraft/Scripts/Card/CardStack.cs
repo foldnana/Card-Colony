@@ -13,6 +13,10 @@ namespace CryingSnow.StackCraft
         public List<CardInstance> Cards { get; private set; }
         public Vector3 TargetPosition { get; private set; }
         public bool IsLocked { get; set; }
+        public bool IsAnchored => Cards != null && Cards.Exists(card =>
+            card?.Definition != null &&
+            card.Definition.IsLocationStatic &&
+            !card.Definition.PlayerDraggable);
 
         public CardInstance TopCard => Cards.Count > 0 ? Cards[0] : null;
         public CardInstance BottomCard => Cards.Count > 0 ? Cards[Cards.Count - 1] : null;
