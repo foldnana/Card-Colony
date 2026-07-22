@@ -222,6 +222,7 @@ namespace CryingSnow.StackCraft
 
             var terminalActions = new System.Func<bool>[]
             {
+                TryStoreInBackpack,
                 TryDockAtNearbyBuilding,
                 TryTradeWithNearbyZone,
                 TryEquipOnNearbyCharacter,
@@ -275,6 +276,14 @@ namespace CryingSnow.StackCraft
                 _card,
                 _card.Settings.AttachRadius);
             return entrance != null && entrance.OnStack(_card.Stack);
+        }
+
+        private bool TryStoreInBackpack()
+        {
+            BackpackView backpack = BackpackView.Instance;
+            return backpack != null &&
+                backpack.IsPointerOverStorageArea(Input.mousePosition) &&
+                BackpackService.TryStore(_card);
         }
         #endregion
 

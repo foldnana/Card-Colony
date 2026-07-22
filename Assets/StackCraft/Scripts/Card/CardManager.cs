@@ -253,7 +253,11 @@ namespace CryingSnow.StackCraft
                     continue;
                 }
 
-                CardInstance newCard = CreateCardInstance(def, stackPos, CardStack.RefuseAll);
+                CardInstance newCard = CreateCardInstance(
+                    def,
+                    stackPos,
+                    CardStack.RefuseAll,
+                    notifyCreated: false);
                 newCard.RestoreSavedStats(cardData);
 
                 if (newCard.EquipperComponent != null && cardData.EquippedItems != null && cardData.EquippedItems.Count > 0)
@@ -300,7 +304,10 @@ namespace CryingSnow.StackCraft
             }
         }
 
-        private void RestoreEquipmentForCard(CardInstance character, CardData data)
+        private void RestoreEquipmentForCard(
+            CardInstance character,
+            CardData data,
+            bool notifyStats = true)
         {
             // 1. If this character changed class (e.g. is now a Warrior), 
             // manually inject the "Villager" base state so the Equipper knows we aren't starting fresh.
@@ -318,7 +325,12 @@ namespace CryingSnow.StackCraft
 
                 // Create the item "in the void" (Vector3.zero)
                 // We temporarily create it on the board, but Equip() will immediately remove it.
-                CardInstance itemCard = CreateCardInstance(itemDef, Vector3.zero, CardStack.RefuseAll);
+                CardInstance itemCard = CreateCardInstance(
+                    itemDef,
+                    Vector3.zero,
+                    CardStack.RefuseAll,
+                    notifyCreated: false,
+                    notifyStats: notifyStats);
 
                 // Restore stats (durability, etc)
                 itemCard.RestoreSavedStats(itemData);
@@ -335,15 +347,23 @@ namespace CryingSnow.StackCraft
         /// <param name="data">The serialized data containing the card's state, equipment, and original ID.</param>
         /// <param name="position">The world-space position where the card should be instantiated.</param>
         /// <returns>A fully initialized <see cref="CardInstance"/>; returns <c>null</c> if the definition cannot be found.</returns>
-        public CardInstance RestoreCardFromData(CardData data, Vector3 position)
+        public CardInstance RestoreCardFromData(
+            CardData data,
+            Vector3 position,
+            bool notifyStats = true)
         {
             string spawnId = !string.IsNullOrEmpty(data.OriginalId) ? data.OriginalId : data.Id;
             CardDefinition baseDef = GetDefinitionById(spawnId);
 
             if (baseDef == null) return null;
-            CardInstance card = CreateCardInstance(baseDef, position, CardStack.RefuseAll);
+            CardInstance card = CreateCardInstance(
+                baseDef,
+                position,
+                CardStack.RefuseAll,
+                notifyCreated: false,
+                notifyStats: notifyStats);
             card.RestoreSavedStats(data);
-            RestoreEquipmentForCard(card, data);
+            RestoreEquipmentForCard(card, data, notifyStats);
 
             return card;
         }
@@ -360,7 +380,11 @@ namespace CryingSnow.StackCraft
             if (def == null) return;
 
             // 1. Create the base card instance
-            CardInstance newCard = CreateCardInstance(def, position, CardStack.RefuseAll);
+            CardInstance newCard = CreateCardInstance(
+                def,
+                position,
+                CardStack.RefuseAll,
+                notifyCreated: false);
             if (newCard == null) return;
 
             // 2. Restore basic stats (Health, Uses, Nutrition)
@@ -442,7 +466,12 @@ namespace CryingSnow.StackCraft
         /// <param name="position">The initial world position for the card.</param>
         /// <param name="stackToIgnore">A specific stack to ignore when the new card attempts to merge into nearby stacks.</param>
         /// <returns>The newly created <see cref="CardInstance"/> object, or null if spawning failed (e.g., in Friendly Mode).</returns>
-        public CardInstance CreateCardInstance(CardDefinition definition, Vector3 position, CardStack stackToIgnore = null)
+        public CardInstance CreateCardInstance(
+            CardDefinition definition,
+            Vector3 position,
+            CardStack stackToIgnore = null,
+            bool notifyCreated = true,
+            bool notifyStats = true)
         {
             MarkCardAsDiscovered(definition);
 
@@ -484,8 +513,10 @@ namespace CryingSnow.StackCraft
                 chestLogic.Initialize(newCard);
             }
 
-            NotifyStatsChanged();
-            OnCardCreated?.Invoke(newCard);
+            if (notifyStats)
+                NotifyStatsChanged();
+            if (notifyCreated)
+                OnCardCreated?.Invoke(newCard);
             return newCard;
         }
 
@@ -852,9 +883,10 @@ namespace CryingSnow.StackCraft
 
             return new StatsSnapshot
             {
-                TotalNutrition = CalculateTotalNutrition(allCards),
+                TotalNutrition = CalculateTotalNutrition(allCards) +
+                    CalculateBackpackNutrition(),
                 NutritionNeed = CalculateNutritionNeed(allCards),
-                Currency = CalculateCurrency(allCards),
+                Currency = CalculateCurrency(allCards) + CalculateBackpackCurrency(),
                 CardsOwned = cardsOwned,
                 TotalBoost = totalBoost,
                 CardLimit = cardLimit,
@@ -914,6 +946,49 @@ namespace CryingSnow.StackCraft
         private int CalculateCharacter(List<CardInstance> allCards)
         {
             return GetSurvivalCharacters(allCards).Count();
+        }
+
+        public int CountOwnedCard(CardDefinition definition)
+        {
+            if (definition == null)
+                return 0;
+
+            int worldCount = AllCards.Count(card => card.BaseDefinition == definition);
+            int backpackCount = GetBackpackEntries().Count(entry =>
+                entry.Card.Id == definition.Id || entry.Card.OriginalId == definition.Id);
+            return worldCount + backpackCount;
+        }
+
+        private int CalculateBackpackNutrition()
+        {
+            return GetBackpackEntries()
+                .Where(entry => IsStoredCategory(entry, CardCategory.Consumable))
+                .Sum(entry => Mathf.Max(0, entry.Card.CurrentNutrition));
+        }
+
+        private int CalculateBackpackCurrency()
+        {
+            int looseCoins = GetBackpackEntries()
+                .Count(entry => IsStoredCategory(entry, CardCategory.Currency));
+            int storedCoins = GetBackpackEntries()
+                .Sum(entry => Mathf.Max(0, entry.Card.StoredCoins));
+            return looseCoins + storedCoins;
+        }
+
+        private IEnumerable<BackpackEntryData> GetBackpackEntries()
+        {
+            return GameDirector.Instance?.GameData?.EnsureBackpack()?.Entries?
+                .Where(entry => entry?.Card != null) ??
+                Enumerable.Empty<BackpackEntryData>();
+        }
+
+        private bool IsStoredCategory(
+            BackpackEntryData entry,
+            CardCategory category)
+        {
+            return entry?.Card != null && definitionLookup != null &&
+                definitionLookup.TryGetValue(entry.Card.Id, out CardDefinition definition) &&
+                definition.Category == category;
         }
 
         public static IEnumerable<CardInstance> GetSurvivalCharacters(

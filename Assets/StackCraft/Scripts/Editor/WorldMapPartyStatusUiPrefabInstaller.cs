@@ -37,7 +37,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 panelRect.anchorMin = Vector2.zero;
                 panelRect.anchorMax = Vector2.zero;
                 panelRect.pivot = Vector2.zero;
-                panelRect.anchoredPosition = new Vector2(30f, 30f);
+                panelRect.anchoredPosition = new Vector2(30f, 102f);
                 panelRect.sizeDelta = new Vector2(420f, 340f);
                 panelRect.localScale = Vector3.one;
 

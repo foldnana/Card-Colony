@@ -11,6 +11,7 @@ namespace CryingSnow.StackCraft
         public string ActiveLocationId;
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
+        public BackpackData Backpack = new();
         public GameplayPrefs GameplayPrefs;
         public Dictionary<string, SceneData> SavedScenes = new();
         public HashSet<string> DiscoveredCards = new();
@@ -80,6 +81,13 @@ namespace CryingSnow.StackCraft
             bool wasPending = locationPartyTransferPending;
             locationPartyTransferPending = false;
             return wasPending;
+        }
+
+        public BackpackData EnsureBackpack()
+        {
+            Backpack ??= new BackpackData();
+            Backpack.Normalize();
+            return Backpack;
         }
     }
 

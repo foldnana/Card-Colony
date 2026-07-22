@@ -123,6 +123,10 @@ namespace CryingSnow.StackCraft
         /// <param name="gameData">The GameData object loaded from a save file.</param>
         public void LoadGame(GameData gameData)
         {
+            if (gameData == null)
+                return;
+
+            gameData.EnsureBackpack();
             this.GameData = gameData;
             StartCoroutine(TravelSequence(gameData.CurrentScene, null));
         }

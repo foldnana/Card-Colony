@@ -303,8 +303,8 @@ namespace CryingSnow.StackCraft
                         }
                         else
                         {
-                            int count = CardManager.Instance.AllCards
-                                .Count(c => c.BaseDefinition == quest.QuestData.TargetCard);
+                            int count = CardManager.Instance.CountOwnedCard(
+                                quest.QuestData.TargetCard);
                             quest.SetProgress(count);
                         }
                         break;

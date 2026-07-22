@@ -440,7 +440,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void OriginalUiRoot_HasFixedWorldMapPartyStatusPanelWithoutBackpack()
+        public void OriginalUiRoot_HasPartyStatusAndEightSlotBackpackTabletop()
         {
             GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -460,18 +460,116 @@ namespace CardColony.Tests
             Assert.That(FindDescendant(panel.gameObject, "PartyLocationText"), Is.Not.Null);
             Assert.That(FindDescendant(panel.gameObject, "PartyMembersText"), Is.Not.Null);
             Assert.That(FindDescendant(panel.gameObject, "PartyStateText"), Is.Not.Null);
+            Transform backpackRoot = FindDescendant(uiRoot, "BackpackRoot");
+            Assert.That(backpackRoot, Is.Not.Null, "正式 UIRoot 需要常驻的背包入口和小桌面");
             Assert.That(
-                panel.GetComponentsInChildren<Transform>(true).Any(child =>
-                    child.name.IndexOf("Backpack", System.StringComparison.OrdinalIgnoreCase) >= 0),
-                Is.False,
-                "本阶段的小队状态栏不显示背包");
+                backpackRoot.GetComponents<MonoBehaviour>().Any(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.BackpackView"),
+                Is.True);
+            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackButton"), Is.Not.Null);
+            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackTablePanel"), Is.Not.Null);
+            Transform scrollViewport = FindDescendant(backpackRoot.gameObject, "BackpackScrollViewport");
+            Assert.That(scrollViewport, Is.Not.Null);
+            Assert.That(scrollViewport.GetComponent<ScrollRect>(), Is.Not.Null);
+            Assert.That(scrollViewport.GetComponent<RectMask2D>(), Is.Not.Null);
+            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackCapacityText"), Is.Not.Null);
+            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackCloseButton"), Is.Not.Null);
+            Assert.That(
+                backpackRoot.GetComponentsInChildren<Transform>(true)
+                    .Count(child => child.name.StartsWith("BackpackSlot") &&
+                        child.name != "BackpackSlots"),
+                Is.EqualTo(8));
 
             RectTransform rect = panel.GetComponent<RectTransform>();
             Assert.That(rect.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(rect.anchorMax, Is.EqualTo(Vector2.zero));
             Assert.That(rect.pivot, Is.EqualTo(Vector2.zero));
+            Assert.That(rect.anchoredPosition.y, Is.GreaterThanOrEqualTo(100f),
+                "小队信息框需要位于背包入口上方，避免两个常驻 UI 相互遮挡");
             Assert.That(rect.sizeDelta.x, Is.GreaterThanOrEqualTo(400f));
             Assert.That(rect.sizeDelta.y, Is.GreaterThanOrEqualTo(300f));
+        }
+
+        [Test]
+        public void BackpackView_RebuildsStoredCardsAsMiniatureCardViews()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            try
+            {
+                Transform root = FindDescendant(uiInstance, "BackpackRoot");
+                Component view = root.GetComponents<MonoBehaviour>().First(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.BackpackView");
+                System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+                System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+                object backpack = System.Activator.CreateInstance(backpackType);
+                Object appleDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+                Object coinDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset");
+                foreach (Object definition in new[] { appleDefinition, coinDefinition })
+                {
+                    object data = System.Activator.CreateInstance(cardDataType);
+                    cardDataType.GetField("Id").SetValue(
+                        data,
+                        definition.GetType().GetProperty("Id").GetValue(definition));
+                    object[] addArguments = { data, null };
+                    backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+                }
+                object unknownData = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(unknownData, "removed-card-definition");
+                backpackType.GetMethod("TryAdd").Invoke(
+                    backpack,
+                    new object[] { unknownData, null });
+                backpackType.GetField("SlotCapacity").SetValue(backpack, 24);
+
+                MethodInfo rebuild = view.GetType().GetMethod("Rebuild");
+                Assert.That(rebuild, Is.Not.Null);
+                rebuild.Invoke(view, new[] { backpack });
+
+                Assert.That(
+                    root.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
+                        component.GetType().FullName == "CryingSnow.StackCraft.BackpackItemView"),
+                    Is.EqualTo(3), "已改名或移除定义的旧物品也需要显示为占位卡，不能成为幽灵物品");
+                Assert.That(
+                    FindDescendant(root.gameObject, "BackpackCapacityText")
+                        .GetComponent<TMPro.TMP_Text>().text,
+                    Does.Contain("3/24"));
+                Assert.That(
+                    root.GetComponentsInChildren<Transform>(true).Count(child =>
+                        child.name.StartsWith("BackpackSlot") &&
+                        child.name != "BackpackSlots"),
+                    Is.EqualTo(24), "自动扩容后 UI 也必须生成新格子");
+                RectTransform table = (RectTransform)FindDescendant(
+                    root.gameObject,
+                    "BackpackTablePanel");
+                RectTransform slots = (RectTransform)FindDescendant(
+                    root.gameObject,
+                    "BackpackSlots");
+                Assert.That(table.sizeDelta.y, Is.LessThanOrEqualTo(440f),
+                    "无上限背包不能把桌面面板顶出屏幕");
+                Assert.That(slots.sizeDelta.y, Is.GreaterThan(440f),
+                    "额外格子应扩展滚动内容高度，而不是扩展面板高度");
+            }
+            finally
+            {
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void CardController_ExposesBackpackDropAsAStandardDropAction()
+        {
+            System.Type controllerType = FindType("CryingSnow.StackCraft.CardController");
+            MethodInfo tryStore = controllerType.GetMethod(
+                "TryStoreInBackpack",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+
+            Assert.That(tryStore, Is.Not.Null,
+                "世界卡牌拖到背包入口或背包桌面时，需要由标准放下流程优先收纳");
+            Assert.That(tryStore.ReturnType, Is.EqualTo(typeof(bool)));
+            Assert.That(tryStore.GetParameters(), Is.Empty);
         }
 
         [Test]
@@ -4792,6 +4890,490 @@ namespace CardColony.Tests
                 Object.DestroyImmediate(controllerObject);
                 Object.DestroyImmediate(temporaryLocation);
             }
+        }
+
+        [Test]
+        public void GameData_CreatesEightSlotBackpackAndRepairsMissingOldSaveData()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Assert.That(backpackType, Is.Not.Null, "当前正式存档需要独立的全局背包数据");
+
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            FieldInfo backpackField = gameDataType.GetField("Backpack");
+            MethodInfo ensureBackpack = gameDataType.GetMethod("EnsureBackpack");
+            Assert.That(backpackField, Is.Not.Null);
+            Assert.That(ensureBackpack, Is.Not.Null);
+
+            object backpack = backpackField.GetValue(gameData);
+            Assert.That(backpack, Is.Not.Null);
+            Assert.That(backpackType.GetProperty("Capacity").GetValue(backpack), Is.EqualTo(8));
+
+            backpackType.GetField("Entries").SetValue(backpack, null);
+            object normalized = ensureBackpack.Invoke(gameData, null);
+            Assert.That(backpackType.GetField("Entries").GetValue(normalized), Is.Not.Null,
+                "旧存档缺少背包条目列表时必须自动修复");
+
+            backpackField.SetValue(gameData, null);
+            object repaired = ensureBackpack.Invoke(gameData, null);
+            Assert.That(repaired, Is.Not.Null);
+            Assert.That(backpackField.GetValue(gameData), Is.SameAs(repaired));
+            Assert.That(backpackType.GetProperty("Capacity").GetValue(repaired), Is.EqualTo(8));
+        }
+
+        [Test]
+        public void BackpackData_ExpandsWhenFullAndRemovesByStableInstanceId()
+        {
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            backpackType.GetField("SlotCapacity").SetValue(backpack, 2);
+            MethodInfo tryAdd = backpackType.GetMethod("TryAdd");
+            MethodInfo tryRemove = backpackType.GetMethod("TryRemove");
+            MethodInfo compact = backpackType.GetMethod("Compact");
+            Assert.That(tryAdd, Is.Not.Null);
+            Assert.That(tryRemove, Is.Not.Null);
+            Assert.That(compact, Is.Not.Null);
+
+            object apple = System.Activator.CreateInstance(cardDataType);
+            object coin = System.Activator.CreateInstance(cardDataType);
+            object sword = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(apple, "apple");
+            cardDataType.GetField("Id").SetValue(coin, "coin");
+            cardDataType.GetField("Id").SetValue(sword, "sword");
+
+            object[] firstAdd = { apple, null };
+            object[] secondAdd = { coin, null };
+            object[] expandedAdd = { sword, null };
+            Assert.That(tryAdd.Invoke(backpack, firstAdd), Is.True);
+            Assert.That(tryAdd.Invoke(backpack, secondAdd), Is.True);
+            Assert.That(tryAdd.Invoke(backpack, expandedAdd), Is.True,
+                "当前版本暂不限制背包卡牌上限，格子用满后应自动扩展");
+            Assert.That(backpackType.GetProperty("Capacity").GetValue(backpack),
+                Is.GreaterThanOrEqualTo(3));
+
+            string firstId = (string)firstAdd[1].GetType().GetField("InstanceId")
+                .GetValue(firstAdd[1]);
+            Assert.That(firstId, Is.Not.Empty);
+            Assert.That(firstAdd[1].GetType().GetField("SlotIndex").GetValue(firstAdd[1]), Is.EqualTo(0));
+            Assert.That(secondAdd[1].GetType().GetField("SlotIndex").GetValue(secondAdd[1]), Is.EqualTo(1));
+
+            object[] removeArguments = { firstId, null };
+            Assert.That(tryRemove.Invoke(backpack, removeArguments), Is.True);
+            Assert.That(removeArguments[1], Is.SameAs(apple));
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(2));
+
+            compact.Invoke(backpack, null);
+            Assert.That(secondAdd[1].GetType().GetField("SlotIndex").GetValue(secondAdd[1]),
+                Is.EqualTo(0), "整理背包应把卡牌顺序填入前面的空格");
+            Assert.That(expandedAdd[1].GetType().GetField("SlotIndex").GetValue(expandedAdd[1]),
+                Is.EqualTo(1));
+        }
+
+        [Test]
+        public void BackpackData_NormalizeKeepsOverflowedOldSaveEntriesVisible()
+        {
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type entryType = FindType("CryingSnow.StackCraft.BackpackEntryData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            backpackType.GetField("SlotCapacity").SetValue(backpack, 2);
+            var entries = (System.Collections.IList)backpackType.GetField("Entries")
+                .GetValue(backpack);
+            for (int index = 0; index < 3; index++)
+            {
+                object data = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(data, $"legacy-{index}");
+                object entry = System.Activator.CreateInstance(entryType);
+                entryType.GetField("InstanceId").SetValue(entry, $"duplicate-{index}");
+                entryType.GetField("Card").SetValue(entry, data);
+                entryType.GetField("SlotIndex").SetValue(entry, 0);
+                entries.Add(entry);
+            }
+
+            backpackType.GetMethod("Normalize").Invoke(backpack, null);
+            int capacity = (int)backpackType.GetProperty("Capacity").GetValue(backpack);
+            int[] slots = entries.Cast<object>()
+                .Select(entry => (int)entryType.GetField("SlotIndex").GetValue(entry))
+                .ToArray();
+            Assert.That(capacity, Is.GreaterThanOrEqualTo(3),
+                "旧存档条目超过原容量时应扩容，不能产生不可见物品");
+            Assert.That(slots.Distinct().Count(), Is.EqualTo(3));
+            Assert.That(slots.All(slot => slot >= 0 && slot < capacity), Is.True);
+        }
+
+        [Test]
+        public void BackpackService_AllowsPortableItemsIncludingFoodAndCoins()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            Assert.That(serviceType, Is.Not.Null);
+            MethodInfo canStore = serviceType.GetMethod(
+                "CanStoreDefinition",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(canStore, Is.Not.Null);
+
+            string[] allowedPaths =
+            {
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset",
+                "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset",
+                "Assets/StackCraft/Resources/Cards/Materials/Card_Wood.asset",
+                "Assets/StackCraft/Resources/Cards/Equipments/Card_Sword.asset"
+            };
+            foreach (string path in allowedPaths)
+            {
+                Object definition = AssetDatabase.LoadAssetAtPath<Object>(path);
+                Assert.That(definition, Is.Not.Null, path);
+                Assert.That(canStore.Invoke(null, new[] { definition }), Is.True, path);
+            }
+
+            string[] rejectedPaths =
+            {
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset",
+                "Assets/StackCraft/Resources/Cards/Resources/Card_AppleTree.asset",
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset"
+            };
+            foreach (string path in rejectedPaths)
+            {
+                Object definition = AssetDatabase.LoadAssetAtPath<Object>(path);
+                Assert.That(definition, Is.Not.Null, path);
+                Assert.That(canStore.Invoke(null, new[] { definition }), Is.False, path);
+            }
+        }
+
+        [Test]
+        public void BackpackService_StoresOnePortableWorldCardWithItsRuntimeState()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            MethodInfo tryStore = serviceType.GetMethod(
+                "TryStore",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { cardType, backpackType },
+                null);
+            Assert.That(tryStore, Is.Not.Null);
+
+            Object appleDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+            Component apple = CreateUninitializedCard(appleDefinition, "Backpack Apple");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            try
+            {
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
+                Assert.That(tryStore.Invoke(null, new[] { apple, backpack }), Is.True);
+                Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(1));
+                Assert.That(cardType.GetProperty("Stack").GetValue(apple), Is.Null,
+                    "写入背包成功后必须立即退出世界卡堆，避免场景存档重复保存");
+
+                IEnumerable entries = (IEnumerable)backpackType.GetField("Entries").GetValue(backpack);
+                object entry = entries.Cast<object>().Single();
+                object storedCard = entry.GetType().GetField("Card").GetValue(entry);
+                Assert.That(storedCard.GetType().GetField("Id").GetValue(storedCard),
+                    Is.EqualTo(appleDefinition.GetType().GetProperty("Id").GetValue(appleDefinition)));
+            }
+            finally
+            {
+                DestroyTestCard(apple);
+            }
+        }
+
+        [Test]
+        public void BackpackService_StoresAnEntirePortableCardStackAtomically()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            MethodInfo tryStore = serviceType.GetMethod(
+                "TryStore",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { cardType, backpackType },
+                null);
+            Object appleDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+            Component firstApple = CreateUninitializedCard(appleDefinition, "First Backpack Apple");
+            Component secondApple = CreateUninitializedCard(appleDefinition, "Second Backpack Apple");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            try
+            {
+                for (int index = 0; index < 8; index++)
+                {
+                    object existing = System.Activator.CreateInstance(cardDataType);
+                    cardDataType.GetField("Id").SetValue(existing, $"existing-{index}");
+                    backpackType.GetMethod("TryAdd").Invoke(
+                        backpack,
+                        new object[] { existing, null });
+                }
+                object firstStack = cardType.GetProperty("Stack").GetValue(firstApple);
+                object secondStack = cardType.GetProperty("Stack").GetValue(secondApple);
+                firstStack.GetType().GetMethod("MergeWith").Invoke(
+                    firstStack,
+                    new[] { secondStack });
+
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
+                Assert.That(tryStore.Invoke(null, new[] { firstApple, backpack }), Is.True);
+                Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(10),
+                    "玩家拖动堆叠的食物或金币时，整叠应一次进入背包");
+                Assert.That(backpackType.GetProperty("Capacity").GetValue(backpack), Is.EqualTo(12),
+                    "通过正式收纳服务放入第 9 张卡时也必须自动扩容");
+                Assert.That(cardType.GetProperty("Stack").GetValue(firstApple), Is.Null);
+                Assert.That(cardType.GetProperty("Stack").GetValue(secondApple), Is.Null);
+            }
+            finally
+            {
+                DestroyTestCard(secondApple);
+                DestroyTestCard(firstApple);
+            }
+        }
+
+        [Test]
+        public void BackpackService_RemovesStoredCardOnlyAfterWorldRestoreSucceeds()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            System.Type restoreType = typeof(System.Func<,>).MakeGenericType(cardDataType, cardType);
+            MethodInfo tryTake = serviceType.GetMethod(
+                "TryTake",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { backpackType, typeof(string), restoreType, cardType.MakeByRefType() },
+                null);
+            Assert.That(tryTake, Is.Not.Null);
+
+            object backpack = System.Activator.CreateInstance(backpackType);
+            object cardData = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(cardData, "apple");
+            object[] addArguments = { cardData, null };
+            backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+            object entry = addArguments[1];
+            string instanceId = (string)entry.GetType().GetField("InstanceId").GetValue(entry);
+
+            var dataParameter = System.Linq.Expressions.Expression.Parameter(cardDataType, "data");
+            System.Delegate failedRestore = System.Linq.Expressions.Expression.Lambda(
+                    restoreType,
+                    System.Linq.Expressions.Expression.Constant(null, cardType),
+                    dataParameter)
+                .Compile();
+            object[] failedTake = { backpack, instanceId, failedRestore, null };
+            Assert.That(tryTake.Invoke(null, failedTake), Is.False);
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(1),
+                "生成世界卡牌失败时不能丢失背包数据");
+
+            Object appleDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+            Component restoredCard = CreateUninitializedCard(appleDefinition, "Restored Backpack Apple");
+            try
+            {
+                System.Delegate successfulRestore = System.Linq.Expressions.Expression.Lambda(
+                        restoreType,
+                        System.Linq.Expressions.Expression.Constant(restoredCard, cardType),
+                        dataParameter)
+                    .Compile();
+                object[] successfulTake = { backpack, instanceId, successfulRestore, null };
+                Assert.That(tryTake.Invoke(null, successfulTake), Is.True);
+                Assert.That(successfulTake[3], Is.SameAs(restoredCard));
+                Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.Zero);
+            }
+            finally
+            {
+                DestroyTestCard(restoredCard);
+            }
+        }
+
+        [Test]
+        public void CardManager_StatsAndOwnedCountsIncludeBackpackFoodAndCoinsButNotCardLimit()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType = FindType("CryingSnow.StackCraft.GameDirector");
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject("Backpack Stats GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(FindType("CryingSnow.StackCraft.GameplayPrefs")));
+            gameDirector.GetType().GetProperty("GameData").SetValue(gameDirector, gameData);
+
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            System.Type cardManagerType = cardManager.GetType();
+            cardManagerType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            cardManagerType.GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+            cardManagerType.GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            Object apple = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+            Object coin = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object backpack = gameDataType.GetMethod("EnsureBackpack").Invoke(gameData, null);
+            MethodInfo tryAdd = backpack.GetType().GetMethod("TryAdd");
+            foreach ((Object definition, int nutrition) in new[]
+                     {
+                         (apple, 7),
+                         (coin, 0)
+                     })
+            {
+                object data = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(
+                    data,
+                    definition.GetType().GetProperty("Id").GetValue(definition));
+                cardDataType.GetField("CurrentNutrition").SetValue(data, nutrition);
+                object[] add = { data, null };
+                Assert.That(tryAdd.Invoke(backpack, add), Is.True);
+            }
+
+            object snapshot = cardManagerType.GetMethod("GetStatsSnapshot")
+                .Invoke(cardManager, null);
+            Assert.That(snapshot.GetType().GetProperty("TotalNutrition").GetValue(snapshot),
+                Is.EqualTo(7), "背包里的食物仍然属于玩家拥有的食物");
+            Assert.That(snapshot.GetType().GetProperty("Currency").GetValue(snapshot),
+                Is.EqualTo(1), "背包里的金币仍然属于玩家拥有的金币");
+            Assert.That(snapshot.GetType().GetProperty("CardsOwned").GetValue(snapshot),
+                Is.Zero, "背包物品当前不计入桌面卡牌上限");
+
+            MethodInfo countOwned = cardManagerType.GetMethod("CountOwnedCard");
+            Assert.That(countOwned, Is.Not.Null);
+            Assert.That(countOwned.Invoke(cardManager, new[] { apple }), Is.EqualTo(1));
+            Assert.That(countOwned.Invoke(cardManager, new[] { coin }), Is.EqualTo(1));
+
+            Object.DestroyImmediate(gameDirector.gameObject);
+        }
+
+        [Test]
+        public void CardManager_RestoringBackpackCardDoesNotEmitNewlyObtainedEvent()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType = FindType("CryingSnow.StackCraft.GameDirector");
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject("Backpack Restore GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(FindType("CryingSnow.StackCraft.GameplayPrefs")));
+            gameDirector.GetType().GetProperty("GameData").SetValue(gameDirector, gameData);
+
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod("Awake", BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            System.Type cardManagerType = cardManager.GetType();
+            cardManagerType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            cardManagerType.GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+            cardManagerType.GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            EventInfo createdEvent = cardManagerType.GetEvent("OnCardCreated");
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            var cardParameter = System.Linq.Expressions.Expression.Parameter(cardType, "card");
+            System.Delegate handler = System.Linq.Expressions.Expression.Lambda(
+                    createdEvent.EventHandlerType,
+                    System.Linq.Expressions.Expression.Call(
+                        typeof(PlayableLoopUnityTests).GetMethod(
+                            nameof(RecordBackpackCreatedEvent),
+                            BindingFlags.Static | BindingFlags.NonPublic)),
+                    cardParameter)
+                .Compile();
+            backpackCreatedEventCount = 0;
+            createdEvent.AddEventHandler(cardManager, handler);
+            EventInfo statsEvent = cardManagerType.GetEvent("OnStatsChanged");
+            var statsParameter = System.Linq.Expressions.Expression.Parameter(
+                statsEvent.EventHandlerType.GenericTypeArguments[0],
+                "stats");
+            System.Delegate statsHandler = System.Linq.Expressions.Expression.Lambda(
+                    statsEvent.EventHandlerType,
+                    System.Linq.Expressions.Expression.Call(
+                        typeof(PlayableLoopUnityTests).GetMethod(
+                            nameof(RecordBackpackStatsEvent),
+                            BindingFlags.Static | BindingFlags.NonPublic)),
+                    statsParameter)
+                .Compile();
+            backpackStatsEventCount = 0;
+            statsEvent.AddEventHandler(cardManager, statsHandler);
+
+            Object apple = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object data = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(
+                data,
+                apple.GetType().GetProperty("Id").GetValue(apple));
+            cardDataType.GetField("UsesLeft").SetValue(data, 1);
+            cardDataType.GetField("CurrentNutrition").SetValue(data, 5);
+
+            Component restored = null;
+            try
+            {
+                LogAssert.Expect(
+                    LogType.Error,
+                    "Instantiating material due to calling renderer.material during edit mode. This will leak materials into the scene. You most likely want to use renderer.sharedMaterial instead.");
+                restored = (Component)cardManagerType.GetMethod("RestoreCardFromData")
+                    .Invoke(cardManager, new object[] { data, Vector3.zero, false });
+                Assert.That(restored, Is.Not.Null);
+                Assert.That(backpackCreatedEventCount, Is.Zero,
+                    "从背包取回旧卡牌不能再次推进 Obtain/获得卡牌任务");
+                Assert.That(backpackStatsEventCount, Is.Zero,
+                    "背包数据尚未删除时不能发布临时的双重资源统计");
+            }
+            finally
+            {
+                createdEvent.RemoveEventHandler(cardManager, handler);
+                statsEvent.RemoveEventHandler(cardManager, statsHandler);
+                if (restored != null)
+                    Object.DestroyImmediate(restored.gameObject);
+                Object.DestroyImmediate(gameDirector.gameObject);
+            }
+        }
+
+        private static int backpackCreatedEventCount;
+        private static int backpackStatsEventCount;
+
+        private static void RecordBackpackCreatedEvent()
+        {
+            backpackCreatedEventCount++;
+        }
+
+        private static void RecordBackpackStatsEvent()
+        {
+            backpackStatsEventCount++;
         }
 
         private static Transform FindDescendant(GameObject root, string name)
