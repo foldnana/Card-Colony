@@ -192,6 +192,8 @@ namespace CryingSnow.StackCraft
                         backpack);
                 }
             }
+
+            ResolveTableOverlaps();
         }
 
         public bool ContainsScreenPoint(Vector2 screenPosition)
@@ -430,12 +432,39 @@ namespace CryingSnow.StackCraft
                     targetStack.TargetPosition,
                     targetStack);
                 targetStack.SetTargetPosition(clampedTargetPosition);
-                PersistStackPlacement(targetStack, clampedTargetPosition);
+                ResolveTableOverlaps();
                 return;
             }
 
             movingStack.SetTargetPosition(freePosition);
-            PersistStackPlacement(movingStack, freePosition);
+            ResolveTableOverlaps();
+        }
+
+        private void ResolveTableOverlaps()
+        {
+            List<CardStack> stacks = proxies.Values
+                .Where(proxy => proxy?.Card?.Stack?.TopCard != null)
+                .Select(proxy => proxy.Card.Stack)
+                .Distinct()
+                .ToList();
+            if (stacks.Count == 0)
+                return;
+
+            CardPhysicsSolver.ResolveOverlaps(
+                stacks,
+                combatRects: null,
+                maxIterations: 10,
+                placementResolver: ClampTableStackTarget);
+
+            foreach (CardStack stack in stacks)
+                PersistStackPlacement(stack, stack.TargetPosition);
+        }
+
+        private Vector3 ClampTableStackTarget(
+            CardStack stack,
+            Vector3 targetPosition)
+        {
+            return GetClampedWorldPosition(targetPosition, stack);
         }
 
         private BackpackCardProxy FindStackTarget(

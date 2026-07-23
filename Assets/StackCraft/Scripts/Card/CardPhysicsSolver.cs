@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -18,6 +19,23 @@ namespace CryingSnow.StackCraft
         /// <param name="maxIterations">The maximum number of times the solver loop is allowed to run.</param>
         public static void ResolveOverlaps(IList<CardStack> stacks, IEnumerable<CombatRect> combatRects, int maxIterations)
         {
+            ResolveOverlaps(
+                stacks,
+                combatRects,
+                maxIterations,
+                placementResolver: null);
+        }
+
+        /// <summary>
+        /// Resolves overlaps while allowing a non-world surface to enforce its
+        /// own placement bounds.
+        /// </summary>
+        public static void ResolveOverlaps(
+            IList<CardStack> stacks,
+            IEnumerable<CombatRect> combatRects,
+            int maxIterations,
+            Func<CardStack, Vector3, Vector3> placementResolver)
+        {
             int iter = 0;
             bool anyOverlap = true;
 
@@ -35,7 +53,10 @@ namespace CryingSnow.StackCraft
                     {
                         if (IsImmovableStack(stack)) continue;
 
-                        if (CheckAndSeparate(stack, combatRect))
+                        if (CheckAndSeparate(
+                                stack,
+                                combatRect,
+                                placementResolver))
                         {
                             anyOverlap = true;
                         }
@@ -51,7 +72,10 @@ namespace CryingSnow.StackCraft
                     {
                         var stackB = stacks[j];
 
-                        if (CheckAndSeparate(stackA, stackB))
+                        if (CheckAndSeparate(
+                                stackA,
+                                stackB,
+                                placementResolver))
                         {
                             anyOverlap = true;
                         }
@@ -60,7 +84,10 @@ namespace CryingSnow.StackCraft
             }
         }
 
-        private static bool CheckAndSeparate(CardStack a, CardStack b)
+        private static bool CheckAndSeparate(
+            CardStack a,
+            CardStack b,
+            Func<CardStack, Vector3, Vector3> placementResolver)
         {
             if (a == b || a == null || b == null) return false;
 
@@ -85,16 +112,22 @@ namespace CryingSnow.StackCraft
 
             if (aLocked)
             {
-                b.ApplyTranslation(-separation);
+                ApplyTranslation(b, -separation, placementResolver);
             }
             else if (bLocked)
             {
-                a.ApplyTranslation(separation);
+                ApplyTranslation(a, separation, placementResolver);
             }
             else
             {
-                a.ApplyTranslation(separation * 0.5f);
-                b.ApplyTranslation(-separation * 0.5f);
+                ApplyTranslation(
+                    a,
+                    separation * 0.5f,
+                    placementResolver);
+                ApplyTranslation(
+                    b,
+                    -separation * 0.5f,
+                    placementResolver);
             }
 
             return true;
@@ -120,7 +153,10 @@ namespace CryingSnow.StackCraft
                 (stack.IsLocked || stack.IsAnchored || IsDockedPartyStack(stack));
         }
 
-        private static bool CheckAndSeparate(CardStack stack, CombatRect combatRect)
+        private static bool CheckAndSeparate(
+            CardStack stack,
+            CombatRect combatRect,
+            Func<CardStack, Vector3, Vector3> placementResolver)
         {
             if (stack == null || combatRect == null) return false;
             if (IsImmovableStack(stack)) return false;
@@ -140,8 +176,25 @@ namespace CryingSnow.StackCraft
                 return false;
 
             // Only move the stack
-            stack.ApplyTranslation(separation);
+            ApplyTranslation(stack, separation, placementResolver);
             return true;
+        }
+
+        private static void ApplyTranslation(
+            CardStack stack,
+            Vector3 translation,
+            Func<CardStack, Vector3, Vector3> placementResolver)
+        {
+            if (placementResolver == null)
+            {
+                stack.ApplyTranslation(translation);
+                return;
+            }
+
+            Vector3 targetPosition =
+                stack.TargetPosition + translation;
+            stack.SetTargetPosition(
+                placementResolver.Invoke(stack, targetPosition));
         }
 
         private static void GetStackBounds(CardStack stack, out Vector2 pos, out Vector2 halfSize)
@@ -210,12 +263,12 @@ namespace CryingSnow.StackCraft
 
             if (px < pz)
             {
-                float sign = Mathf.Sign(dx);
+                float sign = dx < 0f ? -1f : 1f;
                 separation = new Vector3(px * sign, 0f, 0f);
             }
             else
             {
-                float sign = Mathf.Sign(dz);
+                float sign = dz < 0f ? -1f : 1f;
                 separation = new Vector3(0f, 0f, pz * sign);
             }
 

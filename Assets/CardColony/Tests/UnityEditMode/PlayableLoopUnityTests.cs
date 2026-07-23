@@ -1525,6 +1525,90 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void BackpackBoard_PushesApartCardsThatCannotStack()
+        {
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type proxyType =
+                FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            GameObject boardObject = new("Backpack Collision Board");
+            Component firstCard = CreateUninitializedCard(
+                null,
+                "Backpack Nonstackable First");
+            Component secondCard = CreateUninitializedCard(
+                null,
+                "Backpack Nonstackable Second");
+            Object firstSettings = (Object)firstCard.GetType()
+                .GetProperty("Settings").GetValue(firstCard);
+            Object secondSettings = (Object)secondCard.GetType()
+                .GetProperty("Settings").GetValue(secondCard);
+
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                firstCard.GetType().GetProperty("Size")
+                    .SetValue(firstCard, Vector2.one);
+                secondCard.GetType().GetProperty("Size")
+                    .SetValue(secondCard, Vector2.one);
+                SetTestCardStackPosition(firstCard, Vector3.zero);
+                SetTestCardStackPosition(secondCard, Vector3.zero);
+
+                Component firstProxy =
+                    firstCard.gameObject.AddComponent(proxyType);
+                Component secondProxy =
+                    secondCard.gameObject.AddComponent(proxyType);
+                proxyType.GetMethod("Bind").Invoke(
+                    firstProxy,
+                    new object[] { null, board, firstCard, "first", 0 });
+                proxyType.GetMethod("Bind").Invoke(
+                    secondProxy,
+                    new object[] { null, board, secondCard, "second", 1 });
+
+                var proxies = (IDictionary)boardType.GetField(
+                        "proxies",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(board);
+                proxies.Add("first", firstProxy);
+                proxies.Add("second", secondProxy);
+
+                Vector3 dropPosition = boardObject.transform.TransformPoint(
+                    new Vector3(0f, 0.5f, 0f));
+                boardType.GetMethod(
+                        "PlaceOnTable",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(board, new object[] { firstProxy, dropPosition });
+
+                object firstStack = firstCard.GetType()
+                    .GetProperty("Stack").GetValue(firstCard);
+                object secondStack = secondCard.GetType()
+                    .GetProperty("Stack").GetValue(secondCard);
+                Vector3 firstPosition = (Vector3)firstStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(firstStack);
+                Vector3 secondPosition = (Vector3)secondStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(secondStack);
+
+                Assert.That(
+                    Vector2.Distance(
+                        new Vector2(firstPosition.x, firstPosition.z),
+                        new Vector2(secondPosition.x, secondPosition.z)),
+                    Is.GreaterThanOrEqualTo(0.99f),
+                    "Cards rejected by CanStack must separate like ordinary world-table stacks.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                if (firstCard != null)
+                    Object.DestroyImmediate(firstCard.gameObject);
+                if (secondCard != null)
+                    Object.DestroyImmediate(secondCard.gameObject);
+                if (firstSettings != null)
+                    Object.DestroyImmediate(firstSettings);
+                if (secondSettings != null)
+                    Object.DestroyImmediate(secondSettings);
+            }
+        }
+
+        [Test]
         public void BackpackBoard_ClampsAnOffsetStackByItsFullFootprint()
         {
             System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
