@@ -2686,7 +2686,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void MainScene_OnlyRiverbendHasAnImplementedLocalMapInPhaseOne()
+        public void MainScene_OnlyCompletedLocationsHaveImplementedLocalMaps()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Main.unity", OpenSceneMode.Single);
             MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
@@ -2698,12 +2698,15 @@ namespace CardColony.Tests
             for (int index = 0; index < details.arraySize; index++)
             {
                 SerializedProperty entry = details.GetArrayElementAtIndex(index);
-                bool expected = entry.FindPropertyRelative("locationId").stringValue == "riverbend";
+                string locationId =
+                    entry.FindPropertyRelative("locationId").stringValue;
+                bool expected = locationId == "riverbend" ||
+                    locationId == "whispering-forest";
                 SerializedProperty implemented = entry.FindPropertyRelative("localMapImplemented");
                 Assert.That(implemented, Is.Not.Null,
                     "地点配置必须明确标记是否已有局部地图，避免未完成地点进入空场景");
                 Assert.That(implemented.boolValue, Is.EqualTo(expected),
-                    "第一阶段应当只开放河湾村的地点地图");
+                    "当前只应开放已经完成局部地图的河湾村和低语森林");
             }
         }
 
@@ -5060,7 +5063,12 @@ namespace CardColony.Tests
                 stacks.Add(partyStack);
                 stacks.Add(nearbyStack);
 
-                solverType.GetMethod("ResolveOverlaps").Invoke(
+                MethodInfo resolveWorldOverlaps = solverType.GetMethods(
+                        BindingFlags.Public | BindingFlags.Static)
+                    .Single(method =>
+                        method.Name == "ResolveOverlaps" &&
+                        method.GetParameters().Length == 3);
+                resolveWorldOverlaps.Invoke(
                     null,
                     new object[] { stacks, null, 8 });
 
@@ -5817,6 +5825,26 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void GameData_LocationTransitionReasonIsConsumedOnce()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type reasonType = FindType(
+                "CryingSnow.StackCraft.LocationTransitionReason");
+            Assert.That(reasonType, Is.Not.Null);
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            MethodInfo mark = gameDataType.GetMethod("MarkLocationTransitionPending");
+            MethodInfo consume = gameDataType.GetMethod("ConsumeLocationTransitionReason");
+            Assert.That(mark, Is.Not.Null);
+            Assert.That(consume, Is.Not.Null);
+
+            object worldMapEntry = System.Enum.Parse(reasonType, "WorldMapEntry");
+            object none = System.Enum.Parse(reasonType, "None");
+            mark.Invoke(gameData, new[] { worldMapEntry });
+            Assert.That(consume.Invoke(gameData, null), Is.EqualTo(worldMapEntry));
+            Assert.That(consume.Invoke(gameData, null), Is.EqualTo(none));
+        }
+
+        [Test]
         public void LocationSceneController_ReplacesRestoredParentPartyWithoutRollingBackStats()
         {
             EditorSceneManager.OpenScene(
@@ -6332,6 +6360,287 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void LocationSceneController_MergesConfiguredAndDiscoveredDefinitionsById()
+        {
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+            ScriptableObject configuredRiverbend =
+                ScriptableObject.CreateInstance(definitionType);
+            ScriptableObject discoveredRiverbend =
+                ScriptableObject.CreateInstance(definitionType);
+            ScriptableObject discoveredForest =
+                ScriptableObject.CreateInstance(definitionType);
+            try
+            {
+                SetSerializedString(configuredRiverbend, "id", "riverbend");
+                SetSerializedString(discoveredRiverbend, "id", "riverbend");
+                SetSerializedString(discoveredForest, "id", "whispering-forest");
+
+                System.Array configured = System.Array.CreateInstance(definitionType, 2);
+                configured.SetValue(configuredRiverbend, 0);
+                configured.SetValue(null, 1);
+                System.Array discovered = System.Array.CreateInstance(definitionType, 2);
+                discovered.SetValue(discoveredRiverbend, 0);
+                discovered.SetValue(discoveredForest, 1);
+
+                MethodInfo merge = controllerType.GetMethod(
+                    "MergeDefinitions",
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.That(merge, Is.Not.Null,
+                    "通用地点场景需要自动合并场景配置和 Resources/Locations 中的新地点");
+
+                var merged = ((IEnumerable)merge.Invoke(
+                        null,
+                        new object[] { configured, discovered }))
+                    .Cast<Object>()
+                    .ToList();
+                Assert.That(merged.Count, Is.EqualTo(2));
+                Assert.That(merged[0], Is.SameAs(configuredRiverbend),
+                    "同一地点 ID 应保留显式场景配置，避免旧地图引用被替换");
+                Assert.That(merged, Does.Contain(discoveredForest));
+            }
+            finally
+            {
+                Object.DestroyImmediate(discoveredForest);
+                Object.DestroyImmediate(discoveredRiverbend);
+                Object.DestroyImmediate(configuredRiverbend);
+            }
+        }
+
+        [Test]
+        public void LocationTemplateBuilder_CreatesReusableLocationDefinitionAsset()
+        {
+            const string assetPath =
+                "Assets/CardColony/Tests/UnityEditMode/Temp_LocationTemplate.asset";
+            AssetDatabase.DeleteAsset(assetPath);
+
+            System.Type builderType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateBuilder");
+            System.Type templateType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplate");
+            Assert.That(builderType, Is.Not.Null);
+            Assert.That(templateType, Is.Not.Null);
+
+            object template = System.Activator.CreateInstance(templateType);
+            templateType.GetField("Id").SetValue(template, "template-test");
+            templateType.GetField("DisplayName").SetValue(template, "模板测试地点");
+            templateType.GetField("MapSize").SetValue(template, new Vector2(22f, 14f));
+            templateType.GetField("CameraMinDistance").SetValue(template, 4f);
+            templateType.GetField("CameraMaxDistance").SetValue(template, 26f);
+            templateType.GetField("CameraInitialDistance").SetValue(template, 9f);
+            templateType.GetField("CameraZoomSpeed").SetValue(template, 3.5f);
+            templateType.GetField("PartySpawnPosition").SetValue(
+                template,
+                new Vector3(-1f, 0f, -3f));
+            templateType.GetField("PartyMemberSpacing").SetValue(template, 1.1f);
+
+            MethodInfo createOrUpdate = builderType.GetMethod(
+                "CreateOrUpdate",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(createOrUpdate, Is.Not.Null);
+
+            try
+            {
+                Object definition = (Object)createOrUpdate.Invoke(
+                    null,
+                    new[] { assetPath, template });
+                Assert.That(definition, Is.Not.Null);
+                Assert.That(AssetDatabase.LoadAssetAtPath<Object>(assetPath), Is.SameAs(definition));
+
+                var serialized = new SerializedObject(definition);
+                Assert.That(serialized.FindProperty("id").stringValue, Is.EqualTo("template-test"));
+                Assert.That(serialized.FindProperty("displayName").stringValue,
+                    Is.EqualTo("模板测试地点"));
+                Assert.That(serialized.FindProperty("mapSize").vector2Value,
+                    Is.EqualTo(new Vector2(22f, 14f)));
+                Assert.That(serialized.FindProperty("cameraZoomSpeed").floatValue,
+                    Is.EqualTo(3.5f));
+                Assert.That(serialized.FindProperty("partySpawnPosition").vector3Value,
+                    Is.EqualTo(new Vector3(-1f, 0f, -3f)));
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        [Test]
+        public void LocationTemplateBuilder_UpsertsEntrancesWithoutDeletingExistingEntries()
+        {
+            const string assetPath =
+                "Assets/CardColony/Tests/UnityEditMode/Temp_LocationEntrances.asset";
+            AssetDatabase.DeleteAsset(assetPath);
+
+            System.Type builderType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateBuilder");
+            System.Type templateType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplate");
+            System.Type entranceType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateEntrance");
+            MethodInfo createOrUpdate = builderType.GetMethod(
+                "CreateOrUpdate",
+                BindingFlags.Public | BindingFlags.Static);
+            MethodInfo upsertEntrance = builderType.GetMethod(
+                "UpsertEntrance",
+                BindingFlags.Public | BindingFlags.Static);
+            Object market = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Object inn = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+
+            object template = System.Activator.CreateInstance(templateType);
+            templateType.GetField("Id").SetValue(template, "entrance-template-test");
+            templateType.GetField("DisplayName").SetValue(template, "入口模板测试");
+
+            try
+            {
+                Object definition = (Object)createOrUpdate.Invoke(
+                    null,
+                    new object[] { assetPath, template });
+                upsertEntrance.Invoke(
+                    null,
+                    new object[] { definition, market, "future-market" });
+
+                object newEntrance = System.Activator.CreateInstance(
+                    entranceType,
+                    new object[] { inn, "riverbend-inn" });
+                System.Array entrances = System.Array.CreateInstance(entranceType, 1);
+                entrances.SetValue(newEntrance, 0);
+                templateType.GetField("Entrances").SetValue(template, entrances);
+
+                createOrUpdate.Invoke(null, new object[] { assetPath, template });
+
+                SerializedProperty savedEntrances = new SerializedObject(definition)
+                    .FindProperty("entrances");
+                var destinations = new List<string>();
+                for (int index = 0; index < savedEntrances.arraySize; index++)
+                {
+                    destinations.Add(savedEntrances.GetArrayElementAtIndex(index)
+                        .FindPropertyRelative("destinationLocationId").stringValue);
+                }
+
+                Assert.That(destinations, Is.EquivalentTo(new[]
+                {
+                    "future-market",
+                    "riverbend-inn"
+                }), "模板更新应追加或更新声明的入口，不能删除其他系统后来添加的入口");
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        [Test]
+        public void LocationTemplateBuilder_PreservesExplicitSceneDefinitionWithSameId()
+        {
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            System.Type controllerType = FindType("CryingSnow.StackCraft.LocationSceneController");
+            System.Type builderType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateBuilder");
+            ScriptableObject explicitDefinition =
+                ScriptableObject.CreateInstance(definitionType);
+            ScriptableObject generatedDefinition =
+                ScriptableObject.CreateInstance(definitionType);
+            var controllerObject = new GameObject("Location Template Controller");
+            Component controller = controllerObject.AddComponent(controllerType);
+            try
+            {
+                SetSerializedString(explicitDefinition, "id", "same-location");
+                SetSerializedString(generatedDefinition, "id", "same-location");
+                var serializedController = new SerializedObject(controller);
+                SerializedProperty definitions =
+                    serializedController.FindProperty("locationDefinitions");
+                definitions.InsertArrayElementAtIndex(0);
+                definitions.GetArrayElementAtIndex(0).objectReferenceValue =
+                    explicitDefinition;
+                serializedController.ApplyModifiedPropertiesWithoutUndo();
+
+                builderType.GetMethod(
+                        "UpsertDefinition",
+                        BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new object[] { controller, generatedDefinition });
+
+                serializedController.Update();
+                Assert.That(definitions.arraySize, Is.EqualTo(1));
+                Assert.That(
+                    definitions.GetArrayElementAtIndex(0).objectReferenceValue,
+                    Is.SameAs(explicitDefinition),
+                    "安装器不能替换场景中同 ID 的显式覆盖定义");
+            }
+            finally
+            {
+                Object.DestroyImmediate(controllerObject);
+                Object.DestroyImmediate(generatedDefinition);
+                Object.DestroyImmediate(explicitDefinition);
+            }
+        }
+
+        [Test]
+        public void LocationTemplateBuilder_GeneratesDifferentDefaultIdsForUniqueAssetPaths()
+        {
+            System.Type builderType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateBuilder");
+            MethodInfo createId = builderType.GetMethod(
+                "CreateDefaultLocationId",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(createId, Is.Not.Null);
+
+            string first = (string)createId.Invoke(
+                null,
+                new object[] { "Assets/StackCraft/Resources/Locations/Location_New.asset" });
+            string second = (string)createId.Invoke(
+                null,
+                new object[] { "Assets/StackCraft/Resources/Locations/Location_New 1.asset" });
+
+            Assert.That(first, Is.Not.Empty);
+            Assert.That(second, Is.Not.Empty);
+            Assert.That(second, Is.Not.EqualTo(first),
+                "连续创建地点时，唯一资产路径也必须产生唯一的默认地点 ID");
+        }
+
+        [Test]
+        public void LocationSceneController_AutoDiscoversDefinitionFromResourcesFolder()
+        {
+            string assetPath = AssetDatabase.GenerateUniqueAssetPath(
+                "Assets/StackCraft/Resources/Locations/Location_AutoDiscoveryTest.asset");
+            System.Type builderType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplateBuilder");
+            System.Type templateType = FindType(
+                "CryingSnow.StackCraft.EditorTools.LocationTemplate");
+            object template = System.Activator.CreateInstance(templateType);
+            templateType.GetField("Id").SetValue(template, "auto-discovery-test");
+            templateType.GetField("DisplayName").SetValue(template, "自动发现测试");
+            var controllerObject = new GameObject("Auto Discovery Controller");
+            Component controller = controllerObject.AddComponent(
+                FindType("CryingSnow.StackCraft.LocationSceneController"));
+            try
+            {
+                builderType.GetMethod(
+                        "CreateOrUpdate",
+                        BindingFlags.Public | BindingFlags.Static)
+                    .Invoke(null, new[] { assetPath, template });
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                MethodInfo getAvailable = controller.GetType().GetMethod(
+                    "GetAvailableDefinitions",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                var ids = ((IEnumerable)getAvailable.Invoke(controller, null))
+                    .Cast<Object>()
+                    .Select(definition =>
+                        new SerializedObject(definition).FindProperty("id").stringValue)
+                    .ToList();
+                Assert.That(ids, Does.Contain("auto-discovery-test"));
+            }
+            finally
+            {
+                Object.DestroyImmediate(controllerObject);
+                AssetDatabase.DeleteAsset(assetPath);
+            }
+        }
+
+        [Test]
         public void LocationSceneController_ReturnLabelNamesParentLocation()
         {
             System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
@@ -6427,6 +6736,454 @@ namespace CardColony.Tests
             {
                 Object.DestroyImmediate(controllerObject);
                 Object.DestroyImmediate(temporaryLocation);
+            }
+        }
+
+        [Test]
+        public void WhisperingForest_IsConfiguredAsEnterableRandomizedLocation()
+        {
+            Object forest = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_WhisperingForest.asset");
+            Assert.That(forest, Is.Not.Null, "低语森林需要使用通用 LocationDefinition 资产");
+
+            var serialized = new SerializedObject(forest);
+            Assert.That(serialized.FindProperty("id").stringValue,
+                Is.EqualTo("whispering-forest"));
+            Assert.That(
+                AssetDatabase.GetAssetPath(
+                    serialized.FindProperty("backgroundTexture").objectReferenceValue),
+                Is.EqualTo(
+                    "Assets/CardColony/Art/Backgrounds/WhisperingForestBackground_v2.png"));
+            Assert.That(serialized.FindProperty("randomizeCardsOnEntry").boolValue,
+                Is.True, "野外地点需要在每次从世界地图进入时重新生成内容");
+            Vector2 mapSize = serialized.FindProperty("mapSize").vector2Value;
+            Vector2 randomCenter =
+                serialized.FindProperty("randomSpawnAreaCenter").vector2Value;
+            Vector2 randomSize =
+                serialized.FindProperty("randomSpawnAreaSize").vector2Value;
+            const float boardTopMargin = 1.5f;
+            const float standardCardHalfDepth = 0.6f;
+            Assert.That(
+                randomCenter.y + randomSize.y * 0.5f,
+                Is.LessThanOrEqualTo(
+                    mapSize.y * 0.5f - boardTopMargin - standardCardHalfDepth),
+                "随机区域需要避开顶部 UI 禁放区，并为完整卡牌尺寸留出空间");
+
+            SerializedProperty rules = serialized.FindProperty("randomCardSpawns");
+            Assert.That(rules, Is.Not.Null);
+            var cardAssetNames = new HashSet<string>();
+            for (int index = 0; index < rules.arraySize; index++)
+            {
+                Object definition = rules.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("definition").objectReferenceValue;
+                Assert.That(definition, Is.Not.Null);
+                cardAssetNames.Add(definition.name);
+            }
+
+            Assert.That(cardAssetNames, Is.SupersetOf(new[]
+            {
+                "Card_Rock",
+                "Card_BerryBush",
+                "Card_Tree",
+                "Card_Slime",
+                "Card_Goblin"
+            }), "低语森林应直接复用原项目的资源与敌人卡牌");
+
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Main.unity",
+                OpenSceneMode.Single);
+            MonoBehaviour bootstrap = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.WorldMapBootstrap");
+            Assert.That(bootstrap, Is.Not.Null);
+
+            SerializedProperty locations = new SerializedObject(bootstrap)
+                .FindProperty("locationDetails");
+            bool isEnterable = false;
+            for (int index = 0; index < locations.arraySize; index++)
+            {
+                SerializedProperty location = locations.GetArrayElementAtIndex(index);
+                if (location.FindPropertyRelative("locationId").stringValue !=
+                    "whispering-forest")
+                {
+                    continue;
+                }
+
+                isEnterable = location.FindPropertyRelative("localMapImplemented").boolValue;
+                break;
+            }
+
+            Assert.That(isEnterable, Is.True,
+                "世界地图中的低语森林卡牌需要开放“进入地点”按钮");
+        }
+
+        [Test]
+        public void LocationSceneController_RandomSpawnPlanIsSeededAndRespectsRuleCounts()
+        {
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            System.Type controllerType = FindType(
+                "CryingSnow.StackCraft.LocationSceneController");
+            ScriptableObject definition =
+                ScriptableObject.CreateInstance(definitionType);
+            try
+            {
+                Object rock = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Resources/Card_Rock.asset");
+                Object goblin = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Mobs/Card_Goblin.asset");
+                var serialized = new SerializedObject(definition);
+                SerializedProperty rules = serialized.FindProperty("randomCardSpawns");
+                Assert.That(rules, Is.Not.Null,
+                    "通用地点定义需要声明可复用的随机卡牌规则");
+                rules.arraySize = 2;
+                SetRandomSpawnRule(rules.GetArrayElementAtIndex(0), rock, 2, 4);
+                SetRandomSpawnRule(rules.GetArrayElementAtIndex(1), goblin, 0, 2);
+                serialized.FindProperty("randomSpawnAreaCenter").vector2Value =
+                    new Vector2(1f, -0.5f);
+                serialized.FindProperty("randomSpawnAreaSize").vector2Value =
+                    new Vector2(12f, 6f);
+                serialized.FindProperty("randomSpawnMinSpacing").floatValue = 0.8f;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                MethodInfo createPlan = controllerType.GetMethod(
+                    "CreateRandomSpawnPlan",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { definitionType, typeof(int) },
+                    null);
+                Assert.That(createPlan, Is.Not.Null,
+                    "随机布局应由可测试的种子计划生成器创建");
+
+                List<object> first = ((IEnumerable)createPlan.Invoke(
+                        null,
+                        new object[] { definition, 12345 }))
+                    .Cast<object>()
+                    .ToList();
+                List<object> repeated = ((IEnumerable)createPlan.Invoke(
+                        null,
+                        new object[] { definition, 12345 }))
+                    .Cast<object>()
+                    .ToList();
+                List<object> different = ((IEnumerable)createPlan.Invoke(
+                        null,
+                        new object[] { definition, 54321 }))
+                    .Cast<object>()
+                    .ToList();
+
+                Assert.That(CaptureRandomSpawnPlan(first),
+                    Is.EqualTo(CaptureRandomSpawnPlan(repeated)),
+                    "同一种子必须生成可复现的布局，方便测试与排查存档");
+                Assert.That(CaptureRandomSpawnPlan(first),
+                    Is.Not.EqualTo(CaptureRandomSpawnPlan(different)),
+                    "不同进入种子应能改变卡牌数量或位置");
+
+                int rockCount = CountRandomSpawnItems(first, "Card_Rock");
+                int goblinCount = CountRandomSpawnItems(first, "Card_Goblin");
+                Assert.That(rockCount, Is.InRange(2, 4));
+                Assert.That(goblinCount, Is.InRange(0, 2));
+            }
+            finally
+            {
+                Object.DestroyImmediate(definition);
+            }
+        }
+
+        [Test]
+        public void LocationSceneController_RandomSpawnPlanAvoidsRuntimeOccupancyAndSkipsInvalidFallback()
+        {
+            System.Type definitionType = FindType("CryingSnow.StackCraft.LocationDefinition");
+            System.Type controllerType = FindType(
+                "CryingSnow.StackCraft.LocationSceneController");
+            ScriptableObject definition =
+                ScriptableObject.CreateInstance(definitionType);
+            try
+            {
+                Object rock = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Resources/Card_Rock.asset");
+                var serialized = new SerializedObject(definition);
+                SerializedProperty rules = serialized.FindProperty("randomCardSpawns");
+                rules.arraySize = 1;
+                SetRandomSpawnRule(rules.GetArrayElementAtIndex(0), rock, 1, 1);
+                serialized.FindProperty("randomSpawnAreaCenter").vector2Value =
+                    Vector2.zero;
+                serialized.FindProperty("randomSpawnAreaSize").vector2Value =
+                    Vector2.zero;
+                serialized.FindProperty("randomSpawnMinSpacing").floatValue = 1f;
+                serialized.FindProperty("randomSpawnPartyClearance").floatValue = 2f;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+
+                MethodInfo createPlan = controllerType.GetMethod(
+                    "CreateRandomSpawnPlan",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[]
+                    {
+                        definitionType,
+                        typeof(int),
+                        typeof(IEnumerable<Vector3>),
+                        typeof(IEnumerable<Vector3>)
+                    },
+                    null);
+                Assert.That(createPlan, Is.Not.Null,
+                    "重进地点的布局计划必须接收保留卡牌和所有队员的运行时位置");
+
+                var occupied = new[] { Vector3.zero };
+                var party = new[] { new Vector3(4f, 0f, 0f) };
+                List<object> blocked = ((IEnumerable)createPlan.Invoke(
+                        null,
+                        new object[] { definition, 7, occupied, party }))
+                    .Cast<object>()
+                    .ToList();
+                Assert.That(blocked, Is.Empty,
+                    "找不到合法位置时应跳过卡牌，不能返回已知碰撞的最后候选点");
+
+                serialized.FindProperty("randomSpawnAreaSize").vector2Value =
+                    new Vector2(10f, 6f);
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+                List<object> valid = ((IEnumerable)createPlan.Invoke(
+                        null,
+                        new object[] { definition, 7, occupied, party }))
+                    .Cast<object>()
+                    .ToList();
+                Assert.That(valid, Has.Count.EqualTo(1));
+                Vector3 position = (Vector3)valid[0].GetType()
+                    .GetProperty("Position").GetValue(valid[0]);
+                Assert.That(Vector3.Distance(position, occupied[0]),
+                    Is.GreaterThanOrEqualTo(1f));
+                Assert.That(Vector3.Distance(position, party[0]),
+                    Is.GreaterThanOrEqualTo(2f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(definition);
+            }
+        }
+
+        [Test]
+        public void CardData_PreservesRandomLocationSpawnIdentity()
+        {
+            Object rock = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Resources/Card_Rock.asset");
+            Component card = CreateUninitializedCard(rock, "Random Forest Rock");
+            try
+            {
+                System.Type markerType = FindType(
+                    "CryingSnow.StackCraft.LocationRandomSpawnMarker");
+                Assert.That(markerType, Is.Not.Null,
+                    "随机地点卡牌需要持久化标记，重进地点时才能只替换随机内容");
+                card.gameObject.AddComponent(markerType);
+
+                System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+                object cardData = System.Activator.CreateInstance(
+                    cardDataType,
+                    new object[] { card });
+                FieldInfo markerField = cardDataType.GetField("IsLocationRandomSpawn");
+                Assert.That(markerField, Is.Not.Null);
+                Assert.That(markerField.GetValue(cardData), Is.True);
+            }
+            finally
+            {
+                DestroyTestCard(card);
+            }
+        }
+
+        [Test]
+        public void CardManager_RestoresRandomLocationSpawnMarker()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType = FindType("CryingSnow.StackCraft.GameDirector");
+            var gameDirectorObject = new GameObject("Random Spawn Game Director");
+            Component gameDirector = gameDirectorObject.AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(
+                    FindType("CryingSnow.StackCraft.GameplayPrefs")));
+            gameDirectorType.GetProperty("GameData").SetValue(gameDirector, gameData);
+
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            cardManager.GetType().GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            Component restored = null;
+            try
+            {
+                cardManager.GetType().GetMethod(
+                        "InitializePrefabLookup",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(cardManager, null);
+                cardManager.GetType().GetMethod(
+                        "BuildDefinitionDatabase",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(cardManager, null);
+
+                Object rock = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Resources/Card_Rock.asset");
+                System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+                object data = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(
+                    data,
+                    rock.GetType().GetProperty("Id").GetValue(rock));
+                cardDataType.GetField("UsesLeft").SetValue(data, 3);
+                cardDataType.GetField("CurrentHealth").SetValue(data, 15);
+                cardDataType.GetField("IsLocationRandomSpawn").SetValue(data, true);
+
+                LogAssert.Expect(
+                    LogType.Error,
+                    "Instantiating material due to calling renderer.material during edit mode. This will leak materials into the scene. You most likely want to use renderer.sharedMaterial instead.");
+                restored = (Component)cardManager.GetType()
+                    .GetMethod("RestoreCardFromData")
+                    .Invoke(cardManager, new object[] { data, Vector3.zero, false });
+                Assert.That(restored, Is.Not.Null);
+                Assert.That(
+                    restored.GetComponent("LocationRandomSpawnMarker"),
+                    Is.Not.Null,
+                    "从存档恢复地点时，随机卡牌必须保留可重投标记");
+            }
+            finally
+            {
+                if (restored != null)
+                    Object.DestroyImmediate(restored.gameObject);
+                Object.DestroyImmediate(gameDirectorObject);
+            }
+        }
+
+        [Test]
+        public void LocationSceneController_RandomizesOnlyForWorldMapEntryOrFreshLocation()
+        {
+            System.Type controllerType = FindType(
+                "CryingSnow.StackCraft.LocationSceneController");
+            System.Type reasonType = FindType(
+                "CryingSnow.StackCraft.LocationTransitionReason");
+            MethodInfo shouldRandomize = controllerType.GetMethod(
+                "ShouldRandomizeLocationCards",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(shouldRandomize, Is.Not.Null);
+            Assert.That(reasonType, Is.Not.Null);
+
+            object none = System.Enum.Parse(reasonType, "None");
+            object worldMapEntry = System.Enum.Parse(reasonType, "WorldMapEntry");
+            object childEntry = System.Enum.Parse(reasonType, "ChildLocationEntry");
+            object returnToParent = System.Enum.Parse(reasonType, "ReturnToParent");
+
+            Assert.That(
+                shouldRandomize.Invoke(null, new[] { (object)false, false, none }),
+                Is.False,
+                "未开启随机地点内容时不能刷新卡牌");
+            Assert.That(
+                shouldRandomize.Invoke(
+                    null,
+                    new[] { (object)true, true, worldMapEntry }),
+                Is.True,
+                "从世界地图重新进入已保存地点时需要刷新随机内容");
+            Assert.That(
+                shouldRandomize.Invoke(
+                    null,
+                    new[] { (object)true, true, childEntry }),
+                Is.False,
+                "进入子地点不能刷新当前地点");
+            Assert.That(
+                shouldRandomize.Invoke(
+                    null,
+                    new[] { (object)true, true, returnToParent }),
+                Is.False,
+                "从建筑或下一层返回父地点不能刷新父地点");
+            Assert.That(
+                shouldRandomize.Invoke(null, new[] { (object)true, true, none }),
+                Is.False,
+                "在地点中直接读取存档不能刷新敌人与资源");
+            Assert.That(
+                shouldRandomize.Invoke(null, new[] { (object)true, false, none }),
+                Is.True,
+                "首次进入未保存地点时需要生成随机内容");
+        }
+
+        [Test]
+        public void CombatManager_EndAllCombatsRestoresCombatantsToWorldStacks()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            foreach (string typeName in new[]
+                     {
+                         "CryingSnow.StackCraft.Board",
+                         "CryingSnow.StackCraft.CardManager",
+                         "CryingSnow.StackCraft.CombatManager"
+                     })
+            {
+                MonoBehaviour singleton = Object.FindObjectsOfType<MonoBehaviour>(true)
+                    .First(component => component.GetType().FullName == typeName);
+                singleton.GetType().GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(singleton, null);
+            }
+
+            MonoBehaviour combatManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CombatManager");
+            MethodInfo endAll = combatManager.GetType().GetMethod(
+                "EndAllCombats",
+                BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(endAll, Is.Not.Null,
+                "地点重投前需要通过战斗系统正式结束所有活动战斗");
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object goblinDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Mobs/Card_Goblin.asset");
+            Component player = CreateUninitializedCard(playerDefinition, "Combat Player");
+            Component goblin = CreateUninitializedCard(goblinDefinition, "Combat Goblin");
+            try
+            {
+                InitializeTestCombatant(player);
+                InitializeTestCombatant(goblin);
+                System.Type cardType = player.GetType();
+                System.Type listType = typeof(List<>).MakeGenericType(cardType);
+                var attackers = (IList)System.Activator.CreateInstance(listType);
+                var defenders = (IList)System.Activator.CreateInstance(listType);
+                attackers.Add(player);
+                defenders.Add(goblin);
+
+                object task = combatManager.GetType().GetMethod(
+                        "StartCombat",
+                        new[] { listType, listType, typeof(bool) })
+                    .Invoke(combatManager, new object[] { attackers, defenders, true });
+                Assert.That(task, Is.Not.Null);
+                Assert.That(player.GetType().GetProperty("Stack").GetValue(player), Is.Null);
+                Assert.That(goblin.GetType().GetProperty("Stack").GetValue(goblin), Is.Null);
+
+                endAll.Invoke(combatManager, null);
+
+                Assert.That(
+                    ((IEnumerable)combatManager.GetType()
+                        .GetProperty("ActiveCombats").GetValue(combatManager))
+                    .Cast<object>(),
+                    Is.Empty);
+                Assert.That(player.GetType().GetProperty("Stack").GetValue(player),
+                    Is.Not.Null);
+                Assert.That(goblin.GetType().GetProperty("Stack").GetValue(goblin),
+                    Is.Not.Null);
+            }
+            finally
+            {
+                DestroyTestCard(goblin);
+                DestroyTestCard(player);
             }
         }
 
@@ -6952,6 +7709,58 @@ namespace CardColony.Tests
         private static int backpackCreatedEventCount;
         private static int backpackStatsEventCount;
 
+        private static void SetRandomSpawnRule(
+            SerializedProperty rule,
+            Object definition,
+            int minimum,
+            int maximum)
+        {
+            rule.FindPropertyRelative("definition").objectReferenceValue = definition;
+            rule.FindPropertyRelative("minimumCount").intValue = minimum;
+            rule.FindPropertyRelative("maximumCount").intValue = maximum;
+        }
+
+        private static void InitializeTestCombatant(Component card)
+        {
+            System.Type combatantType = FindType(
+                "CryingSnow.StackCraft.CardCombatant");
+            Component combatant = card.gameObject.AddComponent(combatantType);
+            combatantType.GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(combatant, null);
+            card.GetType().GetProperty("Combatant").SetValue(card, combatant);
+            card.GetType().GetProperty("Size").SetValue(card, Vector2.one);
+        }
+
+        private static int CountRandomSpawnItems(
+            IEnumerable<object> items,
+            string cardId)
+        {
+            return items.Count(item =>
+            {
+                Object definition = (Object)item.GetType()
+                    .GetProperty("Definition").GetValue(item);
+                return definition.name == cardId;
+            });
+        }
+
+        private static string CaptureRandomSpawnPlan(IEnumerable<object> items)
+        {
+            return string.Join(
+                "|",
+                items.Select(item =>
+                {
+                    System.Type type = item.GetType();
+                    Object definition =
+                        (Object)type.GetProperty("Definition").GetValue(item);
+                    Vector3 position =
+                        (Vector3)type.GetProperty("Position").GetValue(item);
+                    return $"{definition.name}@" +
+                        $"{position.x:R},{position.z:R}";
+                }));
+        }
+
         private static void RecordBackpackCreatedEvent()
         {
             backpackCreatedEventCount++;
@@ -7053,6 +7862,13 @@ namespace CardColony.Tests
         {
             return root != null && root.GetComponentsInChildren<Component>(true)
                 .Any(component => component != null && component.GetType().FullName == fullTypeName);
+        }
+
+        private static void SetSerializedString(Object target, string propertyName, string value)
+        {
+            var serialized = new SerializedObject(target);
+            serialized.FindProperty(propertyName).stringValue = value;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
         }
     }
 }

@@ -617,7 +617,7 @@ MonoBehaviour:
     explorationProgress: 0.1
     description: "\u5E9F\u5F03\u77FF\u9053\u901A\u5411\u66F4\u6DF1\u7684\u5730\u4E0B\uFF0C\u4ECD\u80FD\u627E\u5230\u77FF\u77F3\uFF0C\u4E5F\u53EF\u80FD\u60CA\u52A8\u6F5C\u4F0F\u8005\u3002"
   - locationId: whispering-forest
-    localMapImplemented: 0
+    localMapImplemented: 1
     locationType: "\u68EE\u6797"
     dangerLevel: 2
     travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"

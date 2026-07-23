@@ -259,6 +259,7 @@ namespace CryingSnow.StackCraft
                     CardStack.RefuseAll,
                     notifyCreated: false);
                 newCard.RestoreSavedStats(cardData);
+                RestoreLocationRandomSpawnMarker(newCard, cardData);
 
                 if (newCard.EquipperComponent != null && cardData.EquippedItems != null && cardData.EquippedItems.Count > 0)
                 {
@@ -393,6 +394,7 @@ namespace CryingSnow.StackCraft
                 notifyStats: notifyStats,
                 registerWithManager: registerWithManager);
             card.RestoreSavedStats(data);
+            RestoreLocationRandomSpawnMarker(card, data);
             RestoreEquipmentForCard(
                 card,
                 data,
@@ -400,6 +402,19 @@ namespace CryingSnow.StackCraft
                 registerWithManager);
 
             return card;
+        }
+
+        private static void RestoreLocationRandomSpawnMarker(
+            CardInstance card,
+            CardData data)
+        {
+            if (card == null || data == null || !data.IsLocationRandomSpawn ||
+                card.GetComponent<LocationRandomSpawnMarker>() != null)
+            {
+                return;
+            }
+
+            card.gameObject.AddComponent<LocationRandomSpawnMarker>();
         }
 
         /// <summary>

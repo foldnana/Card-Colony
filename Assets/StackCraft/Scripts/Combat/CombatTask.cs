@@ -408,6 +408,11 @@ namespace CryingSnow.StackCraft
         #endregion
 
         #region Cleanup
+        public void EndImmediately()
+        {
+            EndCombat();
+        }
+
         private void EndCombat()
         {
             if (_currentState == CombatState.Finished) return; // Prevent multiple calls

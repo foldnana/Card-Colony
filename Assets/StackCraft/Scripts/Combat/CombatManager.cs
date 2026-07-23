@@ -361,6 +361,14 @@ namespace CryingSnow.StackCraft
             return null;
         }
 
+        public void EndAllCombats()
+        {
+            foreach (CombatTask task in _activeCombats.ToList())
+                task.EndImmediately();
+
+            _activeCombats.Clear();
+        }
+
         /// <summary>
         /// Instantiates a floating UI element at a specific world position to display the outcome of a combat hit.
         /// </summary>

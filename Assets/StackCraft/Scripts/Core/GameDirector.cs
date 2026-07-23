@@ -148,7 +148,10 @@ namespace CryingSnow.StackCraft
             GameData.PartyMembers = partyMembers != null
                 ? new List<CardData>(partyMembers)
                 : new List<CardData>();
-            GameData.MarkLocationPartyTransferPending();
+            GameData.MarkLocationTransitionPending(
+                enteringFromLocation
+                    ? LocationTransitionReason.ChildLocationEntry
+                    : LocationTransitionReason.WorldMapEntry);
             StartCoroutine(TravelSequence(locationScene, null));
             return true;
         }
@@ -165,7 +168,8 @@ namespace CryingSnow.StackCraft
             if (GameData.TryPopLocation(out string parentLocationId))
             {
                 GameData.ActiveLocationId = parentLocationId;
-                GameData.MarkLocationPartyTransferPending();
+                GameData.MarkLocationTransitionPending(
+                    LocationTransitionReason.ReturnToParent);
                 StartCoroutine(TravelSequence(locationScene, null));
                 return true;
             }

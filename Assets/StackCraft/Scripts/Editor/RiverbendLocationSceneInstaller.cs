@@ -137,6 +137,7 @@ namespace CryingSnow.StackCraft.EditorTools
             LocationSceneController controller = cardManager.GetComponent<LocationSceneController>();
             if (controller == null)
                 controller = cardManager.gameObject.AddComponent<LocationSceneController>();
+            LocationTemplateBuilder.UpsertDefinition(controller, riverbend);
 
             Canvas canvas = Object.FindObjectsOfType<Canvas>(true)
                 .OrderByDescending(item => item.transform.childCount)
@@ -145,10 +146,6 @@ namespace CryingSnow.StackCraft.EditorTools
             TMP_Text titleLabel = CreateLocationTitle(canvas.transform);
 
             var controllerObject = new SerializedObject(controller);
-            SerializedProperty definitions = controllerObject.FindProperty("locationDefinitions");
-            definitions.ClearArray();
-            definitions.InsertArrayElementAtIndex(0);
-            definitions.GetArrayElementAtIndex(0).objectReferenceValue = riverbend;
             controllerObject.FindProperty("returnButton").objectReferenceValue = returnButton;
             controllerObject.FindProperty("locationTitleLabel").objectReferenceValue = titleLabel;
             controllerObject.FindProperty("backgroundShader").objectReferenceValue = Shader.Find("Unlit/Texture");
@@ -173,47 +170,13 @@ namespace CryingSnow.StackCraft.EditorTools
 
         private static LocationDefinition CreateOrUpdateDefinition()
         {
-            LocationDefinition definition = AssetDatabase.LoadAssetAtPath<LocationDefinition>(DefinitionPath);
-            if (definition == null)
-            {
-                definition = ScriptableObject.CreateInstance<LocationDefinition>();
-                AssetDatabase.CreateAsset(definition, DefinitionPath);
-            }
-
-            var serialized = new SerializedObject(definition);
-            serialized.FindProperty("id").stringValue = "riverbend";
-            serialized.FindProperty("displayName").stringValue = "河湾村";
-            serialized.FindProperty("backgroundTexture").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath);
-            serialized.FindProperty("mapSize").vector2Value = new Vector2(18.4f, 10.35f);
-            serialized.FindProperty("cameraMinDistance").floatValue = 3f;
-            serialized.FindProperty("cameraMaxDistance").floatValue = 24f;
-            serialized.FindProperty("cameraInitialDistance").floatValue = 7f;
-            serialized.FindProperty("cameraZoomSpeed").floatValue = 3f;
-            serialized.FindProperty("expandedPartyMemberDefinition").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath);
-            serialized.FindProperty("partySpawnPosition").vector3Value = new Vector3(0f, 0f, -0.48f);
-            serialized.FindProperty("partyMemberSpacing").floatValue = 0.9f;
-            ConfigureInitialCardSpawns(serialized);
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(definition);
-            return definition;
-        }
-
-        private static void ConfigureInitialCardSpawns(SerializedObject location)
-        {
             EnsureFolder(RiverbendCardsFolder);
-            SerializedProperty spawns = location.FindProperty("initialCardSpawns");
-            spawns.ClearArray();
+            var spawns = new List<LocationTemplateSpawn>();
 
-            for (int index = 0; index < InitialCards.Length; index++)
+            foreach (InitialCardSpec spec in InitialCards)
             {
-                InitialCardSpec spec = InitialCards[index];
                 CardDefinition card = CreateOrUpdateCard(spec);
-                spawns.InsertArrayElementAtIndex(index);
-                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
-                spawn.FindPropertyRelative("definition").objectReferenceValue = card;
-                spawn.FindPropertyRelative("position").vector3Value = spec.Position;
+                spawns.Add(new LocationTemplateSpawn(card, spec.Position));
             }
 
             CardDefinition egg = AssetDatabase.LoadAssetAtPath<CardDefinition>(EggPath);
@@ -221,13 +184,27 @@ namespace CryingSnow.StackCraft.EditorTools
                 throw new System.InvalidOperationException($"Existing egg card is missing: {EggPath}");
 
             foreach (Vector3 position in BackpackTestEggPositions)
-            {
-                int index = spawns.arraySize;
-                spawns.InsertArrayElementAtIndex(index);
-                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
-                spawn.FindPropertyRelative("definition").objectReferenceValue = egg;
-                spawn.FindPropertyRelative("position").vector3Value = position;
-            }
+                spawns.Add(new LocationTemplateSpawn(egg, position));
+
+            return LocationTemplateBuilder.CreateOrUpdate(
+                DefinitionPath,
+                new LocationTemplate
+                {
+                    Id = "riverbend",
+                    DisplayName = "河湾村",
+                    BackgroundTexture =
+                        AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath),
+                    MapSize = new Vector2(18.4f, 10.35f),
+                    CameraMinDistance = 3f,
+                    CameraMaxDistance = 24f,
+                    CameraInitialDistance = 7f,
+                    CameraZoomSpeed = 3f,
+                    ExpandedPartyMemberDefinition =
+                        AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath),
+                    PartySpawnPosition = new Vector3(0f, 0f, -0.48f),
+                    PartyMemberSpacing = 0.9f,
+                    InitialCardSpawns = spawns
+                });
         }
 
         private static CardDefinition CreateOrUpdateCard(InitialCardSpec spec)

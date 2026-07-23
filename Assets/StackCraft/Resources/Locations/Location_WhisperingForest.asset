@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c7f5a4d4a14b09a7d9fd4b1fc9aa11, type: 3}
+  m_Name: Location_WhisperingForest
+  m_EditorClassIdentifier: 
+  id: whispering-forest
+  displayName: "\u4F4E\u8BED\u68EE\u6797"
+  backgroundTexture: {fileID: 2800000, guid: 25a8d5b19f04d9947abb0bba57990911, type: 3}
+  mapSize: {x: 18.4, y: 10.35}
+  cameraMinDistance: 3
+  cameraMaxDistance: 24
+  cameraInitialDistance: 7
+  cameraZoomSpeed: 3
+  expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  partySpawnPosition: {x: -6.7, y: 0, z: -3.7}
+  partyMemberSpacing: 0.9
+  initialCardSpawns: []
+  entrances: []
+  randomizeCardsOnEntry: 1
+  randomSpawnAreaCenter: {x: -0.8, y: -0.3}
+  randomSpawnAreaSize: {x: 13.2, y: 5.4}
+  randomSpawnMinSpacing: 1.05
+  randomSpawnPartyClearance: 2.1
+  randomCardSpawns:
+  - definition: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
+    minimumCount: 2
+    maximumCount: 4
+  - definition: {fileID: 11400000, guid: f7d0d2080bf68dc48885e8d4f6381af2, type: 2}
+    minimumCount: 2
+    maximumCount: 4
+  - definition: {fileID: 11400000, guid: ff332e75fb8842942a379e7397816f5a, type: 2}
+    minimumCount: 3
+    maximumCount: 6
+  - definition: {fileID: 11400000, guid: ab518c0794a7c9f4db0ff8fcd4e6dfd5, type: 2}
+    minimumCount: 1
+    maximumCount: 3
+  - definition: {fileID: 11400000, guid: 06b45747ae3922147809ae68228f5063, type: 2}
+    minimumCount: 0
+    maximumCount: 2

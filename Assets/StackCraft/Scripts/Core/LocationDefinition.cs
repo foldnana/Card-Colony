@@ -24,6 +24,18 @@ namespace CryingSnow.StackCraft
         public string DestinationLocationId => destinationLocationId;
     }
 
+    [Serializable]
+    public struct LocationRandomCardSpawn
+    {
+        [SerializeField] private CardDefinition definition;
+        [SerializeField, Min(0)] private int minimumCount;
+        [SerializeField, Min(0)] private int maximumCount;
+
+        public CardDefinition Definition => definition;
+        public int MinimumCount => minimumCount;
+        public int MaximumCount => maximumCount;
+    }
+
     [CreateAssetMenu(menuName = "StackCraft/World/Location Definition", fileName = "Location_")]
     public sealed class LocationDefinition : ScriptableObject
     {
@@ -40,6 +52,13 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0.1f)] private float partyMemberSpacing = 0.9f;
         [SerializeField] private List<LocationCardSpawn> initialCardSpawns = new();
         [SerializeField] private List<LocationEntranceDefinition> entrances = new();
+        [Header("Random location content")]
+        [SerializeField] private bool randomizeCardsOnEntry;
+        [SerializeField] private Vector2 randomSpawnAreaCenter;
+        [SerializeField] private Vector2 randomSpawnAreaSize = new(14f, 7f);
+        [SerializeField, Min(0f)] private float randomSpawnMinSpacing = 0.8f;
+        [SerializeField, Min(0f)] private float randomSpawnPartyClearance = 2f;
+        [SerializeField] private List<LocationRandomCardSpawn> randomCardSpawns = new();
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -54,5 +73,11 @@ namespace CryingSnow.StackCraft
         public float PartyMemberSpacing => partyMemberSpacing;
         public IReadOnlyList<LocationCardSpawn> InitialCardSpawns => initialCardSpawns;
         public IReadOnlyList<LocationEntranceDefinition> Entrances => entrances;
+        public bool RandomizeCardsOnEntry => randomizeCardsOnEntry;
+        public Vector2 RandomSpawnAreaCenter => randomSpawnAreaCenter;
+        public Vector2 RandomSpawnAreaSize => randomSpawnAreaSize;
+        public float RandomSpawnMinSpacing => randomSpawnMinSpacing;
+        public float RandomSpawnPartyClearance => randomSpawnPartyClearance;
+        public IReadOnlyList<LocationRandomCardSpawn> RandomCardSpawns => randomCardSpawns;
     }
 }

@@ -3,6 +3,14 @@ using UnityEngine;
 
 namespace CryingSnow.StackCraft
 {
+    public enum LocationTransitionReason
+    {
+        None,
+        WorldMapEntry,
+        ChildLocationEntry,
+        ReturnToParent
+    }
+
     [System.Serializable]
     public class GameData
     {
@@ -20,7 +28,7 @@ namespace CryingSnow.StackCraft
         public System.DateTime LastSaved;
 
         [System.NonSerialized]
-        private bool locationPartyTransferPending;
+        private LocationTransitionReason pendingLocationTransition;
 
         public GameData() { }
 
@@ -73,14 +81,25 @@ namespace CryingSnow.StackCraft
 
         public void MarkLocationPartyTransferPending()
         {
-            locationPartyTransferPending = true;
+            MarkLocationTransitionPending(LocationTransitionReason.WorldMapEntry);
         }
 
         public bool ConsumeLocationPartyTransferPending()
         {
-            bool wasPending = locationPartyTransferPending;
-            locationPartyTransferPending = false;
-            return wasPending;
+            return ConsumeLocationTransitionReason() !=
+                LocationTransitionReason.None;
+        }
+
+        public void MarkLocationTransitionPending(LocationTransitionReason reason)
+        {
+            pendingLocationTransition = reason;
+        }
+
+        public LocationTransitionReason ConsumeLocationTransitionReason()
+        {
+            LocationTransitionReason reason = pendingLocationTransition;
+            pendingLocationTransition = LocationTransitionReason.None;
+            return reason;
         }
 
         public BackpackData EnsureBackpack()
@@ -206,6 +225,7 @@ namespace CryingSnow.StackCraft
         public int CurrentHealth;
         public int CurrentNutrition;
         public int StoredCoins;
+        public bool IsLocationRandomSpawn;
 
         public string OriginalId; // Stores "Villager" if current Id is "Warrior"
         public List<CardData> EquippedItems = new();
@@ -218,6 +238,8 @@ namespace CryingSnow.StackCraft
             UsesLeft = card.UsesLeft;
             CurrentHealth = card.CurrentHealth;
             CurrentNutrition = card.CurrentNutrition;
+            IsLocationRandomSpawn =
+                card.GetComponent<LocationRandomSpawnMarker>() != null;
 
             if (card.TryGetComponent<ChestLogic>(out var chest))
             {

@@ -200,43 +200,34 @@ namespace CryingSnow.StackCraft.EditorTools
         private static LocationDefinition CreateOrUpdateInn(
             IReadOnlyDictionary<string, CardDefinition> cards)
         {
-            LocationDefinition definition = AssetDatabase.LoadAssetAtPath<LocationDefinition>(InnPath);
-            if (definition == null)
+            var spawns = new List<LocationTemplateSpawn>();
+            foreach (SpawnSpec spawn in Spawns)
             {
-                definition = ScriptableObject.CreateInstance<LocationDefinition>();
-                AssetDatabase.CreateAsset(definition, InnPath);
+                spawns.Add(new LocationTemplateSpawn(
+                    cards[spawn.CardId],
+                    spawn.Position));
             }
 
-            var serialized = new SerializedObject(definition);
-            serialized.FindProperty("id").stringValue = "riverbend-inn";
-            serialized.FindProperty("displayName").stringValue = "河湾旅馆";
-            serialized.FindProperty("backgroundTexture").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath);
-            serialized.FindProperty("mapSize").vector2Value = new Vector2(18.4f, 10.35f);
-            serialized.FindProperty("cameraMinDistance").floatValue = 3f;
-            serialized.FindProperty("cameraMaxDistance").floatValue = 20f;
-            serialized.FindProperty("cameraInitialDistance").floatValue = 7f;
-            serialized.FindProperty("cameraZoomSpeed").floatValue = 3f;
-            serialized.FindProperty("expandedPartyMemberDefinition").objectReferenceValue =
-                AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath);
-            serialized.FindProperty("partySpawnPosition").vector3Value = new Vector3(0f, 0f, -3.7f);
-            serialized.FindProperty("partyMemberSpacing").floatValue = 0.9f;
-
-            SerializedProperty spawns = serialized.FindProperty("initialCardSpawns");
-            spawns.ClearArray();
-            for (int index = 0; index < Spawns.Length; index++)
-            {
-                SpawnSpec spec = Spawns[index];
-                spawns.InsertArrayElementAtIndex(index);
-                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
-                spawn.FindPropertyRelative("definition").objectReferenceValue = cards[spec.CardId];
-                spawn.FindPropertyRelative("position").vector3Value = spec.Position;
-            }
-
-            serialized.FindProperty("entrances").ClearArray();
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(definition);
-            return definition;
+            return LocationTemplateBuilder.CreateOrUpdate(
+                InnPath,
+                new LocationTemplate
+                {
+                    Id = "riverbend-inn",
+                    DisplayName = "河湾旅馆",
+                    BackgroundTexture =
+                        AssetDatabase.LoadAssetAtPath<Texture2D>(BackgroundPath),
+                    MapSize = new Vector2(18.4f, 10.35f),
+                    CameraMinDistance = 3f,
+                    CameraMaxDistance = 20f,
+                    CameraInitialDistance = 7f,
+                    CameraZoomSpeed = 3f,
+                    ExpandedPartyMemberDefinition =
+                        AssetDatabase.LoadAssetAtPath<CardDefinition>(VillagerPath),
+                    PartySpawnPosition = new Vector3(0f, 0f, -3.7f),
+                    PartyMemberSpacing = 0.9f,
+                    InitialCardSpawns = spawns,
+                    Entrances = System.Array.Empty<LocationTemplateEntrance>()
+                });
         }
 
         private static void ConfigureRiverbendEntrance()
@@ -268,53 +259,17 @@ namespace CryingSnow.StackCraft.EditorTools
             CardDefinition sourceCard,
             string destinationLocationId)
         {
-            var serialized = new SerializedObject(location);
-            SerializedProperty entrances = serialized.FindProperty("entrances");
-            SerializedProperty entrance = null;
-            for (int index = 0; index < entrances.arraySize; index++)
-            {
-                SerializedProperty candidate = entrances.GetArrayElementAtIndex(index);
-                if (candidate.FindPropertyRelative("sourceCardDefinition").objectReferenceValue ==
-                    sourceCard)
-                {
-                    entrance = candidate;
-                    break;
-                }
-            }
-
-            if (entrance == null)
-            {
-                int index = entrances.arraySize;
-                entrances.InsertArrayElementAtIndex(index);
-                entrance = entrances.GetArrayElementAtIndex(index);
-            }
-
-            entrance.FindPropertyRelative("sourceCardDefinition").objectReferenceValue = sourceCard;
-            entrance.FindPropertyRelative("destinationLocationId").stringValue = destinationLocationId;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(location);
+            LocationTemplateBuilder.UpsertEntrance(
+                location,
+                sourceCard,
+                destinationLocationId);
         }
 
         private static void UpsertDefinition(
             LocationSceneController controller,
             LocationDefinition definition)
         {
-            if (definition == null)
-                return;
-
-            var serialized = new SerializedObject(controller);
-            SerializedProperty definitions = serialized.FindProperty("locationDefinitions");
-            for (int index = 0; index < definitions.arraySize; index++)
-            {
-                if (definitions.GetArrayElementAtIndex(index).objectReferenceValue == definition)
-                    return;
-            }
-
-            int newIndex = definitions.arraySize;
-            definitions.InsertArrayElementAtIndex(newIndex);
-            definitions.GetArrayElementAtIndex(newIndex).objectReferenceValue = definition;
-            serialized.ApplyModifiedPropertiesWithoutUndo();
-            EditorUtility.SetDirty(controller);
+            LocationTemplateBuilder.UpsertDefinition(controller, definition);
         }
 
         private static void EnsureArtMaskImportSettings(string artPath)
