@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace CryingSnow.StackCraft
 {
@@ -100,6 +101,13 @@ namespace CryingSnow.StackCraft
                 CurrentPosition,
                 Destination,
                 moveSpeed * deltaTime);
+            if (IsNpcMovementBlocked(nextPosition))
+            {
+                Destination = CurrentPosition;
+                EnterIdle();
+                return;
+            }
+
             card.Stack.SetTargetPosition(nextPosition, instant: true);
 
             if (Vector3.SqrMagnitude(nextPosition - Destination) <= 0.0001f)
@@ -110,6 +118,55 @@ namespace CryingSnow.StackCraft
         }
 
         private Vector3 CurrentPosition => card?.Stack?.TargetPosition.Flatten() ?? transform.position.Flatten();
+
+        private bool IsNpcMovementBlocked(Vector3 nextPosition)
+        {
+            if (card?.Stack == null || CardManager.Instance == null)
+                return false;
+
+            var checkedStacks = new HashSet<CardStack>();
+            foreach (CardInstance otherCard in CardManager.Instance.AllCards)
+            {
+                CardStack otherStack = otherCard?.Stack;
+                if (otherStack == null ||
+                    otherStack == card.Stack ||
+                    !checkedStacks.Add(otherStack) ||
+                    otherCard.GetComponent<LocationNpcActivity>() == null)
+                    continue;
+
+                if (CardPhysicsSolver.WouldOverlapAt(
+                        card.Stack,
+                        nextPosition,
+                        otherStack,
+                        0.04f) &&
+                    !IsSeparatingFromExistingOverlap(
+                        nextPosition,
+                        otherStack))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool IsSeparatingFromExistingOverlap(
+            Vector3 nextPosition,
+            CardStack otherStack)
+        {
+            Vector3 currentPosition = CurrentPosition;
+            if (!CardPhysicsSolver.WouldOverlapAt(
+                    card.Stack,
+                    currentPosition,
+                    otherStack,
+                    0.04f))
+                return false;
+
+            Vector3 otherPosition = otherStack.TargetPosition.Flatten();
+            float currentDistance = (
+                currentPosition.Flatten() - otherPosition).sqrMagnitude;
+            float nextDistance = (
+                nextPosition.Flatten() - otherPosition).sqrMagnitude;
+            return nextDistance > currentDistance + Mathf.Epsilon;
+        }
 
         private void ChooseWanderDestination()
         {

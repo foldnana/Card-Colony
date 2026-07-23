@@ -15,6 +15,16 @@ namespace CryingSnow.StackCraft
         void HandleDragStarted(CardInstance card);
     }
 
+    public interface ICardDragHeightProvider
+    {
+        float GetDragHeight(CardInstance card);
+    }
+
+    public interface ICardStackRegistrationPolicy
+    {
+        bool RegisterSplitStacksWithWorld { get; }
+    }
+
     [RequireComponent(typeof(CardInstance))]
     public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
     {
@@ -27,6 +37,8 @@ namespace CryingSnow.StackCraft
         // Drag State
         private Vector3 _dragOffset;
         private Vector3 _dragStartPosition;
+        private Vector2 _dragScreenOffset;
+        private bool _backpackBridgeActive;
 
         // Helper Properties
         private bool isEquipped => _equipmentComponent != null && _equipmentComponent.IsEquipped;
@@ -60,6 +72,7 @@ namespace CryingSnow.StackCraft
             if (eventData.button != PointerEventData.InputButton.Left) return;
             if (!InputManager.Instance.IsInputEnabled) return;
 
+            _backpackBridgeActive = false;
             WorldMapLocation.NotifyCardClicked(_card);
             LocationEntrance.NotifyCardClicked(_card);
 
@@ -78,6 +91,7 @@ namespace CryingSnow.StackCraft
                 _card.Stack.KillAllTweens();
 
                 _dragOffset = transform.position - GetMouseWorldPosition();
+                CaptureDragScreenOffset();
 
                 CardManager.Instance?.HighlightStackableStacks(_card);
                 TradeManager.Instance?.HighlightTradeableZones(_card.Stack);
@@ -95,6 +109,7 @@ namespace CryingSnow.StackCraft
                     _card.Stack = new CardStack(_card, transform.position);
                     _card.IsBeingDragged = true;
                     _dragOffset = transform.position - GetMouseWorldPosition();
+                    CaptureDragScreenOffset();
                 }
                 return;
             }
@@ -109,23 +124,29 @@ namespace CryingSnow.StackCraft
             if (newStack != null)
             {
                 _card.Stack = newStack;
-                CardManager.Instance.RegisterStack(newStack);
+                bool registerSplitWithWorld = ShouldRegisterSplitStackWithWorld();
+                if (registerSplitWithWorld)
+                    CardManager.Instance.RegisterStack(newStack);
                 // Keep the old stack where it is visually
                 oldStack.SetTargetPosition(oldStack.TargetPosition);
 
-                if (oldStack.IsCrafting)
+                if (registerSplitWithWorld)
                 {
-                    _card.OriginalCraftingStack = oldStack;
-                    CraftingManager.Instance.PauseCraftingTask(oldStack);
-                }
-                else
-                {
-                    CraftingManager.Instance.CheckForRecipe(oldStack);
+                    if (oldStack.IsCrafting)
+                    {
+                        _card.OriginalCraftingStack = oldStack;
+                        CraftingManager.Instance.PauseCraftingTask(oldStack);
+                    }
+                    else
+                    {
+                        CraftingManager.Instance.CheckForRecipe(oldStack);
+                    }
                 }
             }
 
             _card.Stack.KillAllTweens();
             _dragOffset = transform.position - GetMouseWorldPosition();
+            CaptureDragScreenOffset();
 
             CardManager.Instance?.HighlightStackableStacks(_card);
             TradeManager.Instance?.HighlightTradeableZones(_card.Stack);
@@ -136,11 +157,48 @@ namespace CryingSnow.StackCraft
 
         private void UpdateDragPosition()
         {
+            if (TryResolveBackpackDragPosition(out Vector3 bridgedPosition))
+            {
+                MoveDraggedStack(bridgedPosition);
+                return;
+            }
+
             Vector3 mousePos = GetMouseWorldPosition() + _dragOffset;
-            mousePos.y = _card.Settings.DragHeight;
+            mousePos.y = ResolveDragHeight();
             Vector3 finalPos = Board.Instance.ClampToBounds(mousePos, _card.Stack);
 
-            _card.Stack?.SetDragTargetPosition(finalPos);
+            MoveDraggedStack(finalPos);
+        }
+
+        private float ResolveDragHeight()
+        {
+            float dragHeight = _card.Settings.DragHeight;
+            foreach (ICardDragHeightProvider provider in
+                     GetComponents<ICardDragHeightProvider>())
+            {
+                dragHeight = Mathf.Max(dragHeight, provider.GetDragHeight(_card));
+            }
+
+            if (BackpackView.Instance != null &&
+                BackpackView.Instance.TryGetStorageDragHeight(
+                    Input.mousePosition,
+                    out float storageHeight))
+            {
+                dragHeight = Mathf.Max(dragHeight, storageHeight);
+            }
+            return dragHeight;
+        }
+
+        private bool ShouldRegisterSplitStackWithWorld()
+        {
+            foreach (ICardStackRegistrationPolicy policy in
+                     GetComponents<ICardStackRegistrationPolicy>())
+            {
+                if (!policy.RegisterSplitStacksWithWorld)
+                    return false;
+            }
+
+            return true;
         }
 
         public void OnPointerUp(PointerEventData eventData)
@@ -154,7 +212,8 @@ namespace CryingSnow.StackCraft
             TradeManager.Instance?.TurnOffHighlightedZones();
             AudioManager.Instance?.PlaySFX(AudioId.CardDrop);
 
-            Vector3 dropPosition = transform.position.Flatten();
+            Vector3 dropPosition = ResolveFinalDropPosition();
+            _backpackBridgeActive = false;
             float dragDistance = Vector3.Distance(dropPosition, _dragStartPosition);
 
             if (dragDistance < _card.Settings.ClickThreshold)
@@ -248,6 +307,10 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
+            // A failed backpack transfer may have moved this stack from the
+            // overlay camera back to the world. Never reuse the position that
+            // was captured before that recovery completed.
+            dropPosition = ResolveFinalDropPosition();
             var finalPos = Board.Instance.EnforcePlacementRules(dropPosition, _card.Stack);
             _card.Stack.SetTargetPosition(finalPos);
 
@@ -281,21 +344,56 @@ namespace CryingSnow.StackCraft
         private bool TryStoreInBackpack()
         {
             BackpackView backpack = BackpackView.Instance;
-            return backpack != null &&
-                backpack.IsPointerOverStorageArea(Input.mousePosition) &&
-                BackpackService.TryStore(_card);
+            if (backpack == null ||
+                !backpack.TryResolveTableDropPlacement(
+                    _card,
+                    Input.mousePosition,
+                    out Vector2 tablePosition,
+                    out string tableStackId,
+                    out int tableStackOrder))
+                return false;
+
+            bool stored = BackpackService.TryStoreAtTablePosition(
+                _card,
+                BackpackService.Current,
+                tablePosition,
+                tableStackId,
+                tableStackOrder);
+            if (!stored)
+            {
+                backpack.RestoreDraggedStackToWorld(
+                    _card,
+                    Input.mousePosition,
+                    _dragScreenOffset);
+            }
+            return stored;
         }
         #endregion
 
         #region World Interactions
         private bool HandleClick()
         {
+            if (!AllowsNativeCardInteraction())
+                return false;
+
             var clickable = _card.GetComponent<IClickable>();
             if (clickable != null)
             {
                 return clickable.OnClick(_dragStartPosition);
             }
             return false;
+        }
+
+        private bool AllowsNativeCardInteraction()
+        {
+            foreach (ICardStackRegistrationPolicy policy in
+                     GetComponents<ICardStackRegistrationPolicy>())
+            {
+                if (!policy.RegisterSplitStacksWithWorld)
+                    return false;
+            }
+
+            return true;
         }
 
         private Vector3 GetMouseWorldPosition()
@@ -305,6 +403,73 @@ namespace CryingSnow.StackCraft
             if (ground.Raycast(ray, out float dist))
                 return ray.GetPoint(dist);
             return Vector3.zero;
+        }
+
+        private void CaptureDragScreenOffset()
+        {
+            Camera dragCamera =
+                GetComponent<BackpackCardProxy>() != null
+                    ? BackpackView.Instance?.OverlayCamera
+                    : _mainCam;
+            if (dragCamera == null)
+            {
+                _dragScreenOffset = Vector2.zero;
+                return;
+            }
+
+            Vector3 cardScreen = dragCamera.WorldToScreenPoint(
+                transform.position);
+            _dragScreenOffset = new Vector2(
+                cardScreen.x - Input.mousePosition.x,
+                cardScreen.y - Input.mousePosition.y);
+        }
+
+        private bool TryResolveBackpackDragPosition(
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+            if (BackpackView.Instance == null ||
+                !BackpackView.Instance.TryResolveBridgedDragPosition(
+                    _card,
+                    Input.mousePosition,
+                    _dragScreenOffset,
+                    _backpackBridgeActive,
+                    out worldPosition))
+            {
+                return false;
+            }
+
+            _backpackBridgeActive = true;
+            return true;
+        }
+
+        private void MoveDraggedStack(Vector3 worldPosition)
+        {
+            if (_card?.Stack == null)
+                return;
+
+            if (BackpackView.Instance != null &&
+                BackpackView.Instance.ShouldUseRigidStackDrag(_card))
+            {
+                _card.Stack.SetTargetPosition(
+                    worldPosition,
+                    instant: true);
+                return;
+            }
+
+            _card.Stack.SetDragTargetPosition(worldPosition);
+        }
+
+        private Vector3 ResolveFinalDropPosition()
+        {
+            if (_backpackBridgeActive &&
+                TryResolveBackpackDragPosition(out Vector3 bridgedPosition))
+            {
+                MoveDraggedStack(bridgedPosition);
+            }
+
+            return (_card.Stack?.TargetPosition ?? transform.position)
+                .Flatten();
         }
 
         private bool TryTradeWithNearbyZone()

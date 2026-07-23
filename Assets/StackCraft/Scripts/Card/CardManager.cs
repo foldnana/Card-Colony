@@ -307,7 +307,8 @@ namespace CryingSnow.StackCraft
         private void RestoreEquipmentForCard(
             CardInstance character,
             CardData data,
-            bool notifyStats = true)
+            bool notifyStats = true,
+            bool registerWithManager = true)
         {
             // 1. If this character changed class (e.g. is now a Warrior), 
             // manually inject the "Villager" base state so the Equipper knows we aren't starting fresh.
@@ -330,7 +331,8 @@ namespace CryingSnow.StackCraft
                     Vector3.zero,
                     CardStack.RefuseAll,
                     notifyCreated: false,
-                    notifyStats: notifyStats);
+                    notifyStats: notifyStats,
+                    registerWithManager: registerWithManager);
 
                 // Restore stats (durability, etc)
                 itemCard.RestoreSavedStats(itemData);
@@ -352,6 +354,33 @@ namespace CryingSnow.StackCraft
             Vector3 position,
             bool notifyStats = true)
         {
+            return RestoreCardFromDataInternal(
+                data,
+                position,
+                notifyStats,
+                registerWithManager: true);
+        }
+
+        /// <summary>
+        /// Reconstructs a card solely for a secondary visual surface such as the backpack.
+        /// Its stack is never registered with the world board, so creation cannot affect
+        /// world overlap resolution or location save data.
+        /// </summary>
+        public CardInstance RestoreUnmanagedCardFromData(CardData data, Vector3 position)
+        {
+            return RestoreCardFromDataInternal(
+                data,
+                position,
+                notifyStats: false,
+                registerWithManager: false);
+        }
+
+        private CardInstance RestoreCardFromDataInternal(
+            CardData data,
+            Vector3 position,
+            bool notifyStats,
+            bool registerWithManager)
+        {
             string spawnId = !string.IsNullOrEmpty(data.OriginalId) ? data.OriginalId : data.Id;
             CardDefinition baseDef = GetDefinitionById(spawnId);
 
@@ -361,9 +390,14 @@ namespace CryingSnow.StackCraft
                 position,
                 CardStack.RefuseAll,
                 notifyCreated: false,
-                notifyStats: notifyStats);
+                notifyStats: notifyStats,
+                registerWithManager: registerWithManager);
             card.RestoreSavedStats(data);
-            RestoreEquipmentForCard(card, data, notifyStats);
+            RestoreEquipmentForCard(
+                card,
+                data,
+                notifyStats,
+                registerWithManager);
 
             return card;
         }
@@ -471,7 +505,8 @@ namespace CryingSnow.StackCraft
             Vector3 position,
             CardStack stackToIgnore = null,
             bool notifyCreated = true,
-            bool notifyStats = true)
+            bool notifyStats = true,
+            bool registerWithManager = true)
         {
             MarkCardAsDiscovered(definition);
 
@@ -500,7 +535,11 @@ namespace CryingSnow.StackCraft
             }
 
             CardInstance newCard = Instantiate(prefabToSpawn, position, Quaternion.identity);
-            newCard.Initialize(definition, cardSettings, stackToIgnore);
+            newCard.Initialize(
+                definition,
+                cardSettings,
+                stackToIgnore,
+                registerWithManager);
 
             if (definition is EnclosureDefinition enclosureDef)
             {

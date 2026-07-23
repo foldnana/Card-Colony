@@ -491,7 +491,1391 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void BackpackView_RebuildsStoredCardsAsMiniatureCardViews()
+        public void OriginalUiRoot_BackpackTableUsesDedicatedBagBackground()
+        {
+            const string backgroundPath =
+                "Assets/StackCraft/Textures/UI/BackpackBackground.png";
+            Sprite expectedBackground = AssetDatabase.LoadAssetAtPath<Sprite>(backgroundPath);
+            Assert.That(expectedBackground, Is.Not.Null,
+                "背包图片需要作为独立的 Sprite 资源导入项目");
+
+            GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform table = FindDescendant(uiRoot, "BackpackTablePanel");
+            Assert.That(table, Is.Not.Null);
+
+            Image tableImage = table.GetComponent<Image>();
+            Assert.That(tableImage, Is.Not.Null);
+            Assert.That(tableImage.enabled, Is.False,
+                "旧的矩形面板图像需要关闭，避免挡住独立背包背景");
+
+            Transform background = FindDescendant(table.gameObject, "BackpackBackground");
+            Assert.That(background, Is.Not.Null,
+                "背包背景需要作为独立子物体，以便单独调整大小和位置");
+            Image backgroundImage = background.GetComponent<Image>();
+            Assert.That(backgroundImage, Is.Not.Null);
+            Assert.That(backgroundImage.sprite, Is.EqualTo(expectedBackground),
+                "独立背包背景需要引用新的背包图片");
+            Assert.That(backgroundImage.color, Is.EqualTo(Color.white),
+                "背景图不应继续叠加旧的深色染色");
+            Assert.That(backgroundImage.preserveAspect, Is.True,
+                "背包背景需要保持原图比例，避免皮包边框被拉伸");
+        }
+
+        [Test]
+        public void BackpackLayout_IsIdenticalAcrossWorldMapAndLocationScenes()
+        {
+            string expectedLayout = CaptureBackpackLayout(
+                "Assets/StackCraft/Scenes/Main.unity");
+
+            foreach (string scenePath in new[]
+                     {
+                         "Assets/StackCraft/Scenes/Location.unity",
+                         "Assets/StackCraft/Scenes/Island.unity"
+                     })
+            {
+                Assert.That(
+                    CaptureBackpackLayout(scenePath),
+                    Is.EqualTo(expectedLayout),
+                    $"{scenePath} 必须使用和世界地图完全相同的背包布局");
+            }
+        }
+
+        [Test]
+        public void BackpackView_CreatesRaisedThreeDimensionalBoard()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            Assert.That(boardType, Is.Not.Null,
+                "背包打开后应使用独立的三维小桌面，而不是把物品转换成二维卡片");
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject uiInstance = Object.Instantiate(prefab);
+            try
+            {
+                Transform root = FindDescendant(uiInstance, "BackpackRoot");
+                Component view = root.GetComponents<MonoBehaviour>().First(component =>
+                    component.GetType().FullName == "CryingSnow.StackCraft.BackpackView");
+                PropertyInfo boardProperty = view.GetType().GetProperty("Board3D");
+                Assert.That(boardProperty, Is.Not.Null);
+
+                Component board = boardProperty.GetValue(view) as Component;
+                if (board == null)
+                {
+                    view.GetType().GetMethod(
+                            "EnsureBoard3D",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(view, null);
+                    board = boardProperty.GetValue(view) as Component;
+                }
+                Assert.That(board, Is.Not.Null);
+                Assert.That(board.transform, Is.Not.TypeOf<RectTransform>(),
+                    "三维背包桌面不能继续依附在屏幕空间 RectTransform 中");
+                Assert.That(
+                    board.GetComponentsInChildren<MeshRenderer>(true),
+                    Is.Not.Empty);
+                Assert.That(
+                    board.GetComponentsInChildren<BoxCollider>(true),
+                    Is.Not.Empty);
+                Assert.That(
+                    (float)boardType.GetProperty("SurfaceHeight").GetValue(board),
+                    Is.GreaterThan(0f),
+                    "背包桌面需要高于地图桌面，形成明确的双层桌面效果");
+            }
+            finally
+            {
+                Object.DestroyImmediate(uiInstance);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_RebuildsEntriesAsNativeThreeDimensionalCardProxies()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type proxyType = FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type dropHandlerType = FindType("CryingSnow.StackCraft.ICardDropHandler");
+
+            Assert.That(proxyType, Is.Not.Null,
+                "背包桌面中的物品仍应是原生三维卡牌，并通过代理组件保留背包归属");
+            Assert.That(dropHandlerType.IsAssignableFrom(proxyType), Is.True,
+                "背包三维卡需要接管放下行为，才能在背包桌面和地图桌面间转移");
+            Assert.That(
+                boardType.GetMethod(
+                    "Rebuild",
+                    BindingFlags.Public | BindingFlags.Instance,
+                    null,
+                    new[] { backpackType },
+                    null),
+                Is.Not.Null);
+            Assert.That(
+                boardType.GetMethod(
+                    "ContainsScreenPoint",
+                    BindingFlags.Public | BindingFlags.Instance),
+                Is.Not.Null,
+                "世界卡牌需要通过三维桌面碰撞范围判断是否放入背包");
+        }
+
+        [Test]
+        public void BackpackCardProxy_ProvidesDragHeightAboveRaisedSurface()
+        {
+            System.Type providerType =
+                FindType("CryingSnow.StackCraft.ICardDragHeightProvider");
+            System.Type proxyType = FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            Assert.That(providerType, Is.Not.Null,
+                "高架桌面上的卡牌需要覆盖默认地面拖拽高度");
+            Assert.That(providerType.IsAssignableFrom(proxyType), Is.True);
+            Assert.That(
+                FindType("CryingSnow.StackCraft.CardController").GetMethod(
+                    "ResolveDragHeight",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "CardController 应从当前卡牌组件解析拖拽平面高度");
+        }
+
+        [Test]
+        public void BackpackView_ExposesRaisedDragHeightForCardsEnteringBoard()
+        {
+            System.Type backpackViewType = FindType("CryingSnow.StackCraft.BackpackView");
+            Assert.That(
+                backpackViewType.GetMethod(
+                    "TryGetStorageDragHeight",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "地图卡拖进较高的背包桌面时需要先抬高，不能从桌面模型下方穿过");
+        }
+
+        [Test]
+        public void BackpackData_PersistsFreeTablePlacementWithoutCompactingItIntoSlots()
+        {
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            object cardData = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(cardData, "egg");
+            object[] addArguments = { cardData, null };
+            backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+            object entry = addArguments[1];
+
+            MethodInfo setPlacement = backpackType.GetMethod("TrySetTablePlacement");
+            Assert.That(setPlacement, Is.Not.Null,
+                "背包卡牌需要保存自由桌面坐标和堆叠归属，不能再只保存格子编号");
+            Assert.That(
+                setPlacement.Invoke(
+                    backpack,
+                    new object[] { entry.GetType().GetField("InstanceId").GetValue(entry), -1.35f, 0.72f, "herb-stack", 2 }),
+                Is.True);
+
+            backpackType.GetMethod("Compact").Invoke(backpack, null);
+            Assert.That(entry.GetType().GetField("HasTablePosition").GetValue(entry), Is.True);
+            Assert.That(entry.GetType().GetField("TablePositionX").GetValue(entry), Is.EqualTo(-1.35f));
+            Assert.That(entry.GetType().GetField("TablePositionZ").GetValue(entry), Is.EqualTo(0.72f));
+            Assert.That(entry.GetType().GetField("TableStackId").GetValue(entry), Is.EqualTo("herb-stack"));
+            Assert.That(entry.GetType().GetField("TableStackOrder").GetValue(entry), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void BackpackBoard_ExposesFreePlacementInsteadOfSlotPlacement()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type proxyType = FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            System.Type entryType = FindType("CryingSnow.StackCraft.BackpackEntryData");
+
+            Assert.That(
+                boardType.GetMethod(
+                    "PlaceOnTable",
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[] { proxyType, typeof(Vector3) },
+                    null),
+                Is.Not.Null,
+                "背包桌面应按落点自由摆放，并允许靠近的卡牌堆叠");
+            Assert.That(
+                boardType.GetMethod(
+                    "GetTableWorldPosition",
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[] { entryType },
+                    null),
+                Is.Not.Null,
+                "恢复背包时应使用已保存的自由桌面坐标，而不是四列格子布局");
+            Assert.That(
+                boardType.GetMethod(
+                    "CanStackTogether",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "自由桌面的堆叠仍必须复用原项目的 CanStack 规则，不能按距离强制合并不兼容卡牌");
+            Assert.That(
+                boardType.GetMethod(
+                    "MergeVisualStacks",
+                    BindingFlags.Static | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "背包合堆只能改变视觉卡堆，不能触发宝箱等世界 IOnStackable 行为");
+        }
+
+        [Test]
+        public void BackpackOverlayLayer_IsReservedForTheDedicatedCamera()
+        {
+            Assert.That(
+                LayerMask.NameToLayer("BackpackOverlay"),
+                Is.EqualTo(30),
+                "The backpack needs an isolated layer so the world camera cannot render it.");
+        }
+
+        [Test]
+        public void BackpackView_CreatesADedicatedOverlayCamera()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            Camera previousMain = Camera.main;
+            string previousTag = previousMain != null
+                ? previousMain.gameObject.tag
+                : null;
+            if (previousMain != null)
+                previousMain.gameObject.tag = "Untagged";
+
+            var mainObject = new GameObject(
+                "BackpackOverlayMainCameraTest",
+                typeof(Camera),
+                typeof(PhysicsRaycaster));
+            mainObject.tag = "MainCamera";
+            Camera mainCamera = mainObject.GetComponent<Camera>();
+            mainCamera.depth = -1f;
+            var viewObject = new GameObject("BackpackOverlayViewTest");
+
+            try
+            {
+                Component existing =
+                    viewType.GetProperty("Instance").GetValue(null) as Component;
+                if (existing != null)
+                    Object.DestroyImmediate(existing.gameObject);
+
+                Component view = viewObject.AddComponent(viewType);
+                viewType.GetMethod(
+                        "EnsureBoard3D",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(view, null);
+                PropertyInfo overlayProperty = viewType.GetProperty("OverlayCamera");
+                Assert.That(overlayProperty, Is.Not.Null);
+                Camera overlay = overlayProperty.GetValue(view) as Camera;
+
+                Assert.That(overlay, Is.Not.Null);
+                Assert.That(overlay, Is.Not.SameAs(mainCamera));
+                Assert.That(overlay.depth, Is.GreaterThan(mainCamera.depth));
+                Assert.That(
+                    overlay.cullingMask,
+                    Is.EqualTo(1 << 30));
+                Assert.That(
+                    mainCamera.cullingMask & (1 << 30),
+                    Is.Zero);
+                Assert.That(
+                    overlay.clearFlags,
+                    Is.EqualTo(CameraClearFlags.Depth));
+                Assert.That(
+                    overlay.GetComponent<PhysicsRaycaster>(),
+                    Is.Not.Null);
+            }
+            finally
+            {
+                Object.DestroyImmediate(viewObject);
+                Object.DestroyImmediate(mainObject);
+                if (previousMain != null)
+                    previousMain.gameObject.tag = previousTag;
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_EmptySurfaceOwnsTheDragGesture()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type handleType =
+                FindType("CryingSnow.StackCraft.BackpackBoardDragSurface");
+            Assert.That(handleType, Is.Not.Null);
+            Assert.That(typeof(IBeginDragHandler).IsAssignableFrom(handleType), Is.True);
+            Assert.That(typeof(IDragHandler).IsAssignableFrom(handleType), Is.True);
+            Assert.That(typeof(IEndDragHandler).IsAssignableFrom(handleType), Is.True);
+
+            var boardObject = new GameObject("BackpackSurfaceDragTest");
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                boardType.GetMethod(
+                        "BuildVisuals",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(board, null);
+                Transform surface = boardObject
+                    .GetComponentsInChildren<Transform>(true)
+                    .Single(child => child.name == "Backpack3DSurface");
+                Assert.That(surface.GetComponent(handleType), Is.Not.Null,
+                    "Only the exposed empty board surface should move the backpack.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+            }
+        }
+
+        [Test]
+        public void CardController_ExposesTheCrossCameraBackpackDragBridge()
+        {
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            Assert.That(
+                controllerType.GetMethod(
+                    "TryResolveBackpackDragPosition",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "Cards need a screen-space bridge when crossing between world and overlay cameras.");
+        }
+
+        [Test]
+        public void CardController_KeepsCrossCameraBridgeActiveUntilDrop()
+        {
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            Assert.That(
+                controllerType.GetField(
+                    "_backpackBridgeActive",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "After leaving the overlay, a dragged card must keep using its screen-space offset until it is dropped.");
+        }
+
+        [Test]
+        public void CrossCameraBridge_ExposesClosedBackpackAndWholeStackSafeguards()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            Assert.That(
+                viewType.GetMethod(
+                    "TryResolveClosedBackpackDrag",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "Closing the backpack during a drag must return the active stack to the world camera.");
+            Assert.That(
+                viewType.GetMethod(
+                    "SnapStackAfterRenderSpaceChange",
+                    BindingFlags.Static | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "Every card in a stack must cross the 10,000-unit camera-space gap instantly.");
+
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            Assert.That(
+                controllerType.GetMethod(
+                    "ResolveFinalDropPosition",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "A failed backpack store must use the restored world target instead of a stale overlay transform.");
+        }
+
+        [Test]
+        public void BackpackOverlay_DragsTheCameraWhileKeepingTheBoardFixed()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            FieldInfo distance = viewType.GetField(
+                "OverlayCameraDistance",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(distance, Is.Not.Null);
+            Assert.That(
+                (float)distance.GetRawConstantValue(),
+                Is.GreaterThanOrEqualTo(15f),
+                "The backpack overlay should occupy less screen space than the initial close camera.");
+
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            Assert.That(
+                boardType.GetMethod(
+                    "SynchronizeStackTargetsToVisuals",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "The opening tween must not leave card targets at the hidden animation position.");
+            MethodInfo updateCameraMotion = boardType.GetMethod(
+                "UpdateSurfaceCameraMotion",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            Assert.That(updateCameraMotion, Is.Not.Null,
+                "Backpack surface dragging should smooth a dedicated camera target instead of moving the card table.");
+            DefaultExecutionOrder executionOrder =
+                boardType.GetCustomAttribute<DefaultExecutionOrder>();
+            Assert.That(executionOrder, Is.Not.Null);
+            Assert.That(executionOrder.order, Is.LessThan(0),
+                "The overlay camera must move before the close-button LateUpdate projects the board corner.");
+
+            GameObject cameraObject = new("Backpack Drag Camera");
+            GameObject boardObject = new("Backpack Drag Board");
+            try
+            {
+                Camera camera = cameraObject.AddComponent<Camera>();
+                camera.orthographic = true;
+                camera.orthographicSize = 10f;
+                camera.transform.position = new Vector3(0f, 10f, 0f);
+                camera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+                Component board = boardObject.AddComponent(boardType);
+                boardType.GetMethod("ConfigureOverlay")?.Invoke(
+                    board,
+                    new object[] { camera, 30 });
+
+                Vector3 screenCenter = camera.WorldToScreenPoint(
+                    boardObject.transform.position);
+                Vector2 start = new(screenCenter.x, screenCenter.y);
+                Vector2 before = (Vector2)boardType
+                    .GetProperty("ViewportAnchor")
+                    ?.GetValue(board);
+                Vector3 boardPositionBefore = boardObject.transform.position;
+                Vector3 cameraPositionBefore = camera.transform.position;
+
+                boardType.GetMethod(
+                    "BeginSurfaceDrag",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(board, new object[] { start });
+                boardType.GetMethod(
+                    "DragSurface",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.Invoke(board, new object[] { start + Vector2.right * 40f });
+                updateCameraMotion.Invoke(board, new object[] { 1f });
+
+                Vector2 after = (Vector2)boardType
+                    .GetProperty("ViewportAnchor")
+                    ?.GetValue(board);
+                Vector3 projectedAfter = camera.WorldToScreenPoint(
+                    boardObject.transform.position);
+                Assert.That(
+                    boardObject.transform.position,
+                    Is.EqualTo(boardPositionBefore),
+                    "Dragging the backpack must leave the board and its card children in stable world coordinates.");
+                Assert.That(
+                    camera.transform.position.x,
+                    Is.LessThan(cameraPositionBefore.x),
+                    "Dragging the backpack to the right should move its overlay camera to the left.");
+                Assert.That(
+                    after.x,
+                    Is.GreaterThan(before.x + 0.001f),
+                    "The requested viewport anchor should follow the pointer immediately.");
+                Assert.That(
+                    projectedAfter.x,
+                    Is.GreaterThan(start.x + 1f),
+                    "The fixed board should appear to move right after the inverse camera pan.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                Object.DestroyImmediate(cameraObject);
+            }
+
+            System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
+            Assert.That(
+                stackType.GetMethod(
+                    "SynchronizeTargetWithParentMotion",
+                    BindingFlags.Instance | BindingFlags.Public),
+                Is.Not.Null,
+                "Moving the backpack should update only the logical stack target because child card transforms already follow their parent.");
+            Assert.That(
+                stackType.GetMethod(
+                    "StopMovementForParentDrag",
+                    BindingFlags.Instance | BindingFlags.Public),
+                Is.Not.Null,
+                "Starting a board drag must stop card-local tweens and damping once so they cannot pull cards away from the moving parent.");
+            Assert.That(
+                boardType.GetMethod(
+                    "StopStackMotionBeforeSurfaceDrag",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "The backpack must settle each distinct stack before the surface drag takes ownership.");
+        }
+
+        [Test]
+        public void BackpackOverlay_ReopensFromItsFixedBoardPosition()
+        {
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            GameObject cameraObject = new("Backpack Reopen Camera");
+            GameObject boardObject = new("Backpack Reopen Board");
+            try
+            {
+                Camera camera = cameraObject.AddComponent<Camera>();
+                camera.orthographic = true;
+                camera.orthographicSize = 10f;
+                camera.transform.position = new Vector3(0f, 10f, 0f);
+                camera.transform.rotation = Quaternion.Euler(90f, 0f, 0f);
+
+                boardObject.transform.position =
+                    new Vector3(10000f, 0f, 10000f);
+                Component board = boardObject.AddComponent(boardType);
+                boardType.GetMethod("ConfigureOverlay")?.Invoke(
+                    board,
+                    new object[] { camera, 30 });
+                Vector3 fixedPosition = boardObject.transform.position;
+
+                boardObject.transform.position =
+                    fixedPosition + Vector3.down * 1.2f;
+                boardType.GetMethod("SetVisible")?.Invoke(
+                    board,
+                    new object[] { true });
+
+                Assert.That(
+                    boardObject.transform.position.x,
+                    Is.EqualTo(fixedPosition.x).Within(0.001f));
+                Assert.That(
+                    boardObject.transform.position.z,
+                    Is.EqualTo(fixedPosition.z).Within(0.001f));
+                Assert.That(
+                    boardObject.transform.position.y,
+                    Is.EqualTo(fixedPosition.y - 1.2f).Within(0.001f),
+                    "Reopening should start one transition below the fixed board position, not accumulate the previous close offset.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                Object.DestroyImmediate(cameraObject);
+            }
+        }
+
+        [Test]
+        public void BackpackOverlay_DragsEveryCardInAStackAsOneRigidLayout()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            Assert.That(
+                viewType.GetMethod(
+                    "ShouldUseRigidStackDrag",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "Backpack stacks must retain their normal StackStep spacing while dragged.");
+
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            Assert.That(
+                controllerType.GetMethod(
+                    "MoveDraggedStack",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "CardController needs one motion path that can disable trailing-card sway on the backpack.");
+        }
+
+        [Test]
+        public void BackpackService_CanAppendAFirstDropToAnExistingTableStack()
+        {
+            System.Type serviceType =
+                FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType =
+                FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardType =
+                FindType("CryingSnow.StackCraft.CardInstance");
+            MethodInfo store = serviceType.GetMethod(
+                "TryStoreAtTablePosition",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    cardType,
+                    backpackType,
+                    typeof(Vector2),
+                    typeof(string),
+                    typeof(int)
+                },
+                null);
+            Assert.That(store, Is.Not.Null,
+                "The first world-to-backpack drop must be able to reuse a compatible table stack id.");
+
+            object backpack = System.Activator.CreateInstance(backpackType);
+            System.Type cardDataType =
+                FindType("CryingSnow.StackCraft.CardData");
+            object storedData = System.Activator.CreateInstance(cardDataType);
+            storedData.GetType().GetField("Id").SetValue(storedData, "egg");
+            object[] add = { storedData, null };
+            backpackType.GetMethod("TryAdd").Invoke(backpack, add);
+            object storedEntry = add[1];
+            string storedId = (string)storedEntry.GetType()
+                .GetField("InstanceId").GetValue(storedEntry);
+            backpackType.GetMethod("TrySetTablePlacement").Invoke(
+                backpack,
+                new object[] { storedId, 0.25f, -0.2f, "existing-stack", 0 });
+
+            Object eggDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset");
+            Component egg = CreateUninitializedCard(
+                eggDefinition,
+                "First Drop Existing Stack Egg");
+            try
+            {
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex(
+                        "Destroy may not be called from edit mode!"));
+                Assert.That(
+                    store.Invoke(
+                        null,
+                        new object[]
+                        {
+                            egg,
+                            backpack,
+                            new Vector2(0.25f, -0.2f),
+                            "existing-stack",
+                            1
+                        }),
+                    Is.True);
+
+                IList entries = (IList)backpackType.GetField("Entries")
+                    .GetValue(backpack);
+                Assert.That(entries.Count, Is.EqualTo(2));
+                object appended = entries.Cast<object>()
+                    .Single(entry => !ReferenceEquals(entry, storedEntry));
+                Assert.That(
+                    appended.GetType().GetField("TableStackId")
+                        .GetValue(appended),
+                    Is.EqualTo("existing-stack"));
+                Assert.That(
+                    appended.GetType().GetField("TableStackOrder")
+                        .GetValue(appended),
+                    Is.EqualTo(1));
+            }
+            finally
+            {
+                DestroyTestCard(egg);
+            }
+
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            Assert.That(
+                boardType.GetMethod(
+                    "TryResolveStoragePlacement",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "The board must select a compatible nearby table stack before storage rebuilds its visuals.");
+        }
+
+        [Test]
+        public void LocationNpcActivity_StopsBeforeWalkingIntoAnotherNpc()
+        {
+            System.Type managerType =
+                FindType("CryingSnow.StackCraft.CardManager");
+            System.Type activityType =
+                FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component first = CreateUninitializedCard(
+                chiefDefinition,
+                "Moving Collision Safe NPC");
+            Component second = CreateUninitializedCard(
+                chiefDefinition,
+                "Stationary Collision Safe NPC");
+            PropertyInfo managerInstance = managerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousManager =
+                managerInstance.GetValue(null) as Component;
+            managerInstance.SetValue(null, null);
+            MonoBehaviour manager = (MonoBehaviour)new GameObject(
+                    "NPC Collision Test CardManager")
+                .AddComponent(managerType);
+            managerInstance.SetValue(null, manager);
+
+            try
+            {
+                first.GetType().GetProperty("Size").SetValue(first, Vector2.one);
+                second.GetType().GetProperty("Size").SetValue(second, Vector2.one);
+                SetTestCardStackPosition(first, Vector3.zero);
+                SetTestCardStackPosition(second, new Vector3(0.8f, 0f, 0f));
+                object firstStack =
+                    first.GetType().GetProperty("Stack").GetValue(first);
+                object secondStack =
+                    second.GetType().GetProperty("Stack").GetValue(second);
+                managerType.GetMethod("RegisterStack").Invoke(
+                    manager,
+                    new[] { firstStack });
+                managerType.GetMethod("RegisterStack").Invoke(
+                    manager,
+                    new[] { secondStack });
+
+                Component firstActivity =
+                    first.gameObject.AddComponent(activityType);
+                Component secondActivity =
+                    second.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    firstActivity,
+                    new object[]
+                    {
+                        first,
+                        Vector3.zero,
+                        3f,
+                        1f,
+                        new Vector2(10f, 10f)
+                    });
+                activityType.GetMethod("Configure").Invoke(
+                    secondActivity,
+                    new object[]
+                    {
+                        second,
+                        new Vector3(0.8f, 0f, 0f),
+                        0.1f,
+                        0.1f,
+                        new Vector2(10f, 10f)
+                    });
+                activityType.GetMethod("SetDestination").Invoke(
+                    firstActivity,
+                    new object[] { new Vector3(2f, 0f, 0f) });
+
+                Assert.That(
+                    ((IEnumerable)managerType.GetProperty("AllCards")
+                        .GetValue(manager)).Cast<object>().Count(),
+                    Is.EqualTo(2),
+                    "The collision test must register both NPC stacks.");
+                Assert.That(
+                    second.GetComponent(activityType),
+                    Is.Not.Null,
+                    "The stationary card must be recognized as an ambient NPC.");
+                Assert.That(
+                    firstStack.GetType().GetProperty("Width")
+                        .GetValue(firstStack),
+                    Is.EqualTo(1f));
+                Assert.That(
+                    secondStack.GetType().GetProperty("Width")
+                        .GetValue(secondStack),
+                    Is.EqualTo(1f));
+                Assert.That(
+                    secondStack.GetType().GetProperty("TargetPosition")
+                        .GetValue(secondStack),
+                    Is.EqualTo(new Vector3(0.8f, 0f, 0f)));
+                Assert.That(
+                    FindType("CryingSnow.StackCraft.CardPhysicsSolver")
+                        .GetMethod(
+                            "WouldOverlapAt",
+                            BindingFlags.Static | BindingFlags.NonPublic)
+                        .Invoke(
+                            null,
+                            new object[]
+                            {
+                                firstStack,
+                                new Vector3(1f, 0f, 0f),
+                                secondStack,
+                                0.04f
+                            }),
+                    Is.True,
+                    "The shared footprint helper must detect the overlap.");
+                Assert.That(
+                    activityType.GetMethod(
+                            "IsNpcMovementBlocked",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        .Invoke(
+                            firstActivity,
+                            new object[] { new Vector3(1f, 0f, 0f) }),
+                    Is.True,
+                    "The candidate step overlaps the stationary NPC footprint.");
+
+                activityType.GetMethod("Tick").Invoke(
+                    firstActivity,
+                    new object[] { 1f });
+
+                Vector3 firstPosition = (Vector3)firstStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(firstStack);
+                Assert.That(
+                    firstPosition,
+                    Is.EqualTo(Vector3.zero),
+                    "The ambient NPC should wait instead of entering a push-pull collision with another NPC.");
+                Assert.That(
+                    activityType.GetProperty("State").GetValue(firstActivity)
+                        .ToString(),
+                    Is.EqualTo("Idle"));
+
+                activityType.GetMethod("SetDestination").Invoke(
+                    firstActivity,
+                    new object[] { new Vector3(-2f, 0f, 0f) });
+                activityType.GetMethod("Tick").Invoke(
+                    firstActivity,
+                    new object[] { 0.1f });
+                Vector3 escapingPosition = (Vector3)firstStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(firstStack);
+                Assert.That(
+                    escapingPosition.x,
+                    Is.LessThan(0f),
+                    "An NPC that already overlaps another NPC must still be allowed to move away smoothly.");
+
+                SetTestCardStackPosition(first, Vector3.zero);
+                SetTestCardStackPosition(second, Vector3.zero);
+                activityType.GetMethod("SetDestination").Invoke(
+                    firstActivity,
+                    new object[] { new Vector3(-2f, 0f, 0f) });
+                activityType.GetMethod("Tick").Invoke(
+                    firstActivity,
+                    new object[] { 0.001f });
+                Vector3 coincidentEscape = (Vector3)firstStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(firstStack);
+                Assert.That(
+                    coincidentEscape.x,
+                    Is.LessThan(0f),
+                    "Coincident NPCs must be able to separate even when the first frame step is very small.");
+            }
+            finally
+            {
+                managerInstance.SetValue(null, previousManager);
+                Object.DestroyImmediate(manager.gameObject);
+                DestroyTestCard(first);
+                DestroyTestCard(second);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_FlipsTheTopSurfaceTextureVertically()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            var boardObject = new GameObject("BackpackTextureOrientationTest");
+            var texture = new Texture2D(2, 2);
+
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                boardType.GetMethod("Initialize")
+                    .Invoke(board, new object[] { null, texture });
+                Material material = boardObject
+                    .GetComponentInChildren<MeshRenderer>(true)
+                    .sharedMaterial;
+
+                Assert.That(material.mainTextureScale.x, Is.EqualTo(1f));
+                Assert.That(material.mainTextureScale.y, Is.EqualTo(-1f),
+                    "Unity cube top-face UVs invert this backpack artwork vertically.");
+                Assert.That(material.mainTextureOffset.x, Is.EqualTo(0f));
+                Assert.That(material.mainTextureOffset.y, Is.EqualTo(1f),
+                    "A +1 V offset must accompany the negative V scale.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(texture);
+                Object.DestroyImmediate(boardObject);
+            }
+        }
+
+        [Test]
+        public void BackpackOpenButton_TogglesAnOpenedBackpackClosed()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            var viewObject = new GameObject("BackpackViewToggleTest");
+            var panelObject = new GameObject(
+                "BackpackPanel",
+                typeof(RectTransform));
+            panelObject.transform.SetParent(viewObject.transform, false);
+
+            try
+            {
+                Component view = viewObject.AddComponent(viewType);
+                viewType.GetField(
+                        "tablePanel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(view, panelObject.GetComponent<RectTransform>());
+
+                MethodInfo toggle = viewType.GetMethod(
+                    "Toggle",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(toggle, Is.Not.Null,
+                    "The same backpack button must be able to open and close the board.");
+
+                viewType.GetMethod("Open").Invoke(view, null);
+                Assert.That(
+                    (bool)viewType.GetProperty("IsOpen").GetValue(view),
+                    Is.True);
+                toggle.Invoke(view, null);
+                Assert.That(
+                    (bool)viewType.GetProperty("IsOpen").GetValue(view),
+                    Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(viewObject);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_KeepsOnlyTheCloseControlOnTheOpenedSurface()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject instance = Object.Instantiate(prefab);
+
+            try
+            {
+                Transform root = FindDescendant(instance, "BackpackRoot");
+                Component view = root.GetComponents<MonoBehaviour>()
+                    .Single(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.BackpackView");
+                System.Type viewType = view.GetType();
+                RectTransform panel = viewType.GetField(
+                        "tablePanel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(view) as RectTransform;
+                Button close = viewType.GetField(
+                        "closeButton",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(view) as Button;
+
+                viewType.GetMethod(
+                        "ConfigureLegacyPanelFor3D",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(view, null);
+                viewType.GetMethod("Open").Invoke(view, null);
+
+                Assert.That(close, Is.Not.Null);
+                Assert.That(close.gameObject.activeSelf, Is.True);
+                Assert.That(
+                    close.transform.parent.GetInstanceID(),
+                    Is.EqualTo(root.GetInstanceID()),
+                    "The close button must follow the 3D board instead of the old side panel.");
+                Assert.That(
+                    panel.GetComponentsInChildren<Graphic>(true)
+                        .All(graphic => !graphic.enabled),
+                    Is.True,
+                    "The legacy title, capacity, background and slot graphics must stay hidden.");
+                Assert.That(
+                    panel.GetComponentsInChildren<Selectable>(true)
+                        .All(selectable => !selectable.gameObject.activeSelf),
+                    Is.True,
+                    "No legacy panel controls should remain beside the backpack.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_ConvertsTheDraggedCardPositionWithoutLosingGrabOffset()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            var boardObject = new GameObject("BackpackDropPositionTest");
+
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                board.transform.position = new Vector3(10f, 0f, -4f);
+                MethodInfo convert = boardType.GetMethod(
+                    "TryGetLocalTablePosition",
+                    BindingFlags.Instance | BindingFlags.NonPublic,
+                    null,
+                    new[]
+                    {
+                        typeof(Vector3),
+                        FindType("CryingSnow.StackCraft.CardStack"),
+                        typeof(Vector2).MakeByRefType()
+                    },
+                    null);
+                Assert.That(convert, Is.Not.Null,
+                    "Storage must persist the dragged card position, not snap its centre to the pointer ray.");
+
+                object[] arguments =
+                {
+                    new Vector3(11.2f, 0.4f, -4.7f),
+                    null,
+                    Vector2.zero
+                };
+                Assert.That(convert.Invoke(board, arguments), Is.True);
+                Vector2 local = (Vector2)arguments[2];
+                Assert.That(local.x, Is.EqualTo(1.2f).Within(0.001f));
+                Assert.That(local.y, Is.EqualTo(-0.7f).Within(0.001f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_MatchesTheWorldTableStackAttachRange()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type stackType = FindType("CryingSnow.StackCraft.CardStack");
+            MethodInfo overlaps = boardType.GetMethod(
+                "IsWithinNormalAttachRange",
+                BindingFlags.Static | BindingFlags.NonPublic,
+                null,
+                new[] { typeof(Vector3), stackType, typeof(float) },
+                null);
+            Assert.That(overlaps, Is.Not.Null,
+                "Backpack stacking should query real target colliders just like Physics.OverlapSphere on the world board.");
+
+            Component target = CreateUninitializedCard(
+                null,
+                "Backpack Attach Range Target");
+            try
+            {
+                BoxCollider collider = target.GetComponent<BoxCollider>();
+                collider.size = new Vector3(0.8f, 0.1f, 1f);
+                SetTestCardStackPosition(target, Vector3.zero);
+                object targetStack =
+                    target.GetType().GetProperty("Stack").GetValue(target);
+                Physics.SyncTransforms();
+
+                bool nearColliderEdge = (bool)overlaps.Invoke(
+                    null,
+                    new[] { (object)new Vector3(0.49f, 0f, 0f), targetStack, 0.1f });
+                Assert.That(nearColliderEdge, Is.True,
+                    "A point within AttachRadius of the real collider should stack.");
+
+                bool visualMarginOnly = (bool)overlaps.Invoke(
+                    null,
+                    new[] { (object)new Vector3(0.55f, 0f, 0f), targetStack, 0.1f });
+                Assert.That(visualMarginOnly, Is.False,
+                    "Visual card margin must not enlarge backpack attachment.");
+
+                bool outsideVertically = (bool)overlaps.Invoke(
+                    null,
+                    new[] { (object)new Vector3(0f, 0.2f, 0f), targetStack, 0.1f });
+                Assert.That(outsideVertically, Is.False,
+                    "The backpack check must preserve the world OverlapSphere's three-dimensional distance.");
+            }
+            finally
+            {
+                DestroyTestCard(target);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_ClampsAnOffsetStackByItsFullFootprint()
+        {
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            MethodInfo clamp = boardType.GetMethod(
+                "ClampFootprintAnchor",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(clamp, Is.Not.Null);
+
+            float anchor = (float)clamp.Invoke(
+                null,
+                new object[]
+                {
+                    -2f,
+                    2.1f,
+                    -1.81f,
+                    0.55f
+                });
+            Assert.That(anchor, Is.EqualTo(-0.29f).Within(0.001f));
+            Assert.That(anchor - 1.81f, Is.EqualTo(-2.1f).Within(0.001f),
+                "A multi-card stack must keep its expanded lower edge on the backpack.");
+
+            float oversized = (float)clamp.Invoke(
+                null,
+                new object[]
+                {
+                    -3f,
+                    2.1f,
+                    -4.5f,
+                    0.5f
+                });
+            Assert.That(oversized, Is.EqualTo(2f).Within(0.001f),
+                "An oversized stack should be centred so overflow is shared by both edges.");
+        }
+
+        [Test]
+        public void BackpackView_UsesTheBrownOutlinedBackpackTexture()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            FieldInfo resourcePath = viewType.GetField(
+                "BackgroundResourcePath",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(resourcePath, Is.Not.Null);
+            Assert.That(
+                resourcePath.GetRawConstantValue(),
+                Is.EqualTo("UI/BackpackTableBackground_Brown"));
+            Assert.That(
+                Resources.Load<Texture2D>("UI/BackpackTableBackground_Brown"),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void BackpackCards_DoNotRegisterSplitStacksWithWorldManager()
+        {
+            System.Type policyType =
+                FindType("CryingSnow.StackCraft.ICardStackRegistrationPolicy");
+            System.Type proxyType = FindType("CryingSnow.StackCraft.BackpackCardProxy");
+
+            Assert.That(policyType, Is.Not.Null);
+            Assert.That(policyType.IsAssignableFrom(proxyType), Is.True,
+                "背包内部拆分堆叠时不能把新堆注册到世界地图");
+            Assert.That(
+                FindType("CryingSnow.StackCraft.CardController").GetMethod(
+                    "AllowsNativeCardInteraction",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "背包代理不能执行宝箱开启等原生世界点击行为");
+            Assert.That(
+                FindType("CryingSnow.StackCraft.CardInstance").GetMethod(
+                    "IsWorldStackCandidate",
+                    BindingFlags.Static | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "世界卡搜索附近堆时必须排除未注册的背包视觉卡");
+        }
+
+        [Test]
+        public void BackpackService_TransfersAFreeTableStackAtomically()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            MethodInfo transferStack = serviceType.GetMethod(
+                "TryTakeExistingStack",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    backpackType,
+                    typeof(System.Collections.Generic.IReadOnlyCollection<string>),
+                    typeof(System.Func<bool>)
+                },
+                null);
+            Assert.That(transferStack, Is.Not.Null,
+                "从背包拖出一个堆叠时，必须整体转移对应数据，不能只删除被点中的一张");
+
+            object backpack = System.Activator.CreateInstance(backpackType);
+            var ids = new List<string>();
+            for (int index = 0; index < 2; index++)
+            {
+                object cardData = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(cardData, $"egg-{index}");
+                object[] addArguments = { cardData, null };
+                backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+                object entry = addArguments[1];
+                ids.Add((string)entry.GetType().GetField("InstanceId").GetValue(entry));
+            }
+
+            int countDuringRejectedTransfer = -1;
+            Assert.That(
+                transferStack.Invoke(
+                    null,
+                    new object[]
+                    {
+                        backpack,
+                        ids,
+                        new System.Func<bool>(() =>
+                        {
+                            countDuringRejectedTransfer =
+                                (int)backpackType.GetProperty("Count").GetValue(backpack);
+                            return false;
+                        })
+                    }),
+                Is.False);
+            Assert.That(countDuringRejectedTransfer, Is.Zero,
+                "转移回调开始前数据必须先完整移出背包，避免世界和背包同时持有同一堆卡");
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(2),
+                "转移失败后必须把整堆数据和布局原样回滚");
+
+            Assert.That(
+                transferStack.Invoke(
+                    null,
+                    new object[] { backpack, ids, new System.Func<bool>(() => true) }),
+                Is.True);
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.Zero);
+        }
+
+        [Test]
+        public void BackpackService_RollsBackWorldSideEffectsWhenStackTransferFails()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            MethodInfo transferStack = serviceType.GetMethod(
+                "TryTakeExistingStack",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[]
+                {
+                    backpackType,
+                    typeof(System.Collections.Generic.IReadOnlyCollection<string>),
+                    typeof(System.Func<bool>),
+                    typeof(System.Action)
+                },
+                null);
+            Assert.That(transferStack, Is.Not.Null,
+                "整堆转移需要显式世界侧回滚，避免异常后同时存在于背包和世界");
+
+            object backpack = System.Activator.CreateInstance(backpackType);
+            object cardData = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(cardData, "egg");
+            object[] addArguments = { cardData, null };
+            backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+            object entry = addArguments[1];
+            var ids = new List<string>
+            {
+                (string)entry.GetType().GetField("InstanceId").GetValue(entry)
+            };
+            int worldSideEffects = 0;
+
+            Assert.That(
+                transferStack.Invoke(
+                    null,
+                    new object[]
+                    {
+                        backpack,
+                        ids,
+                        new System.Func<bool>(() =>
+                        {
+                            worldSideEffects++;
+                            return false;
+                        }),
+                        new System.Action(() => worldSideEffects--)
+                    }),
+                Is.False);
+            Assert.That(worldSideEffects, Is.Zero);
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void BackpackService_StoresWorldStackAtDroppedFreeTablePosition()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            MethodInfo storeAtPosition = serviceType.GetMethod(
+                "TryStoreAtTablePosition",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { cardType, backpackType, typeof(Vector2) },
+                null);
+            Assert.That(storeAtPosition, Is.Not.Null,
+                "地图卡拖入背包后应停在鼠标落点，不能重新跳到默认散点");
+
+            Object eggDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset");
+            Component egg = CreateUninitializedCard(eggDefinition, "Free Table Egg");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            try
+            {
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
+                Assert.That(
+                    storeAtPosition.Invoke(
+                        null,
+                        new object[] { egg, backpack, new Vector2(1.15f, -0.64f) }),
+                    Is.True);
+                object entry = ((IEnumerable)backpackType.GetField("Entries")
+                        .GetValue(backpack))
+                    .Cast<object>()
+                    .Single();
+                Assert.That(entry.GetType().GetField("HasTablePosition").GetValue(entry), Is.True);
+                Assert.That(entry.GetType().GetField("TablePositionX").GetValue(entry), Is.EqualTo(1.15f));
+                Assert.That(entry.GetType().GetField("TablePositionZ").GetValue(entry), Is.EqualTo(-0.64f));
+            }
+            finally
+            {
+                DestroyTestCard(egg);
+            }
+        }
+
+        [Test]
+        public void BackpackView_UsesDedicatedIllustratedTableBackground()
+        {
+            System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
+            FieldInfo resourcePath = viewType.GetField(
+                "BackgroundResourcePath",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(resourcePath, Is.Not.Null,
+                "三维背包桌面必须使用独立的浅色简笔画背景，不能继续读取旧背包 UI 图片");
+            Assert.That(
+                resourcePath.GetRawConstantValue(),
+                Is.EqualTo("UI/BackpackTableBackground_Brown"));
+            Assert.That(
+                AssetDatabase.LoadAssetAtPath<Texture2D>(
+                    "Assets/StackCraft/Resources/UI/BackpackTableBackground.png"),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void CardManager_ProvidesUnmanagedRestoreForBackpackVisualCards()
+        {
+            System.Type cardManagerType = FindType("CryingSnow.StackCraft.CardManager");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+
+            Assert.That(
+                cardManagerType.GetMethod(
+                    "RestoreUnmanagedCardFromData",
+                    BindingFlags.Public | BindingFlags.Instance,
+                    null,
+                    new[] { cardDataType, typeof(Vector3) },
+                    null),
+                Is.Not.Null,
+                "背包桌面的视觉卡从创建开始就不能注册到世界卡牌堆，否则生成时会推动地图上的卡牌");
+        }
+
+        [Test]
+        public void BackpackBoard_VisualCardsStayOutOfWorldSaveStacks()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType = FindType("CryingSnow.StackCraft.GameDirector");
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type gameplayPrefsType = FindType("CryingSnow.StackCraft.GameplayPrefs");
+            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject(
+                    "3D Backpack Test GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(gameplayPrefsType));
+            gameDirectorType.GetProperty("GameData").SetValue(gameDirector, gameData);
+
+            MonoBehaviour cardManager = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.CardManager");
+            System.Type cardManagerType = cardManager.GetType();
+            cardManagerType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            cardManagerType.GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+            cardManagerType.GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            GameObject boardObject = new GameObject("3D Backpack Board Test");
+            Component board = boardObject.AddComponent(boardType);
+            try
+            {
+                boardType.GetMethod("Initialize").Invoke(board, new object[] { null, null });
+                object backpack = System.Activator.CreateInstance(backpackType);
+                object eggData = System.Activator.CreateInstance(cardDataType);
+                Object eggDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset");
+                cardDataType.GetField("Id").SetValue(
+                    eggData,
+                    eggDefinition.GetType().GetProperty("Id").GetValue(eggDefinition));
+                backpackType.GetMethod("TryAdd")
+                    .Invoke(backpack, new object[] { eggData, null });
+
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex(
+                        "Instantiating material due to calling renderer.material during edit mode"));
+                boardType.GetMethod("Rebuild").Invoke(board, new[] { backpack });
+
+                MonoBehaviour proxy = boardObject.GetComponentsInChildren<MonoBehaviour>(true)
+                    .Single(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.BackpackCardProxy");
+                Component visualCard = proxy.GetType().GetProperty("Card").GetValue(proxy)
+                    as Component;
+                Assert.That(visualCard, Is.Not.Null,
+                    "背包内容需要直接显示为原生 CardInstance");
+
+                IEnumerable worldCards =
+                    (IEnumerable)cardManagerType.GetProperty("AllCards").GetValue(cardManager);
+                Assert.That(worldCards.Cast<object>().Contains(visualCard), Is.False,
+                    "背包桌面上的视觉卡不能进入地点存档，否则会与 BackpackData 重复保存");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                Object.DestroyImmediate(gameDirector.gameObject);
+            }
+        }
+
+        [Test]
+        public void BackpackView_UsesThreeDimensionalCardsWhenBoardIsAvailable()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -508,7 +1892,14 @@ namespace CardColony.Tests
                     "Assets/StackCraft/Resources/Cards/Consumables/Card_Apple.asset");
                 Object coinDefinition = AssetDatabase.LoadAssetAtPath<Object>(
                     "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset");
-                foreach (Object definition in new[] { appleDefinition, coinDefinition })
+                Object eggDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset");
+                foreach (Object definition in new[]
+                         {
+                             appleDefinition,
+                             coinDefinition,
+                             eggDefinition
+                         })
                 {
                     object data = System.Activator.CreateInstance(cardDataType);
                     cardDataType.GetField("Id").SetValue(
@@ -517,16 +1908,28 @@ namespace CardColony.Tests
                     object[] addArguments = { data, null };
                     backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
                 }
-                object unknownData = System.Activator.CreateInstance(cardDataType);
-                cardDataType.GetField("Id").SetValue(unknownData, "removed-card-definition");
-                backpackType.GetMethod("TryAdd").Invoke(
-                    backpack,
-                    new object[] { unknownData, null });
                 backpackType.GetField("SlotCapacity").SetValue(backpack, 24);
 
                 MethodInfo rebuild = view.GetType().GetMethod("Rebuild");
                 Assert.That(rebuild, Is.Not.Null);
                 rebuild.Invoke(view, new[] { backpack });
+
+                Component board = view.GetType().GetProperty("Board3D").GetValue(view)
+                    as Component;
+                if (board != null)
+                {
+                    Assert.That(
+                        root.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
+                            component.GetType().FullName ==
+                            "CryingSnow.StackCraft.BackpackItemView"),
+                        Is.Zero,
+                        "三维桌面可用时不应再生成二维背包卡");
+                    Assert.That(
+                        FindDescendant(root.gameObject, "BackpackCapacityText")
+                            .GetComponent<TMPro.TMP_Text>().text,
+                        Does.Contain("3/24"));
+                    return;
+                }
 
                 Assert.That(
                     root.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
@@ -1346,6 +2749,42 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void RiverbendLocation_ProvidesThreeExistingEggCardsForBackpackTesting()
+        {
+            Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
+            Object egg = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset");
+
+            Assert.That(riverbend, Is.Not.Null);
+            Assert.That(egg, Is.Not.Null);
+            var serializedEgg = new SerializedObject(egg);
+            Assert.That(serializedEgg.FindProperty("category").enumValueIndex, Is.EqualTo(3));
+            Assert.That(serializedEgg.FindProperty("isLocationStatic").boolValue, Is.False,
+                "测试鸡蛋必须能被玩家放入背包");
+
+            SerializedProperty spawns =
+                new SerializedObject(riverbend).FindProperty("initialCardSpawns");
+            var eggPositions = new List<Vector2>();
+            for (int index = 0; index < spawns.arraySize; index++)
+            {
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                if (AssetDatabase.GetAssetPath(
+                        spawn.FindPropertyRelative("definition").objectReferenceValue) !=
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset")
+                    continue;
+
+                Vector3 position = spawn.FindPropertyRelative("position").vector3Value;
+                eggPositions.Add(new Vector2(position.x, position.z));
+            }
+
+            Assert.That(eggPositions, Has.Count.EqualTo(3),
+                "河湾村应提供三张现有鸡蛋卡用于测试背包存取");
+            Assert.That(eggPositions.Distinct().Count(), Is.EqualTo(3),
+                "三张鸡蛋卡需要分开放置，避免初始堆叠影响测试");
+        }
+
+        [Test]
         public void RiverbendLocation_ConfiguresThreeBuildingsAndFourNpcCards()
         {
             Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
@@ -1356,8 +2795,7 @@ namespace CardColony.Tests
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
             Assert.That(spawns, Is.Not.Null,
                 "地点定义需要拥有可复用的初始卡牌配置，而不是把河湾村卡牌写死在场景里");
-            Assert.That(spawns.arraySize, Is.EqualTo(7));
-
+            Assert.That(spawns.arraySize, Is.EqualTo(10));
             var expectedCategories = new Dictionary<string, int>
             {
                 ["市场"] = 6,
@@ -1377,6 +2815,9 @@ namespace CardColony.Tests
                 SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
                 Object definition = spawn.FindPropertyRelative("definition").objectReferenceValue;
                 Assert.That(definition, Is.Not.Null);
+                if (AssetDatabase.GetAssetPath(definition) ==
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset")
+                    continue;
 
                 var serializedCard = new SerializedObject(definition);
                 string displayName = serializedCard.FindProperty("displayName").stringValue;
@@ -1431,11 +2872,15 @@ namespace CardColony.Tests
             var serializedLocation = new SerializedObject(riverbend);
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
 
-            Assert.That(spawns.arraySize, Is.EqualTo(7));
+            Assert.That(spawns.arraySize, Is.EqualTo(10));
             for (int index = 0; index < spawns.arraySize; index++)
             {
                 Object definition = spawns.GetArrayElementAtIndex(index)
                     .FindPropertyRelative("definition").objectReferenceValue;
+                if (AssetDatabase.GetAssetPath(definition) ==
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset")
+                    continue;
+
                 var serializedCard = new SerializedObject(definition);
                 string displayName = serializedCard.FindProperty("displayName").stringValue;
                 Texture2D art = serializedCard.FindProperty("artTexture").objectReferenceValue as Texture2D;
@@ -1485,6 +2930,10 @@ namespace CardColony.Tests
             {
                 Object definition = spawns.GetArrayElementAtIndex(index)
                     .FindPropertyRelative("definition").objectReferenceValue;
+                if (AssetDatabase.GetAssetPath(definition) ==
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset")
+                    continue;
+
                 firstDefinition ??= definition;
                 var serializedCard = new SerializedObject(definition);
                 string displayName = serializedCard.FindProperty("displayName").stringValue;
@@ -1554,6 +3003,10 @@ namespace CardColony.Tests
             {
                 Object definition = spawns.GetArrayElementAtIndex(index)
                     .FindPropertyRelative("definition").objectReferenceValue;
+                if (AssetDatabase.GetAssetPath(definition) ==
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset")
+                    continue;
+
                 var serializedCard = new SerializedObject(definition);
                 string displayName = serializedCard.FindProperty("displayName").stringValue;
                 SerializedProperty playerDraggable = serializedCard.FindProperty("playerDraggable");
@@ -2119,7 +3572,7 @@ namespace CardColony.Tests
             var missing = ((IEnumerable)findMissing.Invoke(null, new object[] { riverbend, existing }))
                 .Cast<object>()
                 .ToList();
-            Assert.That(missing.Count, Is.EqualTo(5));
+            Assert.That(missing.Count, Is.EqualTo(8));
 
             var missingIds = missing.Select(spawn =>
             {
@@ -2137,7 +3590,8 @@ namespace CardColony.Tests
                 "riverbend-village-chief",
                 "riverbend-blacksmith",
                 "riverbend-grocer",
-                "riverbend-apothecary"
+                "riverbend-apothecary",
+                "85e392d1882a4c61b5b2736e6fb64f4b"
             };
             var noneMissing = ((IEnumerable)findMissing.Invoke(
                     null,
@@ -2171,7 +3625,7 @@ namespace CardColony.Tests
                 Is.EqualTo(0.9f).Within(0.01f));
 
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
-            Assert.That(spawns.arraySize, Is.EqualTo(7));
+            Assert.That(spawns.arraySize, Is.EqualTo(10));
             for (int index = 0; index < spawns.arraySize; index++)
             {
                 SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
@@ -5192,6 +6646,54 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void BackpackService_RemovesThreeDimensionalCardOnlyAfterTransferAccepted()
+        {
+            System.Type serviceType = FindType("CryingSnow.StackCraft.BackpackService");
+            System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            MethodInfo tryTakeExisting = serviceType.GetMethod(
+                "TryTakeExisting",
+                BindingFlags.Public | BindingFlags.Static,
+                null,
+                new[] { backpackType, typeof(string), typeof(System.Func<bool>) },
+                null);
+            Assert.That(tryTakeExisting, Is.Not.Null,
+                "三维背包卡拖回地图时应转移原卡对象，不能销毁后再生成一张替代卡");
+
+            object backpack = System.Activator.CreateInstance(backpackType);
+            object cardData = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(cardData, "egg");
+            object[] addArguments = { cardData, null };
+            backpackType.GetMethod("TryAdd").Invoke(backpack, addArguments);
+            object entry = addArguments[1];
+            string instanceId = (string)entry.GetType().GetField("InstanceId").GetValue(entry);
+
+            Assert.That(tryTakeExisting.Invoke(
+                null,
+                new object[] { backpack, instanceId, new System.Func<bool>(() => false) }),
+                Is.False);
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.EqualTo(1),
+                "地图放置失败时三维卡牌仍应属于背包");
+
+            int transfers = 0;
+            Assert.That(tryTakeExisting.Invoke(
+                null,
+                new object[]
+                {
+                    backpack,
+                    instanceId,
+                    new System.Func<bool>(() =>
+                    {
+                        transfers++;
+                        return true;
+                    })
+                }),
+                Is.True);
+            Assert.That(transfers, Is.EqualTo(1));
+            Assert.That(backpackType.GetProperty("Count").GetValue(backpack), Is.Zero);
+        }
+
+        [Test]
         public void CardManager_StatsAndOwnedCountsIncludeBackpackFoodAndCoinsButNotCardLimit()
         {
             EditorSceneManager.OpenScene(
@@ -5375,6 +6877,87 @@ namespace CardColony.Tests
         {
             backpackStatsEventCount++;
         }
+
+        private static string CaptureBackpackLayout(string scenePath)
+        {
+            EditorSceneManager.OpenScene(scenePath, OpenSceneMode.Single);
+            GameObject uiRoot = GameObject.Find("UIRoot");
+            Assert.That(uiRoot, Is.Not.Null, $"{scenePath} 缺少 UIRoot");
+            Transform backpackRoot = FindDescendant(uiRoot, "BackpackRoot");
+            Assert.That(backpackRoot, Is.Not.Null, $"{scenePath} 缺少 BackpackRoot");
+
+            var builder = new System.Text.StringBuilder();
+            foreach (Transform child in backpackRoot
+                         .GetComponentsInChildren<Transform>(true)
+                         .OrderBy(candidate => GetHierarchyPath(backpackRoot, candidate)))
+            {
+                builder.Append(GetHierarchyPath(backpackRoot, child))
+                    .Append("|active=").Append(child.gameObject.activeSelf);
+
+                if (child is RectTransform rect)
+                {
+                    builder.Append("|anchors=").Append(Format(rect.anchorMin))
+                        .Append(';').Append(Format(rect.anchorMax))
+                        .Append("|position=").Append(Format(rect.anchoredPosition))
+                        .Append("|size=").Append(Format(rect.sizeDelta))
+                        .Append("|pivot=").Append(Format(rect.pivot))
+                        .Append("|scale=").Append(Format(rect.localScale));
+                }
+
+                Image image = child.GetComponent<Image>();
+                if (image != null)
+                {
+                    builder.Append("|image=").Append(image.enabled)
+                        .Append(';').Append(Format(image.color))
+                        .Append(';').Append(AssetDatabase.GetAssetPath(image.sprite))
+                        .Append(';').Append(image.preserveAspect);
+                }
+
+                GridLayoutGroup grid = child.GetComponent<GridLayoutGroup>();
+                if (grid != null)
+                {
+                    builder.Append("|grid=").Append(Format(grid.cellSize))
+                        .Append(';').Append(Format(grid.spacing))
+                        .Append(';').Append((int)grid.startCorner)
+                        .Append(';').Append((int)grid.childAlignment)
+                        .Append(';').Append(grid.constraintCount);
+                }
+
+                TMPro.TMP_Text text = child.GetComponent<TMPro.TMP_Text>();
+                if (text != null)
+                {
+                    builder.Append("|text=").Append(text.fontSize.ToString("R"))
+                        .Append(';').Append(Format(text.color))
+                        .Append(';').Append((int)text.alignment);
+                }
+
+                builder.AppendLine();
+            }
+
+            return builder.ToString();
+        }
+
+        private static string GetHierarchyPath(Transform root, Transform child)
+        {
+            var names = new Stack<string>();
+            for (Transform current = child;
+                 current != null && current != root;
+                 current = current.parent)
+            {
+                names.Push(current.name);
+            }
+            return names.Count == 0 ? root.name : $"{root.name}/{string.Join("/", names)}";
+        }
+
+        private static string Format(Vector2 value) =>
+            System.FormattableString.Invariant($"{value.x:R},{value.y:R}");
+
+        private static string Format(Vector3 value) =>
+            System.FormattableString.Invariant($"{value.x:R},{value.y:R},{value.z:R}");
+
+        private static string Format(Color value) =>
+            System.FormattableString.Invariant(
+                $"{value.r:R},{value.g:R},{value.b:R},{value.a:R}");
 
         private static Transform FindDescendant(GameObject root, string name)
         {

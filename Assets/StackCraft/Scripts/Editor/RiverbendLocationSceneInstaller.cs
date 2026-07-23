@@ -16,6 +16,8 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string LocationScenePath = "Assets/StackCraft/Scenes/Location.unity";
         private const string DefinitionPath = "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset";
         private const string VillagerPath = "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset";
+        private const string EggPath =
+            "Assets/StackCraft/Resources/Cards/Consumables/Card_Egg.asset";
         private const string RiverbendCardsFolder =
             "Assets/StackCraft/Resources/Cards/Locations/Riverbend";
         private const string BackgroundPath =
@@ -108,6 +110,13 @@ namespace CryingSnow.StackCraft.EditorTools
                 Category = CardCategory.Character,
                 Position = new Vector3(3.2f, 0f, -3.6f)
             }
+        };
+
+        private static readonly Vector3[] BackpackTestEggPositions =
+        {
+            new(-2.2f, 0f, -3.5f),
+            new(-0.8f, 0f, -3.5f),
+            new(0.6f, 0f, -3.5f)
         };
 
         [MenuItem("Tools/Card Colony/Install Riverbend Location Scene")]
@@ -205,6 +214,19 @@ namespace CryingSnow.StackCraft.EditorTools
                 SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
                 spawn.FindPropertyRelative("definition").objectReferenceValue = card;
                 spawn.FindPropertyRelative("position").vector3Value = spec.Position;
+            }
+
+            CardDefinition egg = AssetDatabase.LoadAssetAtPath<CardDefinition>(EggPath);
+            if (egg == null)
+                throw new System.InvalidOperationException($"Existing egg card is missing: {EggPath}");
+
+            foreach (Vector3 position in BackpackTestEggPositions)
+            {
+                int index = spawns.arraySize;
+                spawns.InsertArrayElementAtIndex(index);
+                SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);
+                spawn.FindPropertyRelative("definition").objectReferenceValue = egg;
+                spawn.FindPropertyRelative("position").vector3Value = position;
             }
         }
 

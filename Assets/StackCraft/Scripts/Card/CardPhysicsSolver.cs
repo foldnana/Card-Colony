@@ -146,12 +146,54 @@ namespace CryingSnow.StackCraft
 
         private static void GetStackBounds(CardStack stack, out Vector2 pos, out Vector2 halfSize)
         {
-            float topZ = stack.TargetPosition.z;
-            float bottomZ = stack.TargetPosition.z + (stack.Cards.Count - 1) * stack.TopCard.Settings.StackStep.z;
+            GetStackBoundsAt(
+                stack,
+                stack.TargetPosition,
+                out pos,
+                out halfSize);
+        }
+
+        private static void GetStackBoundsAt(
+            CardStack stack,
+            Vector3 targetPosition,
+            out Vector2 pos,
+            out Vector2 halfSize)
+        {
+            float topZ = targetPosition.z;
+            float bottomZ = targetPosition.z +
+                (stack.Cards.Count - 1) *
+                stack.TopCard.Settings.StackStep.z;
             float centerZ = (topZ + bottomZ) / 2f;
 
-            pos = new Vector2(stack.TargetPosition.x, centerZ);
+            pos = new Vector2(targetPosition.x, centerZ);
             halfSize = new Vector2(stack.Width * 0.5f, stack.FullDepth * 0.5f);
+        }
+
+        internal static bool WouldOverlapAt(
+            CardStack movingStack,
+            Vector3 movingTargetPosition,
+            CardStack otherStack,
+            float clearance)
+        {
+            if (movingStack?.TopCard == null ||
+                otherStack?.TopCard == null ||
+                movingStack == otherStack)
+                return false;
+
+            GetStackBoundsAt(
+                movingStack,
+                movingTargetPosition,
+                out Vector2 movingPosition,
+                out Vector2 movingHalfSize);
+            GetStackBounds(
+                otherStack,
+                out Vector2 otherPosition,
+                out Vector2 otherHalfSize);
+            float safeClearance = Mathf.Max(0f, clearance);
+            return Mathf.Abs(movingPosition.x - otherPosition.x) <
+                    movingHalfSize.x + otherHalfSize.x + safeClearance &&
+                Mathf.Abs(movingPosition.y - otherPosition.y) <
+                    movingHalfSize.y + otherHalfSize.y + safeClearance;
         }
 
         private static bool CalculateSeparationVector(Vector2 posA, Vector2 halfA, Vector2 posB, Vector2 halfB, out Vector3 separation)

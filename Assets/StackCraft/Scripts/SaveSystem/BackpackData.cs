@@ -85,6 +85,25 @@ namespace CryingSnow.StackCraft
             return Entries.Find(entry => entry != null && entry.InstanceId == instanceId);
         }
 
+        public bool TrySetTablePlacement(
+            string instanceId,
+            float positionX,
+            float positionZ,
+            string stackId,
+            int stackOrder)
+        {
+            BackpackEntryData entry = Find(instanceId);
+            if (entry == null)
+                return false;
+
+            entry.HasTablePosition = true;
+            entry.TablePositionX = positionX;
+            entry.TablePositionZ = positionZ;
+            entry.TableStackId = stackId;
+            entry.TableStackOrder = Math.Max(0, stackOrder);
+            return true;
+        }
+
         public void Compact()
         {
             Normalize();
@@ -132,5 +151,10 @@ namespace CryingSnow.StackCraft
         public string InstanceId;
         public CardData Card;
         public int SlotIndex;
+        public bool HasTablePosition;
+        public float TablePositionX;
+        public float TablePositionZ;
+        public string TableStackId;
+        public int TableStackOrder;
     }
 }

@@ -230,6 +230,28 @@ namespace CryingSnow.StackCraft
         }
 
         /// <summary>
+        /// Synchronizes the stack's logical anchor after a parent transform moves.
+        /// The card transforms are intentionally left untouched because they have
+        /// already inherited the same movement from their parent.
+        /// </summary>
+        public void SynchronizeTargetWithParentMotion(Vector3 newPosition)
+        {
+            TargetPosition = newPosition;
+        }
+
+        /// <summary>
+        /// Settles card-local positional motion before the transform that owns
+        /// the whole stack starts moving.
+        /// </summary>
+        public void StopMovementForParentDrag()
+        {
+            foreach (CardInstance card in Cards)
+            {
+                card?.StopMovementAtCurrentPosition();
+            }
+        }
+
+        /// <summary>
         /// Moves the stack by a given world vector, typically used by the physics solver to resolve overlaps.
         /// </summary>
         /// <remarks>

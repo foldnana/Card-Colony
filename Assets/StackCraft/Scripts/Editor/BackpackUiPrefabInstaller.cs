@@ -9,6 +9,8 @@ namespace CryingSnow.StackCraft.EditorTools
     public static class BackpackUiPrefabInstaller
     {
         private const string UiRootPath = "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+        private const string BackpackBackgroundPath =
+            "Assets/StackCraft/Textures/UI/BackpackBackground.png";
 
         [MenuItem("Tools/StackCraft/Install Backpack Tabletop UI")]
         public static void Install()
@@ -59,8 +61,36 @@ namespace CryingSnow.StackCraft.EditorTools
                 RectTransform tableRect = (RectTransform)table.transform;
                 SetBottomLeft(tableRect, new Vector2(30f, 102f), new Vector2(720f, 440f));
                 Image tableImage = table.GetComponent<Image>();
-                tableImage.color = new Color(0.035f, 0.05f, 0.06f, 0.98f);
+                Sprite backpackBackground = AssetDatabase.LoadAssetAtPath<Sprite>(
+                    BackpackBackgroundPath);
+                if (backpackBackground == null)
+                {
+                    throw new System.InvalidOperationException(
+                        $"Backpack background sprite was not found at {BackpackBackgroundPath}.");
+                }
+                tableImage.sprite = backpackBackground;
+                tableImage.color = Color.white;
+                tableImage.preserveAspect = true;
                 tableImage.raycastTarget = true;
+                tableImage.enabled = false;
+
+                GameObject background = CreateUiObject(
+                    "BackpackBackground",
+                    table.transform,
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                SetAnchored(
+                    (RectTransform)background.transform,
+                    new Vector2(0f, -40f),
+                    new Vector2(1057.5569f, 703.5f),
+                    new Vector2(0.5f, 0.5f),
+                    new Vector2(0.5f, 0.5f));
+                Image backgroundImage = background.GetComponent<Image>();
+                backgroundImage.sprite = backpackBackground;
+                backgroundImage.color = Color.white;
+                backgroundImage.preserveAspect = true;
+                backgroundImage.raycastTarget = true;
+                background.transform.SetAsFirstSibling();
 
                 TMP_Text title = CreateText(
                     "BackpackCapacityText",
@@ -69,7 +99,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     "背包  0/8",
                     30f,
                     new Color(0.35f, 0.78f, 0.98f),
-                    TextAlignmentOptions.MidlineLeft);
+                    TextAlignmentOptions.Midline);
                 SetAnchored(
                     title.rectTransform,
                     new Vector2(28f, -18f),
@@ -86,7 +116,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     Color.white);
                 SetAnchored(
                     (RectTransform)arrangeButton.transform,
-                    new Vector2(-202f, -18f),
+                    new Vector2(-216f, -18f),
                     new Vector2(130f, 48f),
                     new Vector2(1f, 1f),
                     new Vector2(1f, 1f));
@@ -100,7 +130,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     Color.white);
                 SetAnchored(
                     (RectTransform)closeButton.transform,
-                    new Vector2(-58f, -18f),
+                    new Vector2(-66f, -18f),
                     new Vector2(130f, 48f),
                     new Vector2(1f, 1f),
                     new Vector2(1f, 1f));
@@ -115,8 +145,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 RectTransform viewportRect = (RectTransform)viewport.transform;
                 SetAnchored(
                     viewportRect,
-                    new Vector2(28f, -82f),
-                    new Vector2(664f, 326f),
+                    new Vector2(42.579628f, -97.96823f),
+                    new Vector2(649.4204f, 310.0317f),
                     new Vector2(0f, 1f),
                     new Vector2(0f, 1f));
                 Image viewportImage = viewport.GetComponent<Image>();
@@ -135,11 +165,11 @@ namespace CryingSnow.StackCraft.EditorTools
                 slotsRect.sizeDelta = new Vector2(0f, 326f);
                 slotsRect.localScale = Vector3.one;
                 GridLayoutGroup grid = slots.GetComponent<GridLayoutGroup>();
-                grid.cellSize = new Vector2(148f, 144f);
-                grid.spacing = new Vector2(18f, 18f);
+                grid.cellSize = new Vector2(132.1f, 130.7f);
+                grid.spacing = new Vector2(9f, 9f);
                 grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
                 grid.constraintCount = 4;
-                grid.childAlignment = TextAnchor.UpperLeft;
+                grid.childAlignment = TextAnchor.MiddleCenter;
 
                 ScrollRect scroll = viewport.GetComponent<ScrollRect>();
                 scroll.viewport = viewportRect;
@@ -160,6 +190,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     slotImage.color = new Color(0.12f, 0.14f, 0.15f, 0.72f);
                     slotImage.raycastTarget = false;
                 }
+                LayoutRebuilder.ForceRebuildLayoutImmediate(slotsRect);
 
                 GameObject dragLayer = CreateUiObject("BackpackDragLayer", backpackRoot.transform);
                 Stretch((RectTransform)dragLayer.transform);

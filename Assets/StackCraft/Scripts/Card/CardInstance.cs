@@ -70,7 +70,12 @@ namespace CryingSnow.StackCraft
         /// <param name="definition">The data definition for this card.</param>
         /// <param name="settings">Runtime movement and behavior settings.</param>
         /// <param name="stackToIgnore">A specific stack to ignore when searching for nearby merge candidates.</param>
-        public void Initialize(CardDefinition definition, CardSettings settings = null, CardStack stackToIgnore = null)
+        /// <param name="registerWithManager">Whether this card belongs to the active world board.</param>
+        public void Initialize(
+            CardDefinition definition,
+            CardSettings settings = null,
+            CardStack stackToIgnore = null,
+            bool registerWithManager = true)
         {
             _mainCam = Camera.main;
             _renderer = GetComponent<MeshRenderer>();
@@ -102,9 +107,12 @@ namespace CryingSnow.StackCraft
             ApplyVisualTextures(_renderer.material, Definition);
 
             Stack = new CardStack(this, transform.position);
-            CardManager.Instance?.RegisterStack(Stack);
-            TryAttachToNearbyStack(settings.SpawnAttachRadius, stackToIgnore);
-            CardManager.Instance?.ResolveOverlaps();
+            if (registerWithManager)
+            {
+                CardManager.Instance?.RegisterStack(Stack);
+                TryAttachToNearbyStack(settings.SpawnAttachRadius, stackToIgnore);
+                CardManager.Instance?.ResolveOverlaps();
+            }
         }
 
         public void OnPointerEnter(PointerEventData eventData)
@@ -359,7 +367,7 @@ namespace CryingSnow.StackCraft
             foreach (var hit in hits)
             {
                 var otherCard = hit.GetComponent<CardInstance>();
-                if (otherCard == null) continue;
+                if (!IsWorldStackCandidate(otherCard)) continue;
 
                 var candidateStack = otherCard.Stack;
 
@@ -446,6 +454,21 @@ namespace CryingSnow.StackCraft
             }
 
             return null;
+        }
+
+        private static bool IsWorldStackCandidate(CardInstance card)
+        {
+            if (card == null)
+                return false;
+
+            foreach (ICardStackRegistrationPolicy policy in
+                     card.GetComponents<ICardStackRegistrationPolicy>())
+            {
+                if (!policy.RegisterSplitStacksWithWorld)
+                    return false;
+            }
+
+            return true;
         }
         #endregion
 
@@ -636,6 +659,20 @@ namespace CryingSnow.StackCraft
             KillTweens();
             _dampedTargetPos = target;
             _isFollowingDamped = true;
+        }
+
+        /// <summary>
+        /// Stops only positional movement at the card's current world position.
+        /// This is used before a parent surface starts moving so an old tween or
+        /// damped drag target cannot pull the child back into the previous space.
+        /// </summary>
+        public void StopMovementAtCurrentPosition()
+        {
+            _isFollowingDamped = false;
+            _dampVelocity = Vector3.zero;
+            _dampedTargetPos = transform.position;
+            _moveTween?.Kill();
+            _moveTween = null;
         }
 
         private Vector3 ExponentialMove(Vector3 current, Vector3 target, float sharpness, float deltaTime)
