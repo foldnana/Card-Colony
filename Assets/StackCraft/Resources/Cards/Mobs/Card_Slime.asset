@@ -21,11 +21,9 @@ MonoBehaviour:
   combatType: 0
   loot:
   - Card: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
-    Weight: 70
+    Weight: 80
   - Card: {fileID: 11400000, guid: 2779c2a939b1de446895fa126c81280d, type: 2}
     Weight: 20
-  - Card: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
-    Weight: 10
   isAggressive: 1
   aggroRadius: 5
   attackRadius: 1.5

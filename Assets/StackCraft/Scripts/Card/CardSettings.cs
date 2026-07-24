@@ -10,9 +10,6 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("The starting limit for how many cards the player can have.")]
         private int baseCardLimit = 24;
 
-        [SerializeField, Tooltip("The amount of nutrition each Character card requires per feeding cycle.")]
-        private int hungerPerCharacter = 2;
-
         [Header("Input & Interaction")]
         [SerializeField, Tooltip("How far the mouse must move to be considered a 'drag' instead of a 'click'.")]
         private float clickThreshold = 0.02f;
@@ -64,8 +61,6 @@ namespace CryingSnow.StackCraft
         private int maxAttemptsPerMove = 5;
 
         public int BaseCardLimit => baseCardLimit;
-        public int HungerPerCharacter => hungerPerCharacter;
-
         public float ClickThreshold => clickThreshold;
         public float DragHeight => dragHeight;
 

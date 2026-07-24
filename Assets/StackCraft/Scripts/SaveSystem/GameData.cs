@@ -114,6 +114,7 @@ namespace CryingSnow.StackCraft
     public class SceneData
     {
         public string SceneName;
+        public int ContentMigrationVersion;
         public List<StackData> SavedStacks = new();
         public List<CombatData> SavedCombats = new();
         public List<string> CompletedQuests = new();

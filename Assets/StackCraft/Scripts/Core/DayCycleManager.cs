@@ -41,51 +41,10 @@ namespace CryingSnow.StackCraft
         {
             InputManager.Instance.AddLock(dayCycleInputLock);
             IsEndingCycle = true;
-            StartCoroutine(NotificationPhase(day));
+            StartSellingPhase();
         }
 
-        // --- PHASE 1: NOTIFICATION ---
-        private IEnumerator NotificationPhase(int day)
-        {
-            InfoPanel.Instance?.RequestInfoDisplay(
-                dayCycleRequester,
-                InfoPriority.Modal,
-                ($"第 {day} 天结束", "你的村民饿了！"),
-                "分配食物",
-                () =>
-                {
-                    StartCoroutine(FeedingPhase());
-                }
-            );
-            yield break;
-        }
-
-        // --- PHASE 2: FEEDING ---
-        private IEnumerator FeedingPhase()
-        {
-            InfoPanel.Instance?.RequestInfoDisplay(
-                dayCycleRequester,
-                InfoPriority.Modal,
-                ("正在分配食物", "正在分发食物……")
-            );
-
-            // Wait for the card animations and logic to finish
-            yield return CardManager.Instance.FeedCharacters();
-
-            // Check if anyone survived
-            var stats = CardManager.Instance.GetStatsSnapshot();
-            if (stats.TotalCharacters <= 0)
-            {
-                HandleGameOver();
-            }
-            else
-            {
-                // Transition to Selling Phase
-                StartSellingPhase();
-            }
-        }
-
-        // --- PHASE 3: SELLING ---
+        // --- PHASE 1: SELLING ---
         private void StartSellingPhase()
         {
             // 1. The player MUST be able to interact to sell cards.
@@ -129,7 +88,7 @@ namespace CryingSnow.StackCraft
             }
         }
 
-        // --- PHASE 4: ENCOUNTER ---
+        // --- PHASE 2: ENCOUNTER ---
         private IEnumerator EncounterPhase()
         {
             // 1. Check if we have an encounter for the current day.
@@ -149,7 +108,7 @@ namespace CryingSnow.StackCraft
             PrepareForNewDay();
         }
 
-        // --- PHASE 5: NEW DAY ---
+        // --- PHASE 3: NEW DAY ---
         private void PrepareForNewDay()
         {
             InputManager.Instance.AddLock(dayCycleInputLock);
@@ -169,19 +128,6 @@ namespace CryingSnow.StackCraft
                     TimeManager.Instance.StartNewDay();
                     GameDirector.Instance.SaveGame();
                 }
-            );
-        }
-
-        private void HandleGameOver()
-        {
-            InputManager.Instance.AddLock(dayCycleInputLock);
-
-            InfoPanel.Instance?.RequestInfoDisplay(
-                dayCycleRequester,
-                InfoPriority.Modal,
-                ("游戏结束", "你已经没有村民了。"),
-                "返回标题界面",
-                () => GameDirector.Instance.GameOver()
             );
         }
     }

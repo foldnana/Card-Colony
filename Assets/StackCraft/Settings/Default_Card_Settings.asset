@@ -13,7 +13,6 @@ MonoBehaviour:
   m_Name: Default_Card_Settings
   m_EditorClassIdentifier: 
   baseCardLimit: 24
-  hungerPerCharacter: 2
   clickThreshold: 0.02
   dragHeight: 0.1
   attachRadius: 0.25

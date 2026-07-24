@@ -192,7 +192,7 @@ namespace CryingSnow.StackCraft
             if (CombatManager.Instance == null) return null;
 
             CombatTask bestTask = null;
-            float bestDistSq = radius * radius;
+            float bestDistSq = GetSquaredAggroRadius(radius);
             Vector3 myPos = transform.position;
 
             foreach (var task in CombatManager.Instance.ActiveCombats)
@@ -205,7 +205,7 @@ namespace CryingSnow.StackCraft
                 if (!hasPlayerInvolvement) continue;
 
                 float distSq = (task.Rect.transform.position - myPos).sqrMagnitude;
-                if (distSq < bestDistSq)
+                if (distSq <= bestDistSq)
                 {
                     bestDistSq = distSq;
                     bestTask = task;
@@ -217,15 +217,28 @@ namespace CryingSnow.StackCraft
 
         private CardInstance FindClosestPlayerCard(float radius)
         {
+            if (CardManager.Instance == null) return null;
+
+            float radiusSq = GetSquaredAggroRadius(radius);
+            Vector3 myPosition = transform.position;
+
             return CardManager.Instance.AllCards
                 .Where(c => c != null &&
                             c.Stack != null &&
+                            c.Definition != null &&
                             c.Definition.Faction == CardFaction.Player &&
                             c.Combatant != null &&
                             !c.Combatant.IsInCombat &&
-                            !(DialogueManager.Instance?.IsCardInDialogue(c) ?? false))
-                .OrderBy(c => Vector3.Distance(transform.position, c.transform.position))
+                            !(DialogueManager.Instance?.IsCardInDialogue(c) ?? false) &&
+                            (c.transform.position - myPosition).sqrMagnitude <= radiusSq)
+                .OrderBy(c => (c.transform.position - myPosition).sqrMagnitude)
                 .FirstOrDefault();
+        }
+
+        private static float GetSquaredAggroRadius(float radius)
+        {
+            float clampedRadius = Mathf.Max(0f, radius);
+            return clampedRadius * clampedRadius;
         }
 
         private void MoveTowards(Vector3 targetPos)

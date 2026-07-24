@@ -88,6 +88,16 @@ namespace CryingSnow.StackCraft
         private StatsSnapshot currentStats;
 
         private readonly HashSet<CardDefinition> discoveredCards = new();
+        private const int RiverbendContentMigrationVersion = 1;
+        private const string RiverbendLocationId = "riverbend";
+        private const string LegacyRiverbendEggId =
+            "85e392d1882a4c61b5b2736e6fb64f4b";
+        private static readonly Vector3[] LegacyRiverbendEggPositions =
+        {
+            new(-2.2f, 0f, -3.5f),
+            new(-0.8f, 0f, -3.5f),
+            new(0.6f, 0f, -3.5f)
+        };
 
         #region Unity Lifecycle
         private void Awake()
@@ -216,6 +226,9 @@ namespace CryingSnow.StackCraft
         {
             if (wasLoaded)
             {
+                MigrateRetiredRiverbendInitialCards(
+                    sceneData,
+                    GameDirector.Instance?.GameData?.ActiveLocationId);
                 foreach (var stackData in sceneData.SavedStacks)
                 {
                     RestoreStack(stackData);
@@ -229,6 +242,40 @@ namespace CryingSnow.StackCraft
                 else
                     SpawnDefaultCards();
             }
+        }
+
+        private static void MigrateRetiredRiverbendInitialCards(
+            SceneData sceneData,
+            string activeLocationId)
+        {
+            if (sceneData == null ||
+                activeLocationId != RiverbendLocationId ||
+                sceneData.ContentMigrationVersion >= RiverbendContentMigrationVersion)
+            {
+                return;
+            }
+
+            sceneData.SavedStacks?.RemoveAll(stack =>
+                IsLegacyRiverbendEggTestStack(stack));
+            sceneData.ContentMigrationVersion = RiverbendContentMigrationVersion;
+        }
+
+        private static bool IsLegacyRiverbendEggTestStack(StackData stack)
+        {
+            if (stack?.Cards == null ||
+                stack.Cards.Count != 1 ||
+                stack.Cards[0]?.Id != LegacyRiverbendEggId ||
+                stack.Position == null ||
+                stack.Position.Length < 3)
+            {
+                return false;
+            }
+
+            Vector3 position = stack.GetPosition();
+            const float positionTolerance = 0.05f;
+            float toleranceSq = positionTolerance * positionTolerance;
+            return LegacyRiverbendEggPositions.Any(legacyPosition =>
+                (position - legacyPosition).sqrMagnitude <= toleranceSq);
         }
 
         private void RestoreStack(StackData stackData)
@@ -843,81 +890,6 @@ namespace CryingSnow.StackCraft
         }
         #endregion
 
-        #region  Game Cycles
-        /// <summary>
-        /// Executes the global feeding phase, where all Character cards attempt to consume 
-        /// available Consumable cards to satisfy their hunger.
-        /// </summary>
-        /// <returns>An IEnumerator to run the feeding process as a coroutine, managing animations and delays.</returns>
-        public IEnumerator FeedCharacters()
-        {
-            var allCards = AllCards.ToList();
-
-            var characterCards = GetSurvivalCharacters(allCards).ToList();
-
-            var consumableCards = allCards
-                .Where(card => card.Definition.Category == CardCategory.Consumable &&
-                       card.CurrentNutrition > 0
-                )
-                .ToList();
-
-            foreach (var character in characterCards)
-            {
-                if (character == null) continue;
-
-                if (Camera.main.transform.parent.TryGetComponent<CameraController>(out var cam))
-                {
-                    yield return cam.MoveTo(character.transform.position);
-                }
-
-                int hungerLeft = cardSettings.HungerPerCharacter;
-
-                while (hungerLeft > 0)
-                {
-                    if (consumableCards.Count == 0)
-                    {
-                        Vector3 position = character.transform.position;
-                        character.Kill();
-                        break;
-                    }
-
-                    var nearestConsumable = consumableCards
-                        .OrderBy(c => Vector3.Distance(character.transform.position, c.transform.position))
-                        .First();
-
-                    consumableCards.Remove(nearestConsumable);
-
-                    yield return nearestConsumable.Consume(
-                        character,
-                        hungerLeft,
-                        nutrition =>
-                        {
-                            hungerLeft -= nutrition;
-
-                            float healFraction = (float)nutrition / cardSettings.HungerPerCharacter;
-                            float healPercent = 0.5f * healFraction;
-                            int maxHealth = character.Stats.MaxHealth.Value;
-                            int healAmount = Mathf.RoundToInt(maxHealth * healPercent);
-                            int maxPossibleHeal = maxHealth - character.CurrentHealth;
-                            healAmount = Mathf.Min(healAmount, maxPossibleHeal);
-
-                            character.Heal(healAmount);
-                        }
-                    );
-
-                    if (nearestConsumable != null && nearestConsumable.CurrentNutrition > 0)
-                    {
-                        consumableCards.Add(nearestConsumable);
-                    }
-
-                    NotifyStatsChanged();
-                }
-
-                yield return new WaitForSecondsRealtime(0.5f);
-            }
-        }
-        #endregion
-
         #region Stats Snapshot
         /// <summary>
         /// Calculates and returns a comprehensive snapshot of the current global game statistics.
@@ -939,7 +911,7 @@ namespace CryingSnow.StackCraft
             {
                 TotalNutrition = CalculateTotalNutrition(allCards) +
                     CalculateBackpackNutrition(),
-                NutritionNeed = CalculateNutritionNeed(allCards),
+                NutritionNeed = 0,
                 Currency = CalculateCurrency(allCards) + CalculateBackpackCurrency(),
                 CardsOwned = cardsOwned,
                 TotalBoost = totalBoost,
@@ -954,11 +926,6 @@ namespace CryingSnow.StackCraft
             return allCards
                 .Where(card => card.Definition.Category == CardCategory.Consumable)
                 .Sum(card => card.CurrentNutrition);
-        }
-
-        private int CalculateNutritionNeed(List<CardInstance> allCards)
-        {
-            return GetSurvivalCharacters(allCards).Count() * cardSettings.HungerPerCharacter;
         }
 
         private int CalculateCurrency(List<CardInstance> allCards)

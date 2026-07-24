@@ -2836,7 +2836,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void RiverbendLocation_ProvidesThreeExistingEggCardsForBackpackTesting()
+        public void RiverbendLocation_HasNoBackpackTestEggCards()
         {
             Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
                 "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
@@ -2865,10 +2865,145 @@ namespace CardColony.Tests
                 eggPositions.Add(new Vector2(position.x, position.z));
             }
 
-            Assert.That(eggPositions, Has.Count.EqualTo(3),
-                "河湾村应提供三张现有鸡蛋卡用于测试背包存取");
-            Assert.That(eggPositions.Distinct().Count(), Is.EqualTo(3),
-                "三张鸡蛋卡需要分开放置，避免初始堆叠影响测试");
+            Assert.That(eggPositions, Is.Empty,
+                "河湾村不应继续生成三张背包测试鸡蛋。");
+            Assert.That(eggPositions.Distinct().Count(), Is.Zero,
+                "河湾村初始卡牌中不能残留测试鸡蛋位置。");
+        }
+
+        [Test]
+        public void RiverbendLocation_MigratesLegacyEggTestStacksOutOfOldSaves()
+        {
+            System.Type managerType = FindType("CryingSnow.StackCraft.CardManager");
+            System.Type sceneDataType = FindType("CryingSnow.StackCraft.SceneData");
+            System.Type stackDataType = FindType("CryingSnow.StackCraft.StackData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            MethodInfo migrate = managerType.GetMethod(
+                "MigrateRetiredRiverbendInitialCards",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(migrate, Is.Not.Null,
+                "旧河湾村存档需要迁移掉仍在原出生点的测试鸡蛋。");
+
+            object sceneData = System.Activator.CreateInstance(sceneDataType);
+            var savedStacks = (IList)sceneDataType.GetField("SavedStacks")
+                .GetValue(sceneData);
+            const string eggId = "85e392d1882a4c61b5b2736e6fb64f4b";
+
+            object CreateEggStack(Vector3 position)
+            {
+                object stack = System.Activator.CreateInstance(stackDataType);
+                stackDataType.GetField("Position").SetValue(
+                    stack,
+                    new[] { position.x, position.y, position.z });
+                var cards = (IList)stackDataType.GetField("Cards").GetValue(stack);
+                object card = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(card, eggId);
+                cards.Add(card);
+                return stack;
+            }
+
+            savedStacks.Add(CreateEggStack(new Vector3(-2.2f, 0f, -3.5f)));
+            savedStacks.Add(CreateEggStack(new Vector3(-0.8f, 0f, -3.5f)));
+            savedStacks.Add(CreateEggStack(new Vector3(0.6f, 0f, -3.5f)));
+            object movedEgg = CreateEggStack(new Vector3(2f, 0f, 2f));
+            savedStacks.Add(movedEgg);
+
+            migrate.Invoke(null, new[] { sceneData, "riverbend" });
+
+            Assert.That(savedStacks, Has.Count.EqualTo(1));
+            Assert.That(savedStacks[0], Is.SameAs(movedEgg),
+                "玩家已经移动的鸡蛋不应被旧内容迁移误删。");
+            Assert.That(
+                sceneDataType.GetField("ContentMigrationVersion").GetValue(sceneData),
+                Is.EqualTo(1));
+
+            migrate.Invoke(null, new[] { sceneData, "riverbend" });
+            Assert.That(savedStacks, Has.Count.EqualTo(1),
+                "地点内容迁移必须可以安全重复调用。");
+        }
+
+        [Test]
+        public void BasicResourceCards_CannotBeDraggedByPlayer()
+        {
+            string[] resourceGuids = AssetDatabase.FindAssets(
+                "t:CardDefinition",
+                new[] { "Assets/StackCraft/Resources/Cards/Resources" });
+            Assert.That(resourceGuids, Is.Not.Empty);
+
+            foreach (string guid in resourceGuids)
+            {
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                Object definition = AssetDatabase.LoadAssetAtPath<Object>(path);
+                Assert.That(
+                    definition.GetType().GetProperty("PlayerDraggable").GetValue(definition),
+                    Is.False,
+                    $"{path} 属于基础资源，不能被玩家拖动。");
+            }
+        }
+
+        [Test]
+        public void DailyFoodRequirement_IsRemovedFromRulesAndCharacterStats()
+        {
+            System.Type managerType = FindType("CryingSnow.StackCraft.CardManager");
+            System.Type settingsType = FindType("CryingSnow.StackCraft.CardSettings");
+            System.Type dayCycleType = FindType("CryingSnow.StackCraft.DayCycleManager");
+            Object villagerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object settings = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Settings/Default_Card_Settings.asset");
+            PropertyInfo managerInstance = managerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousManager = managerInstance.GetValue(null) as Component;
+            MonoBehaviour manager = null;
+            Component villager = null;
+
+            try
+            {
+                managerInstance.SetValue(null, null);
+                manager = (MonoBehaviour)new GameObject(
+                        "No Daily Food Requirement CardManager")
+                    .AddComponent(managerType);
+                managerInstance.SetValue(null, manager);
+                villager = CreateUninitializedCard(
+                    villagerDefinition,
+                    "No Daily Food Requirement Villager");
+                managerType.GetField(
+                        "cardSettings",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(manager, settings);
+                managerType.GetMethod("RegisterStack").Invoke(
+                    manager,
+                    new[] { villager.GetType().GetProperty("Stack").GetValue(villager) });
+
+                object snapshot = managerType.GetMethod("GetStatsSnapshot")
+                    .Invoke(manager, null);
+                Assert.That(
+                    snapshot.GetType().GetProperty("NutritionNeed").GetValue(snapshot),
+                    Is.Zero,
+                    "人物不再产生每日食物需求。");
+                Assert.That(
+                    settingsType.GetProperty("HungerPerCharacter"),
+                    Is.Null,
+                    "规则配置中不应继续保留每人每天两个食物的条件。");
+                Assert.That(
+                    managerType.GetMethod("FeedCharacters"),
+                    Is.Null,
+                    "人物不能再因每日自动喂食失败而死亡。");
+                Assert.That(
+                    dayCycleType.GetMethod(
+                        "FeedingPhase",
+                        BindingFlags.Instance | BindingFlags.NonPublic),
+                    Is.Null,
+                    "日结流程不应再进入喂食与饿死阶段。");
+            }
+            finally
+            {
+                DestroyTestCard(villager);
+                if (manager != null)
+                    Object.DestroyImmediate(manager.gameObject);
+                managerInstance.SetValue(null, previousManager);
+            }
         }
 
         [Test]
@@ -2882,7 +3017,7 @@ namespace CardColony.Tests
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
             Assert.That(spawns, Is.Not.Null,
                 "地点定义需要拥有可复用的初始卡牌配置，而不是把河湾村卡牌写死在场景里");
-            Assert.That(spawns.arraySize, Is.EqualTo(10));
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
             var expectedCategories = new Dictionary<string, int>
             {
                 ["市场"] = 6,
@@ -2959,7 +3094,7 @@ namespace CardColony.Tests
             var serializedLocation = new SerializedObject(riverbend);
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
 
-            Assert.That(spawns.arraySize, Is.EqualTo(10));
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
             for (int index = 0; index < spawns.arraySize; index++)
             {
                 Object definition = spawns.GetArrayElementAtIndex(index)
@@ -3266,6 +3401,184 @@ namespace CardColony.Tests
                 DestroyTestCard(player);
                 DestroyTestCard(chief);
                 DestroyTestCard(market);
+            }
+        }
+
+        [Test]
+        public void SlimeLoot_DoesNotIncludeVillager()
+        {
+            Object slime = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Mobs/Card_Slime.asset");
+            Object villager = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            var serializedSlime = new SerializedObject(slime);
+            SerializedProperty loot = serializedSlime.FindProperty("loot");
+
+            var lootCards = Enumerable.Range(0, loot.arraySize)
+                .Select(index => loot.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("Card").objectReferenceValue);
+            int totalWeight = Enumerable.Range(0, loot.arraySize)
+                .Sum(index => loot.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("Weight").intValue);
+
+            Assert.That(lootCards.Any(card => card == villager), Is.False,
+                "史莱姆战利品表不能再掉落村民。");
+            Assert.That(totalWeight, Is.EqualTo(100),
+                "移除村民后应明确重新分配其权重，避免隐式归一化改变掉落概率。");
+        }
+
+        [Test]
+        public void AggressiveCardAi_TargetSelectionRespectsDetectionRadius()
+        {
+            System.Type managerType = FindType("CryingSnow.StackCraft.CardManager");
+            System.Type combatManagerType = FindType("CryingSnow.StackCraft.CombatManager");
+            System.Type combatTaskType = FindType("CryingSnow.StackCraft.CombatTask");
+            System.Type combatRectType = FindType("CryingSnow.StackCraft.CombatRect");
+            System.Type combatantType = FindType("CryingSnow.StackCraft.CardCombatant");
+            System.Type aiType = FindType("CryingSnow.StackCraft.CardAI");
+            PropertyInfo managerInstance = managerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousManager = managerInstance.GetValue(null) as Component;
+            PropertyInfo combatManagerInstance = combatManagerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousCombatManager =
+                combatManagerInstance.GetValue(null) as Component;
+            MonoBehaviour manager = null;
+            MonoBehaviour combatManager = null;
+            Component combatRect = null;
+            Component goblin = null;
+            Component player = null;
+
+            try
+            {
+                managerInstance.SetValue(null, null);
+                manager = (MonoBehaviour)new GameObject(
+                        "Aggro Radius Test CardManager")
+                    .AddComponent(managerType);
+                managerInstance.SetValue(null, manager);
+                combatManagerInstance.SetValue(null, null);
+                combatManager = (MonoBehaviour)new GameObject(
+                        "Aggro Radius Test CombatManager")
+                    .AddComponent(combatManagerType);
+                combatManagerInstance.SetValue(null, combatManager);
+
+                Object goblinDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Mobs/Card_Goblin.asset");
+                Object slimeDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Mobs/Card_Slime.asset");
+                Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+                Assert.That(goblinDefinition, Is.Not.Null);
+                Assert.That(slimeDefinition, Is.Not.Null);
+                Assert.That(playerDefinition, Is.Not.Null);
+                PropertyInfo aggroRadiusProperty =
+                    goblinDefinition.GetType().GetProperty("AggroRadius");
+                float radius = (float)aggroRadiusProperty.GetValue(goblinDefinition);
+                Assert.That(radius, Is.EqualTo(5f));
+                Assert.That(
+                    aggroRadiusProperty.GetValue(slimeDefinition),
+                    Is.EqualTo(5f));
+
+                goblin = CreateUninitializedCard(
+                    goblinDefinition,
+                    "Aggro Radius Goblin");
+                player = CreateUninitializedCard(
+                    playerDefinition,
+                    "Aggro Radius Player");
+                SetTestCardStackPosition(goblin, Vector3.zero);
+                SetTestCardStackPosition(
+                    player,
+                    new Vector3(radius + 1f, 0f, 0f));
+                managerType.GetMethod("RegisterStack").Invoke(
+                    manager,
+                    new[] { goblin.GetType().GetProperty("Stack").GetValue(goblin) });
+                managerType.GetMethod("RegisterStack").Invoke(
+                    manager,
+                    new[] { player.GetType().GetProperty("Stack").GetValue(player) });
+
+                Component goblinCombatant = goblin.gameObject.AddComponent(combatantType);
+                Component playerCombatant = player.gameObject.AddComponent(combatantType);
+                combatantType.GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(goblinCombatant, null);
+                combatantType.GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(playerCombatant, null);
+                goblin.GetType().GetProperty("Combatant")
+                    .SetValue(goblin, goblinCombatant);
+                player.GetType().GetProperty("Combatant")
+                    .SetValue(player, playerCombatant);
+
+                Component ai = goblin.gameObject.AddComponent(aiType);
+                aiType.GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(ai, null);
+                MethodInfo findTarget = aiType.GetMethod(
+                    "FindClosestPlayerCard",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Assert.That(findTarget.Invoke(ai, new object[] { radius }), Is.Null,
+                    "追踪半径外的玩家不能成为敌人的目标。");
+
+                SetTestCardStackPosition(player, new Vector3(radius, 0f, 0f));
+
+                Assert.That(
+                    findTarget.Invoke(ai, new object[] { radius }),
+                    Is.SameAs(player),
+                    "追踪半径边界内的玩家应当能成为敌人的目标。");
+
+                combatRect = new GameObject(
+                        "Aggro Radius Combat",
+                        typeof(RectTransform))
+                    .AddComponent(combatRectType);
+                combatRect.transform.position = new Vector3(radius, 0f, 0f);
+                System.Type cardListType =
+                    typeof(List<>).MakeGenericType(goblin.GetType());
+                var attackers = (IList)System.Activator.CreateInstance(cardListType);
+                var defenders = (IList)System.Activator.CreateInstance(cardListType);
+                attackers.Add(player);
+                defenders.Add(goblin);
+                object combatTask = combatTaskType.GetConstructors().Single().Invoke(
+                    new object[] { attackers, defenders, true, combatRect });
+                var activeCombats = (IList)combatManagerType.GetField(
+                        "_activeCombats",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(combatManager);
+                activeCombats.Add(combatTask);
+                MethodInfo findCombat = aiType.GetMethod(
+                    "FindClosestRelevantCombat",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                Assert.That(
+                    findCombat.Invoke(ai, new object[] { radius }),
+                    Is.SameAs(combatTask),
+                    "已有战斗位于追踪半径边界时也应当能被发现。");
+
+                combatRect.transform.position =
+                    new Vector3(radius + 0.01f, 0f, 0f);
+
+                Assert.That(
+                    findCombat.Invoke(ai, new object[] { radius }),
+                    Is.Null,
+                    "追踪半径外的已有战斗不能吸引敌人。");
+            }
+            finally
+            {
+                DestroyTestCard(goblin);
+                DestroyTestCard(player);
+                if (combatRect != null)
+                    Object.DestroyImmediate(combatRect.gameObject);
+                if (combatManager != null)
+                    Object.DestroyImmediate(combatManager.gameObject);
+                if (manager != null)
+                    Object.DestroyImmediate(manager.gameObject);
+                combatManagerInstance.SetValue(null, previousCombatManager);
+                managerInstance.SetValue(null, previousManager);
             }
         }
 
@@ -3659,7 +3972,7 @@ namespace CardColony.Tests
             var missing = ((IEnumerable)findMissing.Invoke(null, new object[] { riverbend, existing }))
                 .Cast<object>()
                 .ToList();
-            Assert.That(missing.Count, Is.EqualTo(8));
+            Assert.That(missing.Count, Is.EqualTo(5));
 
             var missingIds = missing.Select(spawn =>
             {
@@ -3677,8 +3990,7 @@ namespace CardColony.Tests
                 "riverbend-village-chief",
                 "riverbend-blacksmith",
                 "riverbend-grocer",
-                "riverbend-apothecary",
-                "85e392d1882a4c61b5b2736e6fb64f4b"
+                "riverbend-apothecary"
             };
             var noneMissing = ((IEnumerable)findMissing.Invoke(
                     null,
@@ -3712,7 +4024,7 @@ namespace CardColony.Tests
                 Is.EqualTo(0.9f).Within(0.01f));
 
             SerializedProperty spawns = serializedLocation.FindProperty("initialCardSpawns");
-            Assert.That(spawns.arraySize, Is.EqualTo(10));
+            Assert.That(spawns.arraySize, Is.EqualTo(7));
             for (int index = 0; index < spawns.arraySize; index++)
             {
                 SerializedProperty spawn = spawns.GetArrayElementAtIndex(index);

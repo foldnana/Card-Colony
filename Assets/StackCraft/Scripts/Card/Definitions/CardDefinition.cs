@@ -71,7 +71,7 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("FALSE = Passive Mob.")]
         private bool isAggressive = false;
 
-        [SerializeField, Tooltip("The range at which this mob will detect player cards.")]
+        [SerializeField, Min(0f), Tooltip("The range at which this mob will detect player cards.")]
         private float aggroRadius = 5f;
 
         [SerializeField, Tooltip("The range at which this mob will stop moving and initiate combat.")]
@@ -146,7 +146,8 @@ namespace CryingSnow.StackCraft
         public CardCategory Category => category;
         public CardFaction Faction => faction;
         public bool IsLocationStatic => isLocationStatic;
-        public bool PlayerDraggable => playerDraggable;
+        public bool PlayerDraggable =>
+            category != CardCategory.Resource && playerDraggable;
         public bool AmbientNpcAiEnabled => ambientNpcAiEnabled;
         public float AmbientWanderRadius => ambientWanderRadius;
         public float AmbientMoveSpeed => ambientMoveSpeed;

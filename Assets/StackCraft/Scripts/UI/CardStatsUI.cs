@@ -6,7 +6,7 @@ namespace CryingSnow.StackCraft
     [RequireComponent(typeof(CanvasGroup))]
     public class CardStatsUI : MonoBehaviour
     {
-        [SerializeField, Tooltip("The TextMeshPro label displaying the current nutrition level versus the required nutrition.")]
+        [SerializeField, Tooltip("The TextMeshPro label displaying the current total nutrition.")]
         private TextMeshProUGUI nutritionLabel;
 
         [SerializeField, Tooltip("The TextMeshPro label displaying the player's current total currency/coins.")]
@@ -65,7 +65,7 @@ namespace CryingSnow.StackCraft
 
         private void UpdateStatsText(StatsSnapshot stats)
         {
-            nutritionLabel.text = $"{stats.TotalNutrition}/{stats.NutritionNeed}";
+            nutritionLabel.text = $"{stats.TotalNutrition}";
             currencyLabel.text = $"{stats.Currency}";
             cardLabel.text = $"{stats.CardsOwned}/{stats.CardLimit}";
         }
