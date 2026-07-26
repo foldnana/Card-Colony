@@ -194,6 +194,7 @@ namespace CryingSnow.StackCraft
             }
 
             ResolveTableOverlaps();
+            SynchronizeStackTargetsToVisuals();
         }
 
         public bool ContainsScreenPoint(Vector2 screenPosition)
@@ -751,9 +752,44 @@ namespace CryingSnow.StackCraft
                 if (stack == null || !synchronizedStacks.Add(stack))
                     continue;
 
-                stack.SynchronizeTargetWithParentMotion(
-                    GetVisualStackAnchor(stack));
+                Vector3 visualAnchor = GetVisualStackAnchor(stack);
+                if (NeedsVisualLayoutRepair(stack, visualAnchor))
+                {
+                    stack.SetTargetPosition(
+                        visualAnchor,
+                        instant: true);
+                }
+                else
+                {
+                    stack.SynchronizeTargetWithParentMotion(
+                        visualAnchor);
+                }
             }
+        }
+
+        private static bool NeedsVisualLayoutRepair(
+            CardStack stack,
+            Vector3 visualAnchor)
+        {
+            if (stack?.Cards == null)
+                return false;
+
+            for (int index = 1; index < stack.Cards.Count; index++)
+            {
+                CardInstance card = stack.Cards[index];
+                if (card == null)
+                    continue;
+
+                Vector3 expectedPosition =
+                    visualAnchor + card.Settings.StackStep * index;
+                if ((card.transform.position - expectedPosition)
+                    .sqrMagnitude > 0.000001f)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private void StopStackMotionBeforeSurfaceDrag()
@@ -968,6 +1004,7 @@ namespace CryingSnow.StackCraft
             foreach (CardInstance stackCard in stack.Cards.ToList())
             {
                 stack.RemoveCard(stackCard);
+                stackCard.gameObject.SetActive(false);
                 if (Application.isPlaying)
                     Destroy(stackCard.gameObject);
                 else

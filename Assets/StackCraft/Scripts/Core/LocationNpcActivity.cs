@@ -130,8 +130,7 @@ namespace CryingSnow.StackCraft
                 CardStack otherStack = otherCard?.Stack;
                 if (otherStack == null ||
                     otherStack == card.Stack ||
-                    !checkedStacks.Add(otherStack) ||
-                    otherCard.GetComponent<LocationNpcActivity>() == null)
+                    !checkedStacks.Add(otherStack))
                     continue;
 
                 if (CardPhysicsSolver.WouldOverlapAt(
@@ -153,19 +152,22 @@ namespace CryingSnow.StackCraft
             CardStack otherStack)
         {
             Vector3 currentPosition = CurrentPosition;
-            if (!CardPhysicsSolver.WouldOverlapAt(
+            float currentOverlap =
+                CardPhysicsSolver.GetPlanarOverlapAreaAt(
                     card.Stack,
                     currentPosition,
                     otherStack,
-                    0.04f))
+                    0.04f);
+            if (currentOverlap <= 0f)
                 return false;
 
-            Vector3 otherPosition = otherStack.TargetPosition.Flatten();
-            float currentDistance = (
-                currentPosition.Flatten() - otherPosition).sqrMagnitude;
-            float nextDistance = (
-                nextPosition.Flatten() - otherPosition).sqrMagnitude;
-            return nextDistance > currentDistance + Mathf.Epsilon;
+            float nextOverlap =
+                CardPhysicsSolver.GetPlanarOverlapAreaAt(
+                    card.Stack,
+                    nextPosition,
+                    otherStack,
+                    0.04f);
+            return nextOverlap < currentOverlap - Mathf.Epsilon;
         }
 
         private void ChooseWanderDestination()

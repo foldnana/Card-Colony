@@ -21,6 +21,12 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("The CardDefinition to be used as currency for trading.")]
         private CardDefinition currencyCard;
 
+        [SerializeField, Tooltip("Whether to create the original buyer and card-pack vendors.")]
+        private bool spawnLegacyZones = true;
+
+        [SerializeField, Tooltip("Location ids that use custom trade layouts instead of the original zones.")]
+        private List<string> legacyZoneExcludedLocationIds = new();
+
         [Header("Vendor")]
         [SerializeField, Tooltip("Prefab for the Pack Vendor trade zone.")]
         private PackVendor vendorPrefab;
@@ -50,6 +56,7 @@ namespace CryingSnow.StackCraft
 
         private readonly Queue<PackVendor> activationQueue = new();
         private Coroutine activeSequenceCoroutine = null;
+        private bool legacyZonesSpawned;
 
         private readonly object sequenceRequester = "VendorSequenceRequester";
         private readonly object tradeSequenceLock = "TradeSequenceLock";
@@ -62,6 +69,10 @@ namespace CryingSnow.StackCraft
                 return;
             }
             Instance = this;
+
+            legacyZonesSpawned = ShouldSpawnLegacyZones();
+            if (!legacyZonesSpawned)
+                return;
 
             // Instantiate Buyer
             var buyer = Instantiate(buyerPrefab, transform);
@@ -88,6 +99,9 @@ namespace CryingSnow.StackCraft
 
         private void Start()
         {
+            if (!legacyZonesSpawned)
+                return;
+
             cameraController = FindFirstObjectByType<CameraController>();
 
             if (Board.Instance != null)
@@ -102,6 +116,18 @@ namespace CryingSnow.StackCraft
             }
 
             RestoreVendors();
+        }
+
+        private bool ShouldSpawnLegacyZones()
+        {
+            if (!spawnLegacyZones)
+                return false;
+
+            string locationId =
+                GameDirector.Instance?.GameData?.ActiveLocationId;
+            return string.IsNullOrWhiteSpace(locationId) ||
+                legacyZoneExcludedLocationIds == null ||
+                !legacyZoneExcludedLocationIds.Contains(locationId);
         }
 
         private void OnDestroy()

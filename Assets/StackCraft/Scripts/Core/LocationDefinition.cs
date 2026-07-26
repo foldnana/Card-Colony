@@ -36,6 +36,22 @@ namespace CryingSnow.StackCraft
         public int MaximumCount => maximumCount;
     }
 
+    [Serializable]
+    public struct LocationMarketOffer
+    {
+        [SerializeField] private CardDefinition sourceCardDefinition;
+        [SerializeField] private CardDefinition productDefinition;
+        [SerializeField, Min(1)] private int buyPrice;
+        [SerializeField, Min(1)] private int minimumDailyStock;
+        [SerializeField, Min(1)] private int maximumDailyStock;
+
+        public CardDefinition SourceCardDefinition => sourceCardDefinition;
+        public CardDefinition ProductDefinition => productDefinition;
+        public int BuyPrice => buyPrice;
+        public int MinimumDailyStock => minimumDailyStock;
+        public int MaximumDailyStock => maximumDailyStock;
+    }
+
     [CreateAssetMenu(menuName = "StackCraft/World/Location Definition", fileName = "Location_")]
     public sealed class LocationDefinition : ScriptableObject
     {
@@ -59,6 +75,11 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0f)] private float randomSpawnMinSpacing = 0.8f;
         [SerializeField, Min(0f)] private float randomSpawnPartyClearance = 2f;
         [SerializeField] private List<LocationRandomCardSpawn> randomCardSpawns = new();
+        [Header("Market services")]
+        [SerializeField] private CardDefinition marketCurrencyCardDefinition;
+        [SerializeField] private CardDefinition marketBuyerCardDefinition;
+        [SerializeField] private CardDefinition marketPickupCardDefinition;
+        [SerializeField] private List<LocationMarketOffer> marketOffers = new();
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -79,5 +100,12 @@ namespace CryingSnow.StackCraft
         public float RandomSpawnMinSpacing => randomSpawnMinSpacing;
         public float RandomSpawnPartyClearance => randomSpawnPartyClearance;
         public IReadOnlyList<LocationRandomCardSpawn> RandomCardSpawns => randomCardSpawns;
+        public CardDefinition MarketCurrencyCardDefinition =>
+            marketCurrencyCardDefinition;
+        public CardDefinition MarketBuyerCardDefinition =>
+            marketBuyerCardDefinition;
+        public CardDefinition MarketPickupCardDefinition =>
+            marketPickupCardDefinition;
+        public IReadOnlyList<LocationMarketOffer> MarketOffers => marketOffers;
     }
 }

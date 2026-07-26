@@ -1,0 +1,92 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c7f5a4d4a14b09a7d9fd4b1fc9aa11, type: 3}
+  m_Name: Location_RiverbendMarket
+  m_EditorClassIdentifier: 
+  id: riverbend-market
+  displayName: "\u6CB3\u6E7E\u5E02\u573A"
+  backgroundTexture: {fileID: 2800000, guid: 7a663a48bb4fbaa4d890c0c36e0afe0a, type: 3}
+  mapSize: {x: 18.4, y: 10.35}
+  cameraMinDistance: 3
+  cameraMaxDistance: 20
+  cameraInitialDistance: 7
+  cameraZoomSpeed: 3
+  expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  partySpawnPosition: {x: 0, y: 0, z: -3.65}
+  partyMemberSpacing: 0.9
+  initialCardSpawns:
+  - definition: {fileID: 11400000, guid: 7bd93a14455287d4499669251c09f641, type: 2}
+    position: {x: 0, y: 0, z: 2.75}
+  - definition: {fileID: 11400000, guid: 57805829cc91cf6439f849e0a28f200e, type: 2}
+    position: {x: 0, y: 0, z: 1.25}
+  - definition: {fileID: 11400000, guid: 3b997ab829e698549a4e4b96a26d6dc9, type: 2}
+    position: {x: 4.6, y: 0, z: -2.65}
+  - definition: {fileID: 11400000, guid: 4bb7818a76a07264db1ae3bb371e58e3, type: 2}
+    position: {x: -5.4, y: 0, z: 1}
+  - definition: {fileID: 11400000, guid: 2b63d95a1cf3d1543b13adf6e04b0f4e, type: 2}
+    position: {x: -3.7, y: 0, z: 1}
+  - definition: {fileID: 11400000, guid: f6bf38ba8a92ace4b97b992c0e255f18, type: 2}
+    position: {x: -5.4, y: 0, z: -0.8}
+  - definition: {fileID: 11400000, guid: a82bc02d7643803428d542b72fd37723, type: 2}
+    position: {x: -3.7, y: 0, z: -0.8}
+  - definition: {fileID: 11400000, guid: ba038d0573a8b3d449a964657502c689, type: 2}
+    position: {x: 3.8, y: 0, z: 1}
+  - definition: {fileID: 11400000, guid: 144024d4f7104f647a3ba486f38e2100, type: 2}
+    position: {x: 5.4, y: 0, z: 1}
+  - definition: {fileID: 11400000, guid: 2f1af1c6d3e933c4e84276b38cfdb8e9, type: 2}
+    position: {x: 4.6, y: 0, z: -0.8}
+  entrances: []
+  randomizeCardsOnEntry: 0
+  randomSpawnAreaCenter: {x: 0, y: 0}
+  randomSpawnAreaSize: {x: 14, y: 7}
+  randomSpawnMinSpacing: 0.8
+  randomSpawnPartyClearance: 2
+  randomCardSpawns: []
+  marketCurrencyCardDefinition: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
+  marketBuyerCardDefinition: {fileID: 11400000, guid: 7bd93a14455287d4499669251c09f641, type: 2}
+  marketPickupCardDefinition: {fileID: 11400000, guid: 3b997ab829e698549a4e4b96a26d6dc9, type: 2}
+  marketOffers:
+  - sourceCardDefinition: {fileID: 11400000, guid: 4bb7818a76a07264db1ae3bb371e58e3, type: 2}
+    productDefinition: {fileID: 11400000, guid: 4b2c6f2b0cdae81459db75add07cc727, type: 2}
+    buyPrice: 3
+    minimumDailyStock: 2
+    maximumDailyStock: 4
+  - sourceCardDefinition: {fileID: 11400000, guid: 2b63d95a1cf3d1543b13adf6e04b0f4e, type: 2}
+    productDefinition: {fileID: 11400000, guid: 2ac53164cb5efa24c857c2d32d1057c1, type: 2}
+    buyPrice: 2
+    minimumDailyStock: 3
+    maximumDailyStock: 5
+  - sourceCardDefinition: {fileID: 11400000, guid: f6bf38ba8a92ace4b97b992c0e255f18, type: 2}
+    productDefinition: {fileID: 11400000, guid: 9cc9900ae3f8a544abec849bb392bf73, type: 2}
+    buyPrice: 3
+    minimumDailyStock: 2
+    maximumDailyStock: 4
+  - sourceCardDefinition: {fileID: 11400000, guid: a82bc02d7643803428d542b72fd37723, type: 2}
+    productDefinition: {fileID: 11400000, guid: 1f1fe259feb05b14182a44039ff20c6b, type: 2}
+    buyPrice: 5
+    minimumDailyStock: 1
+    maximumDailyStock: 3
+  - sourceCardDefinition: {fileID: 11400000, guid: ba038d0573a8b3d449a964657502c689, type: 2}
+    productDefinition: {fileID: 11400000, guid: 72aeff93ef451ea40aeadb2a0e067f97, type: 2}
+    buyPrice: 2
+    minimumDailyStock: 2
+    maximumDailyStock: 4
+  - sourceCardDefinition: {fileID: 11400000, guid: 144024d4f7104f647a3ba486f38e2100, type: 2}
+    productDefinition: {fileID: 11400000, guid: cd07ac519c9e49945a115885ba158123, type: 2}
+    buyPrice: 2
+    minimumDailyStock: 2
+    maximumDailyStock: 4
+  - sourceCardDefinition: {fileID: 11400000, guid: 2f1af1c6d3e933c4e84276b38cfdb8e9, type: 2}
+    productDefinition: {fileID: 11400000, guid: a4d473bf08d7e254c9eff9b71d98cbff, type: 2}
+    buyPrice: 5
+    minimumDailyStock: 1
+    maximumDailyStock: 3

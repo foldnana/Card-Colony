@@ -1030,6 +1030,96 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void BackpackOverlay_RepairsAStackWhoseCardsCollapsedDuringOpening()
+        {
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type proxyType =
+                FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            Object coinDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset");
+            Component firstCoin = CreateUninitializedCard(
+                coinDefinition,
+                "Backpack Layout First Coin");
+            Component secondCoin = CreateUninitializedCard(
+                coinDefinition,
+                "Backpack Layout Second Coin");
+            Component thirdCoin = CreateUninitializedCard(
+                coinDefinition,
+                "Backpack Layout Third Coin");
+            GameObject boardObject = new("Backpack Layout Repair Board");
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                object firstStack = firstCoin.GetType()
+                    .GetProperty("Stack").GetValue(firstCoin);
+                object secondStack = secondCoin.GetType()
+                    .GetProperty("Stack").GetValue(secondCoin);
+                object thirdStack = thirdCoin.GetType()
+                    .GetProperty("Stack").GetValue(thirdCoin);
+                firstStack.GetType().GetMethod("MergeWith")
+                    .Invoke(firstStack, new[] { secondStack });
+                firstStack.GetType().GetMethod("MergeWith")
+                    .Invoke(firstStack, new[] { thirdStack });
+
+                Component firstProxy = firstCoin.gameObject.AddComponent(proxyType);
+                Component secondProxy = secondCoin.gameObject.AddComponent(proxyType);
+                Component thirdProxy = thirdCoin.gameObject.AddComponent(proxyType);
+                MethodInfo bind = proxyType.GetMethod("Bind");
+                bind.Invoke(firstProxy, new object[]
+                {
+                    null, board, firstCoin, "coin-1", 0
+                });
+                bind.Invoke(secondProxy, new object[]
+                {
+                    null, board, secondCoin, "coin-2", 1
+                });
+                bind.Invoke(thirdProxy, new object[]
+                {
+                    null, board, thirdCoin, "coin-3", 2
+                });
+
+                IDictionary proxyMap = (IDictionary)boardType.GetField(
+                        "proxies",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(board);
+                proxyMap.Add("coin-1", firstProxy);
+                proxyMap.Add("coin-2", secondProxy);
+                proxyMap.Add("coin-3", thirdProxy);
+
+                Vector3 collapsedPosition = new(1f, 0.4f, -0.5f);
+                firstCoin.transform.position = collapsedPosition;
+                secondCoin.transform.position = collapsedPosition;
+                thirdCoin.transform.position = collapsedPosition;
+
+                boardType.GetMethod(
+                        "SynchronizeStackTargetsToVisuals",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(board, null);
+
+                Vector3 stackStep = (Vector3)firstCoin.GetType()
+                    .GetProperty("Settings").GetValue(firstCoin)
+                    .GetType().GetProperty("StackStep")
+                    .GetValue(firstCoin.GetType()
+                        .GetProperty("Settings").GetValue(firstCoin));
+                Assert.That(
+                    secondCoin.transform.position,
+                    Is.EqualTo(collapsedPosition + stackStep),
+                    "背包首次展开时即使尾部卡牌位置暂时塌缩，也必须立即恢复完整卡堆。");
+                Assert.That(
+                    thirdCoin.transform.position,
+                    Is.EqualTo(collapsedPosition + stackStep * 2f));
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                DestroyTestCard(firstCoin);
+                DestroyTestCard(secondCoin);
+                DestroyTestCard(thirdCoin);
+            }
+        }
+
+        [Test]
         public void BackpackOverlay_DragsEveryCardInAStackAsOneRigidLayout()
         {
             System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
@@ -1309,6 +1399,297 @@ namespace CardColony.Tests
                 Object.DestroyImmediate(manager.gameObject);
                 DestroyTestCard(first);
                 DestroyTestCard(second);
+            }
+        }
+
+        [Test]
+        public void CardPhysicsSolver_NonDraggableResourceStaysFixedAndMovesTheOtherStack()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            MonoBehaviour board = Object.FindObjectsOfType<MonoBehaviour>(true)
+                .First(component => component.GetType().FullName ==
+                    "CryingSnow.StackCraft.Board");
+            board.GetType().GetMethod(
+                    "Awake",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(board, null);
+
+            Object rockDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Resources/Card_Rock.asset");
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Component rock = CreateUninitializedCard(
+                rockDefinition,
+                "Fixed Resource Rock");
+            Component player = CreateUninitializedCard(
+                playerDefinition,
+                "Movable Card Near Rock");
+            try
+            {
+                rock.GetType().GetProperty("Size").SetValue(rock, Vector2.one);
+                player.GetType().GetProperty("Size").SetValue(player, Vector2.one);
+                SetTestCardStackPosition(rock, Vector3.zero);
+                SetTestCardStackPosition(player, Vector3.zero);
+
+                object rockStack =
+                    rock.GetType().GetProperty("Stack").GetValue(rock);
+                object playerStack =
+                    player.GetType().GetProperty("Stack").GetValue(player);
+                Assert.That(
+                    rockDefinition.GetType().GetProperty("PlayerDraggable")
+                        .GetValue(rockDefinition),
+                    Is.False,
+                    "资源卡在运行时已经被配置为不可移动。");
+                Assert.That(
+                    rockStack.GetType().GetProperty("IsAnchored")
+                        .GetValue(rockStack),
+                    Is.True,
+                    "所有不可移动卡牌都必须成为物理解算锚点，而不只是地点静态卡。");
+
+                System.Type stackType = rockStack.GetType();
+                System.Type solverType =
+                    FindType("CryingSnow.StackCraft.CardPhysicsSolver");
+                System.Type listType = typeof(List<>).MakeGenericType(stackType);
+                var stacks = (IList)System.Activator.CreateInstance(listType);
+                stacks.Add(rockStack);
+                stacks.Add(playerStack);
+                solverType.GetMethods(BindingFlags.Public | BindingFlags.Static)
+                    .Single(method =>
+                        method.Name == "ResolveOverlaps" &&
+                        method.GetParameters().Length == 3)
+                    .Invoke(null, new object[] { stacks, null, 8 });
+
+                Vector3 rockPosition = (Vector3)stackType
+                    .GetProperty("TargetPosition").GetValue(rockStack);
+                Vector3 playerPosition = (Vector3)stackType
+                    .GetProperty("TargetPosition").GetValue(playerStack);
+                Assert.That(rockPosition, Is.EqualTo(Vector3.zero),
+                    "附近卡牌发生避让时不可移动资源卡不能改变位置。");
+                Assert.That(
+                    solverType.GetMethod(
+                            "WouldOverlapAt",
+                            BindingFlags.Static | BindingFlags.NonPublic)
+                        .Invoke(
+                            null,
+                            new object[]
+                            {
+                                playerStack,
+                                playerPosition,
+                                rockStack,
+                                0f
+                            }),
+                    Is.False,
+                    "可移动卡牌必须被推离固定资源卡，不能继续重叠。");
+            }
+            finally
+            {
+                DestroyTestCard(rock);
+                DestroyTestCard(player);
+            }
+        }
+
+        [Test]
+        public void LocationNpcActivity_StopsBeforeWalkingIntoFixedCard()
+        {
+            System.Type managerType =
+                FindType("CryingSnow.StackCraft.CardManager");
+            System.Type activityType =
+                FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Component chief = CreateUninitializedCard(
+                chiefDefinition,
+                "NPC Approaching Fixed Card");
+            Component market = CreateUninitializedCard(
+                marketDefinition,
+                "Fixed Card Blocking NPC");
+            PropertyInfo managerInstance = managerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousManager =
+                managerInstance.GetValue(null) as Component;
+            managerInstance.SetValue(null, null);
+            MonoBehaviour manager = (MonoBehaviour)new GameObject(
+                    "Fixed Card Collision Test CardManager")
+                .AddComponent(managerType);
+            managerInstance.SetValue(null, manager);
+
+            try
+            {
+                chief.GetType().GetProperty("Size")
+                    .SetValue(chief, Vector2.one);
+                market.GetType().GetProperty("Size")
+                    .SetValue(market, Vector2.one);
+                SetTestCardStackPosition(chief, Vector3.zero);
+                SetTestCardStackPosition(
+                    market,
+                    new Vector3(1.8f, 0f, 0f));
+                object chiefStack =
+                    chief.GetType().GetProperty("Stack").GetValue(chief);
+                object marketStack =
+                    market.GetType().GetProperty("Stack").GetValue(market);
+                managerType.GetMethod("RegisterStack")
+                    .Invoke(manager, new[] { chiefStack });
+                managerType.GetMethod("RegisterStack")
+                    .Invoke(manager, new[] { marketStack });
+
+                Component activity =
+                    chief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[]
+                    {
+                        chief,
+                        Vector3.zero,
+                        3f,
+                        1f,
+                        new Vector2(10f, 10f)
+                    });
+                activityType.GetMethod("SetDestination").Invoke(
+                    activity,
+                    new object[] { new Vector3(2f, 0f, 0f) });
+                activityType.GetMethod("Tick")
+                    .Invoke(activity, new object[] { 1f });
+
+                Vector3 chiefPosition = (Vector3)chiefStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(chiefStack);
+                Vector3 marketPosition = (Vector3)marketStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(marketStack);
+                Assert.That(chiefPosition, Is.EqualTo(Vector3.zero),
+                    "NPC 下一步会撞到固定卡牌时必须停下等待。");
+                Assert.That(
+                    marketPosition,
+                    Is.EqualTo(new Vector3(1.8f, 0f, 0f)),
+                    "NPC 活动不能推动固定卡牌改变位置。");
+                Assert.That(
+                    FindType("CryingSnow.StackCraft.CardPhysicsSolver")
+                        .GetMethod(
+                            "WouldOverlapAt",
+                            BindingFlags.Static | BindingFlags.NonPublic)
+                        .Invoke(
+                            null,
+                            new object[]
+                            {
+                                chiefStack,
+                                chiefPosition,
+                                marketStack,
+                                0f
+                            }),
+                    Is.False,
+                    "NPC 停下后不能与固定卡牌重叠。");
+            }
+            finally
+            {
+                managerInstance.SetValue(null, previousManager);
+                Object.DestroyImmediate(manager.gameObject);
+                DestroyTestCard(chief);
+                DestroyTestCard(market);
+            }
+        }
+
+        [Test]
+        public void LocationNpcActivity_CanEscapeAnOverlappingMultiCardStack()
+        {
+            System.Type managerType =
+                FindType("CryingSnow.StackCraft.CardManager");
+            System.Type activityType =
+                FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object marketDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Market.asset");
+            Component chief = CreateUninitializedCard(
+                chiefDefinition,
+                "NPC Escaping Multi Card Stack");
+            var obstacleCards = new List<Component>();
+            PropertyInfo managerInstance = managerType.GetProperty(
+                "Instance",
+                BindingFlags.Public | BindingFlags.Static);
+            Component previousManager =
+                managerInstance.GetValue(null) as Component;
+            managerInstance.SetValue(null, null);
+            MonoBehaviour manager = (MonoBehaviour)new GameObject(
+                    "Multi Card Escape Test CardManager")
+                .AddComponent(managerType);
+            managerInstance.SetValue(null, manager);
+
+            try
+            {
+                for (int index = 0; index < 5; index++)
+                {
+                    Component obstacle = CreateUninitializedCard(
+                        marketDefinition,
+                        $"Fixed Multi Card Obstacle {index}");
+                    obstacle.GetType().GetProperty("Size")
+                        .SetValue(obstacle, Vector2.one);
+                    obstacleCards.Add(obstacle);
+                }
+
+                chief.GetType().GetProperty("Size")
+                    .SetValue(chief, Vector2.one);
+                SetTestCardStackPosition(
+                    chief,
+                    new Vector3(0f, 0f, -0.1f));
+                object chiefStack =
+                    chief.GetType().GetProperty("Stack").GetValue(chief);
+                object obstacleStack = obstacleCards[0].GetType()
+                    .GetProperty("Stack").GetValue(obstacleCards[0]);
+                SetTestCardStackPosition(obstacleCards[0], Vector3.zero);
+                for (int index = 1; index < obstacleCards.Count; index++)
+                {
+                    object additionalStack = obstacleCards[index].GetType()
+                        .GetProperty("Stack").GetValue(obstacleCards[index]);
+                    obstacleStack.GetType().GetMethod("MergeWith")
+                        .Invoke(obstacleStack, new[] { additionalStack });
+                }
+
+                managerType.GetMethod("RegisterStack")
+                    .Invoke(manager, new[] { chiefStack });
+                managerType.GetMethod("RegisterStack")
+                    .Invoke(manager, new[] { obstacleStack });
+
+                Component activity =
+                    chief.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    activity,
+                    new object[]
+                    {
+                        chief,
+                        new Vector3(0f, 0f, -0.1f),
+                        3f,
+                        1f,
+                        new Vector2(10f, 10f)
+                    });
+                activityType.GetMethod("SetDestination").Invoke(
+                    activity,
+                    new object[] { new Vector3(0f, 0f, 2f) });
+
+                activityType.GetMethod("Tick")
+                    .Invoke(activity, new object[] { 0.1f });
+
+                Vector3 resolvedPosition = (Vector3)chiefStack.GetType()
+                    .GetProperty("TargetPosition").GetValue(chiefStack);
+                Assert.That(
+                    resolvedPosition.z,
+                    Is.GreaterThan(-0.1f),
+                    "NPC 正在远离多卡堆真实碰撞中心时必须允许继续脱离，不能按卡堆锚点误判。");
+                Assert.That(
+                    obstacleStack.GetType().GetProperty("TargetPosition")
+                        .GetValue(obstacleStack),
+                    Is.EqualTo(Vector3.zero),
+                    "NPC 脱离重叠时固定多卡堆仍不能移动。");
+            }
+            finally
+            {
+                managerInstance.SetValue(null, previousManager);
+                Object.DestroyImmediate(manager.gameObject);
+                DestroyTestCard(chief);
+                foreach (Component obstacle in obstacleCards)
+                    DestroyTestCard(obstacle);
             }
         }
 
@@ -6070,7 +6451,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void RiverbendLocation_MapsInnBuildingCardToInnInterior()
+        public void RiverbendLocation_MapsBuildingCardsToTheirInteriors()
         {
             Object riverbend = AssetDatabase.LoadAssetAtPath<Object>(
                 "Assets/StackCraft/Resources/Locations/Location_Riverbend.asset");
@@ -6079,18 +6460,27 @@ namespace CardColony.Tests
             SerializedProperty entrances = new SerializedObject(riverbend)
                 .FindProperty("entrances");
             Assert.That(entrances, Is.Not.Null, "LocationDefinition 需要声明建筑入口");
-            Assert.That(entrances.arraySize, Is.EqualTo(1));
+            Assert.That(entrances.arraySize, Is.EqualTo(2));
 
-            SerializedProperty entrance = entrances.GetArrayElementAtIndex(0);
-            Object sourceCard = entrance.FindPropertyRelative("sourceCardDefinition")
-                .objectReferenceValue;
-            Assert.That(sourceCard, Is.Not.Null);
-            Assert.That(
-                new SerializedObject(sourceCard).FindProperty("id").stringValue,
+            var destinationsByCardId = new Dictionary<string, string>();
+            for (int index = 0; index < entrances.arraySize; index++)
+            {
+                SerializedProperty entrance =
+                    entrances.GetArrayElementAtIndex(index);
+                Object sourceCard = entrance
+                    .FindPropertyRelative("sourceCardDefinition")
+                    .objectReferenceValue;
+                Assert.That(sourceCard, Is.Not.Null);
+                string cardId = new SerializedObject(sourceCard)
+                    .FindProperty("id").stringValue;
+                destinationsByCardId[cardId] = entrance
+                    .FindPropertyRelative("destinationLocationId").stringValue;
+            }
+
+            Assert.That(destinationsByCardId["riverbend-inn"],
                 Is.EqualTo("riverbend-inn"));
-            Assert.That(
-                entrance.FindPropertyRelative("destinationLocationId").stringValue,
-                Is.EqualTo("riverbend-inn"));
+            Assert.That(destinationsByCardId["riverbend-market"],
+                Is.EqualTo("riverbend-market"));
         }
 
         [Test]

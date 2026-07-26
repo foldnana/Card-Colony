@@ -26,6 +26,8 @@ namespace CryingSnow.StackCraft
 
         public WorldMapLocation SelectedLocation { get; private set; }
         public LocationEntrance SelectedBuilding { get; private set; }
+        public MarketProductVendor SelectedMarketOffer { get; private set; }
+        public MarketCardBuyer SelectedMarketBuyer { get; private set; }
 
         private void Awake()
         {
@@ -34,9 +36,20 @@ namespace CryingSnow.StackCraft
             enterLocationButton?.onClick.AddListener(PerformLocationAction);
             WorldMapLocation.SelectionChanged += HandleSelectionChanged;
             LocationEntrance.SelectionChanged += HandleBuildingSelectionChanged;
+            MarketProductVendor.SelectionChanged +=
+                HandleMarketOfferSelectionChanged;
+            MarketCardBuyer.SelectionChanged +=
+                HandleMarketBuyerSelectionChanged;
             WorldMapBootstrap.PartyMapStateChanged += HandlePartyMapStateChanged;
+            BackpackService.Changed += HandleMarketFundsChanged;
+            if (CardManager.Instance != null)
+                CardManager.Instance.OnStatsChanged += HandleMarketStatsChanged;
 
-            if (LocationEntrance.ActiveSelection != null)
+            if (MarketProductVendor.ActiveSelection != null)
+                ShowMarketOffer(MarketProductVendor.ActiveSelection);
+            else if (MarketCardBuyer.ActiveSelection != null)
+                ShowMarketBuyer(MarketCardBuyer.ActiveSelection);
+            else if (LocationEntrance.ActiveSelection != null)
                 ShowBuilding(LocationEntrance.ActiveSelection);
             else if (WorldMapLocation.ActiveSelection != null)
                 ShowLocation(WorldMapLocation.ActiveSelection);
@@ -51,7 +64,14 @@ namespace CryingSnow.StackCraft
         {
             WorldMapLocation.SelectionChanged -= HandleSelectionChanged;
             LocationEntrance.SelectionChanged -= HandleBuildingSelectionChanged;
+            MarketProductVendor.SelectionChanged -=
+                HandleMarketOfferSelectionChanged;
+            MarketCardBuyer.SelectionChanged -=
+                HandleMarketBuyerSelectionChanged;
             WorldMapBootstrap.PartyMapStateChanged -= HandlePartyMapStateChanged;
+            BackpackService.Changed -= HandleMarketFundsChanged;
+            if (CardManager.Instance != null)
+                CardManager.Instance.OnStatsChanged -= HandleMarketStatsChanged;
             locationToggle?.onValueChanged.RemoveListener(ToggleView);
             enterLocationButton?.onClick.RemoveListener(PerformLocationAction);
         }
@@ -63,6 +83,8 @@ namespace CryingSnow.StackCraft
 
             SelectedLocation = location;
             SelectedBuilding = null;
+            SelectedMarketOffer = null;
+            SelectedMarketBuyer = null;
             SetLocationTabLabel("地点");
             WorldMapLocationDetails details = location.Details ??
                 WorldMapLocationDetails.CreateFallback(location.Card.Definition);
@@ -101,6 +123,8 @@ namespace CryingSnow.StackCraft
 
             SelectedBuilding = building;
             SelectedLocation = null;
+            SelectedMarketOffer = null;
+            SelectedMarketBuyer = null;
             SetLocationTabLabel("建筑");
 
             CardDefinition definition = building.Card.Definition;
@@ -126,6 +150,78 @@ namespace CryingSnow.StackCraft
             }
             else
                 ToggleView(true);
+        }
+
+        public void ShowMarketOffer(MarketProductVendor vendor)
+        {
+            if (vendor?.Product == null)
+                return;
+
+            SelectedMarketOffer = vendor;
+            SelectedMarketBuyer = null;
+            SelectedLocation = null;
+            SelectedBuilding = null;
+            SetLocationTabLabel("商品");
+
+            CardDefinition product = vendor.Product;
+            titleLabel.text = product.DisplayName;
+            artImage.texture = product.ArtTexture;
+            artImage.enabled = artImage.texture != null;
+            typeAndDangerLabel.text =
+                $"市场商品 · {GetCategoryLabel(product.Category)}";
+            discoveryLabel.text = vendor.StockRemaining > 0
+                ? $"● 今日库存 {vendor.StockRemaining}"
+                : "● 今日售罄";
+            travelTimeLabel.text = $"购买价格    {vendor.BuyPrice} 金币";
+            resourcesLabel.text =
+                "购买方式\n• 点击下方购买按钮\n• 金币从背包与桌面扣除";
+            descriptionLabel.text = product.Description ?? string.Empty;
+            RefreshLocationAction();
+
+            if (locationToggle != null)
+            {
+                locationToggle.interactable = true;
+                locationToggle.isOn = true;
+            }
+            ToggleView(true);
+        }
+
+        public void ShowMarketBuyer(MarketCardBuyer buyer)
+        {
+            if (buyer == null)
+                return;
+
+            SelectedMarketBuyer = buyer;
+            SelectedMarketOffer = null;
+            SelectedLocation = null;
+            SelectedBuilding = null;
+            SetLocationTabLabel("收购");
+
+            CardDefinition definition =
+                buyer.GetComponent<CardInstance>()?.Definition;
+            titleLabel.text = definition?.DisplayName ?? "收购柜台";
+            artImage.texture = definition?.ArtTexture;
+            artImage.enabled = artImage.texture != null;
+            typeAndDangerLabel.text = "市场服务 · 物品收购";
+            discoveryLabel.text = buyer.PendingStack == null
+                ? "● 等待物品"
+                : $"● 待售 {buyer.PendingStack.Cards.Count} 张";
+            travelTimeLabel.text = buyer.PendingStack == null
+                ? "出售价格    —"
+                : $"出售价格    {buyer.PendingSellValue} 金币";
+            resourcesLabel.text =
+                "出售方式\n• 把物品拖到收购柜台\n• 查看价格后确认出售";
+            descriptionLabel.text = buyer.PendingStack == null
+                ? "收购食物、材料、装备和贵重物品。"
+                : "确认后物品会消失，金币直接进入背包。";
+            RefreshLocationAction();
+
+            if (locationToggle != null)
+            {
+                locationToggle.interactable = true;
+                locationToggle.isOn = true;
+            }
+            ToggleView(true);
         }
 
         public void ToggleView(bool show)
@@ -178,8 +274,66 @@ namespace CryingSnow.StackCraft
             RefreshLocationAction();
         }
 
+        private void HandleMarketFundsChanged()
+        {
+            if (SelectedMarketOffer != null)
+                ShowMarketOffer(SelectedMarketOffer);
+        }
+
+        private void HandleMarketStatsChanged(StatsSnapshot _)
+        {
+            HandleMarketFundsChanged();
+        }
+
+        private void HandleMarketOfferSelectionChanged(
+            MarketProductVendor vendor)
+        {
+            if (vendor != null)
+            {
+                ShowMarketOffer(vendor);
+                return;
+            }
+
+            if (SelectedMarketOffer == null)
+                return;
+
+            ShowEmptyState();
+            ToggleView(false);
+        }
+
+        private void HandleMarketBuyerSelectionChanged(
+            MarketCardBuyer buyer)
+        {
+            if (buyer != null)
+            {
+                ShowMarketBuyer(buyer);
+                return;
+            }
+
+            if (SelectedMarketBuyer == null)
+                return;
+
+            ShowEmptyState();
+            ToggleView(false);
+        }
+
         private void PerformLocationAction()
         {
+            if (SelectedMarketOffer != null)
+            {
+                SelectedMarketOffer.TryPurchase();
+                ShowMarketOffer(SelectedMarketOffer);
+                return;
+            }
+
+            if (SelectedMarketBuyer != null)
+            {
+                MarketCardBuyer buyer = SelectedMarketBuyer;
+                if (!buyer.ConfirmSale())
+                    ShowMarketBuyer(buyer);
+                return;
+            }
+
             if (SelectedBuilding != null)
             {
                 SelectedBuilding.TryEnter();
@@ -208,6 +362,34 @@ namespace CryingSnow.StackCraft
                 return;
 
             TMP_Text actionLabel = enterLocationButton.GetComponentInChildren<TMP_Text>(true);
+            if (SelectedMarketOffer != null)
+            {
+                if (actionLabel != null)
+                {
+                    actionLabel.text = SelectedMarketOffer.StockRemaining <= 0
+                        ? "今日售罄"
+                        : SelectedMarketOffer.CanPurchase
+                            ? $"购买（{SelectedMarketOffer.BuyPrice} 金币）"
+                            : $"金币不足（需要 {SelectedMarketOffer.BuyPrice}）";
+                }
+                enterLocationButton.interactable =
+                    SelectedMarketOffer.CanPurchase;
+                return;
+            }
+
+            if (SelectedMarketBuyer != null)
+            {
+                if (actionLabel != null)
+                {
+                    actionLabel.text = SelectedMarketBuyer.PendingStack == null
+                        ? "请先放入物品"
+                        : $"确认出售（{SelectedMarketBuyer.PendingSellValue} 金币）";
+                }
+                enterLocationButton.interactable =
+                    SelectedMarketBuyer.PendingStack != null;
+                return;
+            }
+
             if (SelectedBuilding != null)
             {
                 string buildingName = SelectedBuilding.Card?.Definition?.DisplayName ?? "建筑";
@@ -252,6 +434,8 @@ namespace CryingSnow.StackCraft
         {
             SelectedLocation = null;
             SelectedBuilding = null;
+            SelectedMarketOffer = null;
+            SelectedMarketBuyer = null;
             locationToggle.interactable = false;
             RefreshLocationAction();
             titleLabel.text = "请选择地点";
@@ -262,6 +446,18 @@ namespace CryingSnow.StackCraft
             travelTimeLabel.text = string.Empty;
             resourcesLabel.text = string.Empty;
             descriptionLabel.text = "点选世界地图上的地点卡以查看详情。";
+        }
+
+        private static string GetCategoryLabel(CardCategory category)
+        {
+            return category switch
+            {
+                CardCategory.Consumable => "食物",
+                CardCategory.Material => "材料",
+                CardCategory.Equipment => "装备",
+                CardCategory.Valuable => "贵重物品",
+                _ => "商品"
+            };
         }
 
         private void SetLocationTabLabel(string text)

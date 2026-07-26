@@ -46,13 +46,18 @@ namespace CryingSnow.StackCraft
                 PlayPuffParticle();
 
                 ProcessTransaction(droppedStack);
-                return droppedStack.Cards.Count == 0;
+                return WasTransactionHandled(droppedStack);
             }
             return false;
         }
 
         public abstract bool CanTrade(CardStack droppedStack);
         protected abstract void ProcessTransaction(CardStack droppedStack);
+        protected virtual bool WasTransactionHandled(CardStack droppedStack)
+        {
+            return droppedStack?.Cards == null ||
+                droppedStack.Cards.Count == 0;
+        }
 
         /// <summary>
         /// Controls the visual highlighting state of the zone.
@@ -71,7 +76,8 @@ namespace CryingSnow.StackCraft
 
         public void PlayPuffParticle()
         {
-            Instantiate(puffParticle, transform.position, Quaternion.identity);
+            if (puffParticle != null)
+                Instantiate(puffParticle, transform.position, Quaternion.identity);
         }
 
         public abstract (string, string) GetInfo();

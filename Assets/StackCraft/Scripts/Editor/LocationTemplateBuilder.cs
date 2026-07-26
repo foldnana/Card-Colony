@@ -50,6 +50,29 @@ namespace CryingSnow.StackCraft.EditorTools
         public int MaximumCount { get; }
     }
 
+    public readonly struct LocationTemplateMarketOffer
+    {
+        public LocationTemplateMarketOffer(
+            CardDefinition sourceCardDefinition,
+            CardDefinition productDefinition,
+            int buyPrice,
+            int minimumDailyStock,
+            int maximumDailyStock)
+        {
+            SourceCardDefinition = sourceCardDefinition;
+            ProductDefinition = productDefinition;
+            BuyPrice = buyPrice;
+            MinimumDailyStock = minimumDailyStock;
+            MaximumDailyStock = maximumDailyStock;
+        }
+
+        public CardDefinition SourceCardDefinition { get; }
+        public CardDefinition ProductDefinition { get; }
+        public int BuyPrice { get; }
+        public int MinimumDailyStock { get; }
+        public int MaximumDailyStock { get; }
+    }
+
     [Serializable]
     public sealed class LocationTemplate
     {
@@ -75,6 +98,11 @@ namespace CryingSnow.StackCraft.EditorTools
         public float RandomSpawnPartyClearance = 2f;
         public IReadOnlyList<LocationTemplateRandomSpawn> RandomCardSpawns =
             Array.Empty<LocationTemplateRandomSpawn>();
+        public CardDefinition MarketCurrencyCardDefinition;
+        public CardDefinition MarketBuyerCardDefinition;
+        public CardDefinition MarketPickupCardDefinition;
+        public IReadOnlyList<LocationTemplateMarketOffer> MarketOffers =
+            Array.Empty<LocationTemplateMarketOffer>();
     }
 
     public static class LocationTemplateBuilder
@@ -151,6 +179,15 @@ namespace CryingSnow.StackCraft.EditorTools
             ReplaceRandomSpawns(
                 serialized.FindProperty("randomCardSpawns"),
                 template.RandomCardSpawns);
+            serialized.FindProperty("marketCurrencyCardDefinition")
+                .objectReferenceValue = template.MarketCurrencyCardDefinition;
+            serialized.FindProperty("marketBuyerCardDefinition")
+                .objectReferenceValue = template.MarketBuyerCardDefinition;
+            serialized.FindProperty("marketPickupCardDefinition")
+                .objectReferenceValue = template.MarketPickupCardDefinition;
+            ReplaceMarketOffers(
+                serialized.FindProperty("marketOffers"),
+                template.MarketOffers);
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(definition);
@@ -369,6 +406,42 @@ namespace CryingSnow.StackCraft.EditorTools
                     Mathf.Max(0, spawn.MinimumCount);
                 element.FindPropertyRelative("maximumCount").intValue =
                     Mathf.Max(spawn.MinimumCount, spawn.MaximumCount);
+            }
+        }
+
+        private static void ReplaceMarketOffers(
+            SerializedProperty target,
+            IReadOnlyList<LocationTemplateMarketOffer> offers)
+        {
+            target.ClearArray();
+            if (offers == null)
+                return;
+
+            for (int index = 0; index < offers.Count; index++)
+            {
+                LocationTemplateMarketOffer offer = offers[index];
+                if (offer.SourceCardDefinition == null ||
+                    offer.ProductDefinition == null)
+                {
+                    continue;
+                }
+
+                int targetIndex = target.arraySize;
+                target.InsertArrayElementAtIndex(targetIndex);
+                SerializedProperty element =
+                    target.GetArrayElementAtIndex(targetIndex);
+                element.FindPropertyRelative("sourceCardDefinition")
+                    .objectReferenceValue = offer.SourceCardDefinition;
+                element.FindPropertyRelative("productDefinition")
+                    .objectReferenceValue = offer.ProductDefinition;
+                element.FindPropertyRelative("buyPrice").intValue =
+                    Mathf.Max(1, offer.BuyPrice);
+                element.FindPropertyRelative("minimumDailyStock").intValue =
+                    Mathf.Max(1, offer.MinimumDailyStock);
+                element.FindPropertyRelative("maximumDailyStock").intValue =
+                    Mathf.Max(
+                        offer.MinimumDailyStock,
+                        offer.MaximumDailyStock);
             }
         }
 

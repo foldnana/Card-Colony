@@ -75,6 +75,8 @@ namespace CryingSnow.StackCraft
             _backpackBridgeActive = false;
             WorldMapLocation.NotifyCardClicked(_card);
             LocationEntrance.NotifyCardClicked(_card);
+            MarketProductVendor.NotifyCardClicked(_card);
+            MarketCardBuyer.NotifyCardClicked(_card);
 
             if (!CanBeDragged) return;
 
@@ -474,6 +476,15 @@ namespace CryingSnow.StackCraft
 
         private bool TryTradeWithNearbyZone()
         {
+            if (MarketCardBuyer.TryFindDropTarget(
+                    transform.position,
+                    _card.Settings.AttachRadius,
+                    out MarketCardBuyer marketBuyer) &&
+                marketBuyer.TryTradeAndConsumeStack(_card.Stack))
+            {
+                return true;
+            }
+
             Collider[] hits = Physics.OverlapSphere(transform.position, _card.Settings.AttachRadius);
             TradeZone bestCandidate = null;
             float bestSqrDist = float.MaxValue;
@@ -481,7 +492,7 @@ namespace CryingSnow.StackCraft
             foreach (var hit in hits)
             {
                 var tradeZone = hit.GetComponent<TradeZone>();
-                if (tradeZone == null) continue;
+                if (tradeZone == null || tradeZone == marketBuyer) continue;
 
                 float sqrDist = (tradeZone.transform.position - transform.position).sqrMagnitude;
                 if (sqrDist < bestSqrDist)

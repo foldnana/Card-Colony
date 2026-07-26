@@ -72,14 +72,18 @@ namespace CryingSnow.StackCraft
         private void HandleSceneDataReady(SceneData sceneData, bool wasLoaded)
         {
             if (wasLoaded)
-            {
                 currentTime = sceneData.SavedTime.CurrentTime;
-                CurrentDay = sceneData.SavedTime.CurrentDay;
-            }
+
+            int savedDay = wasLoaded
+                ? sceneData.SavedTime.CurrentDay
+                : CurrentDay;
+            CurrentDay = GameDirector.Instance?.GameData
+                ?.GetWorldDay(savedDay) ?? Mathf.Max(1, savedDay);
         }
 
         private void HandleBeforeSave(GameData gameData)
         {
+            gameData.SetWorldDay(CurrentDay);
             if (gameData.TryGetScene(out var sceneData))
             {
                 sceneData.SavedTime = new TimeData(currentTime, CurrentDay);
@@ -140,6 +144,7 @@ namespace CryingSnow.StackCraft
         public void StartNewDay()
         {
             CurrentDay++;
+            GameDirector.Instance?.GameData?.SetWorldDay(CurrentDay);
             CurrentPace = TimePace.Normal;
 
             UpdateTimeScale();

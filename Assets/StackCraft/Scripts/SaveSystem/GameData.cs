@@ -17,6 +17,7 @@ namespace CryingSnow.StackCraft
         public int SlotNumber;
         public string CurrentScene;
         public string ActiveLocationId;
+        public int WorldDay;
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
         public BackpackData Backpack = new();
@@ -41,6 +42,12 @@ namespace CryingSnow.StackCraft
         public bool TryGetScene(out SceneData sceneData)
         {
             string sceneScope = GetCurrentSceneScope();
+            if (string.IsNullOrWhiteSpace(sceneScope))
+            {
+                sceneData = new SceneData(string.Empty);
+                return false;
+            }
+
             if (SavedScenes.TryGetValue(sceneScope, out sceneData))
             {
                 return true;
@@ -56,6 +63,19 @@ namespace CryingSnow.StackCraft
             return CurrentScene == "Location" && !string.IsNullOrWhiteSpace(ActiveLocationId)
                 ? $"Location/{ActiveLocationId}"
                 : CurrentScene;
+        }
+
+        public int GetWorldDay(int fallbackDay = 1)
+        {
+            if (WorldDay <= 0)
+                WorldDay = Mathf.Max(1, fallbackDay);
+
+            return WorldDay;
+        }
+
+        public void SetWorldDay(int day)
+        {
+            WorldDay = Mathf.Max(1, day);
         }
 
         public void PushLocation(string locationId)
@@ -120,6 +140,7 @@ namespace CryingSnow.StackCraft
         public List<string> CompletedQuests = new();
         public List<QuestData> ActiveQuests = new();
         public List<VendorData> SavedVendors = new();
+        public List<MarketStockData> MarketStock = new();
         public HashSet<string> CompletedEncounters = new();
         public TimeData SavedTime;
         public int QuestProgress;
@@ -338,6 +359,41 @@ namespace CryingSnow.StackCraft
         {
             PackId = packId;
             PaidAmount = paidAmount;
+        }
+    }
+
+    [System.Serializable]
+    public sealed class MarketStockData
+    {
+        [SerializeField] private string offerId;
+        [SerializeField] private int day;
+        [SerializeField] private int remaining;
+
+        public string OfferId
+        {
+            get => offerId;
+            set => offerId = value;
+        }
+
+        public int Day
+        {
+            get => day;
+            set => day = value;
+        }
+
+        public int Remaining
+        {
+            get => remaining;
+            set => remaining = value;
+        }
+
+        public MarketStockData() { }
+
+        public MarketStockData(string offerId, int day, int remaining)
+        {
+            this.offerId = offerId;
+            this.day = day;
+            this.remaining = remaining;
         }
     }
 

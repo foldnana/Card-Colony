@@ -228,10 +228,24 @@ namespace CryingSnow.StackCraft
             CardStack otherStack,
             float clearance)
         {
+            return GetPlanarOverlapAreaAt(
+                    movingStack,
+                    movingTargetPosition,
+                    otherStack,
+                    clearance) >
+                0f;
+        }
+
+        internal static float GetPlanarOverlapAreaAt(
+            CardStack movingStack,
+            Vector3 movingTargetPosition,
+            CardStack otherStack,
+            float clearance)
+        {
             if (movingStack?.TopCard == null ||
                 otherStack?.TopCard == null ||
                 movingStack == otherStack)
-                return false;
+                return 0f;
 
             GetStackBoundsAt(
                 movingStack,
@@ -243,10 +257,15 @@ namespace CryingSnow.StackCraft
                 out Vector2 otherPosition,
                 out Vector2 otherHalfSize);
             float safeClearance = Mathf.Max(0f, clearance);
-            return Mathf.Abs(movingPosition.x - otherPosition.x) <
-                    movingHalfSize.x + otherHalfSize.x + safeClearance &&
-                Mathf.Abs(movingPosition.y - otherPosition.y) <
-                    movingHalfSize.y + otherHalfSize.y + safeClearance;
+            float overlapX =
+                movingHalfSize.x + otherHalfSize.x + safeClearance -
+                Mathf.Abs(movingPosition.x - otherPosition.x);
+            float overlapZ =
+                movingHalfSize.y + otherHalfSize.y + safeClearance -
+                Mathf.Abs(movingPosition.y - otherPosition.y);
+            return overlapX > 0f && overlapZ > 0f
+                ? overlapX * overlapZ
+                : 0f;
         }
 
         private static bool CalculateSeparationVector(Vector2 posA, Vector2 halfA, Vector2 posB, Vector2 halfB, out Vector3 separation)

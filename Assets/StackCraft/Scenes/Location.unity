@@ -986,6 +986,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   buyerPrefab: {fileID: 8156953959473003073, guid: a16b97ea8b4bd0744b1dc8fdd22a9112, type: 3}
   currencyCard: {fileID: 11400000, guid: b7527f3f9c42230439cc0a9d39494bb6, type: 2}
+  spawnLegacyZones: 1
+  legacyZoneExcludedLocationIds:
+  - riverbend-market
   vendorPrefab: {fileID: 6851537038171496301, guid: 4ce6e1ab5a8ec1c49a4913628daf915d, type: 3}
   offeredPacks:
   - {fileID: 11400000, guid: 9e96b5b4a1ae41c4bb64fdff6d4fb118, type: 2}
@@ -1083,6 +1086,7 @@ MonoBehaviour:
   locationDefinitions:
   - {fileID: 11400000, guid: 19057fd9f08f05947830448cfe87bc87, type: 2}
   - {fileID: 11400000, guid: 2bb37438fd811ba4aa86898b9baa1f22, type: 2}
+  - {fileID: 11400000, guid: 4b64c1bfb9b89bb4ab71132ef3e926d2, type: 2}
   returnButton: {fileID: 1376330640}
   locationTitleLabel: {fileID: 9031157}
   backgroundShader: {fileID: 10752, guid: 0000000000000000f000000000000000, type: 0}

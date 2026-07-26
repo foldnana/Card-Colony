@@ -15,7 +15,6 @@ namespace CryingSnow.StackCraft
         public bool IsLocked { get; set; }
         public bool IsAnchored => Cards != null && Cards.Exists(card =>
             card?.Definition != null &&
-            card.Definition.IsLocationStatic &&
             !card.Definition.PlayerDraggable);
 
         public CardInstance TopCard => Cards.Count > 0 ? Cards[0] : null;

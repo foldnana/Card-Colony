@@ -28,6 +28,78 @@ namespace CryingSnow.StackCraft
             return TryStore(card, Current);
         }
 
+        public static bool TryStoreGeneratedCards(
+            CardDefinition definition,
+            int count,
+            BackpackData backpack)
+        {
+            return TryStoreGeneratedCardsInternal(
+                definition,
+                count,
+                backpack,
+                notifyChanges: true);
+        }
+
+        internal static bool TryStoreGeneratedCardsDeferred(
+            CardDefinition definition,
+            int count,
+            BackpackData backpack)
+        {
+            return TryStoreGeneratedCardsInternal(
+                definition,
+                count,
+                backpack,
+                notifyChanges: false);
+        }
+
+        private static bool TryStoreGeneratedCardsInternal(
+            CardDefinition definition,
+            int count,
+            BackpackData backpack,
+            bool notifyChanges)
+        {
+            if (!CanStoreDefinition(definition) ||
+                count <= 0 ||
+                backpack == null)
+            {
+                return false;
+            }
+
+            string tableStackId = System.Guid.NewGuid().ToString("N");
+            var addedEntryIds = new List<string>();
+            for (int index = 0; index < count; index++)
+            {
+                var cardData = new CardData
+                {
+                    Id = definition.Id,
+                    UsesLeft = definition.Uses,
+                    CurrentHealth =
+                        definition.CreateCombatStats().MaxHealth.Value,
+                    CurrentNutrition = definition.Nutrition
+                };
+                if (!backpack.TryAdd(cardData, out BackpackEntryData entry))
+                {
+                    foreach (string entryId in addedEntryIds)
+                        backpack.TryRemove(entryId, out _);
+                    return false;
+                }
+
+                entry.TableStackId = tableStackId;
+                entry.TableStackOrder = index;
+                addedEntryIds.Add(entry.InstanceId);
+            }
+
+            if (notifyChanges)
+                NotifyContentsChanged();
+            return true;
+        }
+
+        public static void NotifyContentsChanged()
+        {
+            CardManager.Instance?.NotifyStatsChanged();
+            Changed?.Invoke();
+        }
+
         public static bool TryStore(CardInstance card, BackpackData backpack)
         {
             return TryStoreInternal(

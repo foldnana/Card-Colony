@@ -41,3 +41,14 @@ MonoBehaviour:
   entrances:
   - sourceCardDefinition: {fileID: 11400000, guid: a4a04f35feea8c64d8f952857fe1a7e6, type: 2}
     destinationLocationId: riverbend-inn
+  - sourceCardDefinition: {fileID: 11400000, guid: b6e33907326ab644284f836bdd7baa3c, type: 2}
+    destinationLocationId: riverbend-market
+  randomizeCardsOnEntry: 0
+  randomSpawnAreaCenter: {x: 0, y: 0}
+  randomSpawnAreaSize: {x: 14, y: 7}
+  randomSpawnMinSpacing: 0.8
+  randomSpawnPartyClearance: 2
+  randomCardSpawns: []
+  marketBuyerCardDefinition: {fileID: 0}
+  marketPickupCardDefinition: {fileID: 0}
+  marketOffers: []

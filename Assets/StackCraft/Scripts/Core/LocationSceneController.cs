@@ -373,10 +373,57 @@ namespace CryingSnow.StackCraft
             if (cards == null)
                 return;
 
-            foreach (CardInstance card in cards)
+            List<CardInstance> locationCards = cards
+                .Where(card => card != null)
+                .ToList();
+            CardInstance marketPickup = locationDefinition?
+                .MarketPickupCardDefinition == null
+                ? null
+                : locationCards.FirstOrDefault(card =>
+                    card.Definition?.Id ==
+                    locationDefinition.MarketPickupCardDefinition.Id);
+            CardDefinition marketCurrency =
+                locationDefinition?.MarketCurrencyCardDefinition ??
+                TradeManager.Instance?.CurrencyCard ??
+                Resources.Load<CardDefinition>(
+                    "Cards/Currencies/Card_Coin");
+
+            foreach (CardInstance card in locationCards)
             {
                 if (card?.Definition == null)
                     continue;
+
+                if (locationDefinition?.MarketBuyerCardDefinition != null &&
+                    card.Definition.Id ==
+                    locationDefinition.MarketBuyerCardDefinition.Id)
+                {
+                    MarketCardBuyer buyer =
+                        card.GetComponent<MarketCardBuyer>();
+                    if (buyer == null)
+                        buyer = card.gameObject.AddComponent<MarketCardBuyer>();
+                    buyer.Configure(marketCurrency);
+                }
+
+                LocationMarketOffer marketOffer =
+                    locationDefinition?.MarketOffers.FirstOrDefault(offer =>
+                        offer.SourceCardDefinition != null &&
+                        offer.SourceCardDefinition.Id == card.Definition.Id) ??
+                    default;
+                if (marketOffer.SourceCardDefinition != null &&
+                    marketOffer.ProductDefinition != null)
+                {
+                    MarketProductVendor vendor =
+                        card.GetComponent<MarketProductVendor>();
+                    if (vendor == null)
+                        vendor = card.gameObject.AddComponent<MarketProductVendor>();
+                    vendor.Configure(
+                        marketOffer.ProductDefinition,
+                        marketOffer.BuyPrice,
+                        marketOffer.MinimumDailyStock,
+                        marketOffer.MaximumDailyStock,
+                        marketCurrency,
+                        marketPickup);
+                }
 
                 LocationEntranceDefinition configuredEntrance = locationDefinition?.Entrances
                     .FirstOrDefault(entrance => entrance.SourceCardDefinition != null &&
