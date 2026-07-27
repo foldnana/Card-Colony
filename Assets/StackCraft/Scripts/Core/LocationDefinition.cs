@@ -41,12 +41,16 @@ namespace CryingSnow.StackCraft
     {
         [SerializeField] private CardDefinition sourceCardDefinition;
         [SerializeField] private CardDefinition productDefinition;
+        [SerializeField] private string stockId;
         [SerializeField, Min(1)] private int buyPrice;
         [SerializeField, Min(1)] private int minimumDailyStock;
         [SerializeField, Min(1)] private int maximumDailyStock;
 
         public CardDefinition SourceCardDefinition => sourceCardDefinition;
         public CardDefinition ProductDefinition => productDefinition;
+        public string StockId => string.IsNullOrWhiteSpace(stockId)
+            ? productDefinition?.Id
+            : stockId;
         public int BuyPrice => buyPrice;
         public int MinimumDailyStock => minimumDailyStock;
         public int MaximumDailyStock => maximumDailyStock;
@@ -80,6 +84,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private CardDefinition marketBuyerCardDefinition;
         [SerializeField] private CardDefinition marketPickupCardDefinition;
         [SerializeField] private List<LocationMarketOffer> marketOffers = new();
+        [SerializeField] private List<NpcTradeProfile> npcTradeProfiles = new();
 
         public string Id => id;
         public string DisplayName => displayName;
@@ -107,5 +112,7 @@ namespace CryingSnow.StackCraft
         public CardDefinition MarketPickupCardDefinition =>
             marketPickupCardDefinition;
         public IReadOnlyList<LocationMarketOffer> MarketOffers => marketOffers;
+        public IReadOnlyList<NpcTradeProfile> NpcTradeProfiles =>
+            npcTradeProfiles;
     }
 }

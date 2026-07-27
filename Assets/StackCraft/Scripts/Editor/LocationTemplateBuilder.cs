@@ -57,13 +57,15 @@ namespace CryingSnow.StackCraft.EditorTools
             CardDefinition productDefinition,
             int buyPrice,
             int minimumDailyStock,
-            int maximumDailyStock)
+            int maximumDailyStock,
+            string stockId = null)
         {
             SourceCardDefinition = sourceCardDefinition;
             ProductDefinition = productDefinition;
             BuyPrice = buyPrice;
             MinimumDailyStock = minimumDailyStock;
             MaximumDailyStock = maximumDailyStock;
+            StockId = stockId;
         }
 
         public CardDefinition SourceCardDefinition { get; }
@@ -71,6 +73,7 @@ namespace CryingSnow.StackCraft.EditorTools
         public int BuyPrice { get; }
         public int MinimumDailyStock { get; }
         public int MaximumDailyStock { get; }
+        public string StockId { get; }
     }
 
     [Serializable]
@@ -434,6 +437,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     .objectReferenceValue = offer.SourceCardDefinition;
                 element.FindPropertyRelative("productDefinition")
                     .objectReferenceValue = offer.ProductDefinition;
+                element.FindPropertyRelative("stockId").stringValue =
+                    offer.StockId ?? string.Empty;
                 element.FindPropertyRelative("buyPrice").intValue =
                     Mathf.Max(1, offer.BuyPrice);
                 element.FindPropertyRelative("minimumDailyStock").intValue =

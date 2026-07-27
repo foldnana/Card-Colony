@@ -90,6 +90,19 @@ namespace CryingSnow.StackCraft
         private readonly HashSet<CardDefinition> discoveredCards = new();
         private const int RiverbendContentMigrationVersion = 1;
         private const string RiverbendLocationId = "riverbend";
+        private const string RiverbendMarketLocationId = "riverbend-market";
+        private static readonly HashSet<string> LegacyRiverbendMarketCardIds =
+            new()
+            {
+                "riverbend-market-buyer",
+                "riverbend-market-apple-stall",
+                "riverbend-market-berry-stall",
+                "riverbend-market-potato-stall",
+                "riverbend-market-raw-meat-stall",
+                "riverbend-market-wood-stall",
+                "riverbend-market-stone-stall",
+                "riverbend-market-rope-stall"
+            };
         private const string LegacyRiverbendEggId =
             "85e392d1882a4c61b5b2736e6fb64f4b";
         private static readonly Vector3[] LegacyRiverbendEggPositions =
@@ -249,14 +262,33 @@ namespace CryingSnow.StackCraft
             string activeLocationId)
         {
             if (sceneData == null ||
-                activeLocationId != RiverbendLocationId ||
                 sceneData.ContentMigrationVersion >= RiverbendContentMigrationVersion)
             {
                 return;
             }
 
-            sceneData.SavedStacks?.RemoveAll(stack =>
-                IsLegacyRiverbendEggTestStack(stack));
+            if (activeLocationId == RiverbendLocationId)
+            {
+                sceneData.SavedStacks?.RemoveAll(stack =>
+                    IsLegacyRiverbendEggTestStack(stack));
+            }
+            else if (activeLocationId == RiverbendMarketLocationId &&
+                     sceneData.SavedStacks != null)
+            {
+                foreach (StackData stack in sceneData.SavedStacks)
+                {
+                    stack?.Cards?.RemoveAll(card =>
+                        card != null &&
+                        LegacyRiverbendMarketCardIds.Contains(card.Id));
+                }
+                sceneData.SavedStacks.RemoveAll(stack =>
+                    stack?.Cards == null || stack.Cards.Count == 0);
+            }
+            else
+            {
+                return;
+            }
+
             sceneData.ContentMigrationVersion = RiverbendContentMigrationVersion;
         }
 
@@ -619,6 +651,12 @@ namespace CryingSnow.StackCraft
             if (notifyCreated)
                 OnCardCreated?.Invoke(newCard);
             return newCard;
+        }
+
+        public void NotifyCardCreated(CardInstance card)
+        {
+            if (card != null)
+                OnCardCreated?.Invoke(card);
         }
 
         /// <summary>

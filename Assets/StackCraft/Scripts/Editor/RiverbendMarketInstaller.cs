@@ -150,12 +150,6 @@ namespace CryingSnow.StackCraft.EditorTools
             CardDefinition marketBuilding =
                 RequireAsset<CardDefinition>(MarketBuildingPath);
             CardDefinition grocer = RequireAsset<CardDefinition>(GrocerPath);
-            CardDefinition buyer = CreateOrUpdateServiceCard(
-                "Card_Market_Buyer",
-                "riverbend-market-buyer",
-                "收购台",
-                "回收食物、材料、装备和贵重物品，售得金币会直接进入背包。",
-                marketBuilding.ArtTexture);
             CardDefinition pickupArt =
                 RequireAsset<CardDefinition>(PickupArtPath);
             CardDefinition pickup = CreateOrUpdateServiceCard(
@@ -165,26 +159,17 @@ namespace CryingSnow.StackCraft.EditorTools
                 "购买的商品会出现在取货台旁边。",
                 pickupArt.ArtTexture);
 
-            var offerCards = new Dictionary<string, CardDefinition>();
             var products = new Dictionary<string, CardDefinition>();
             foreach (OfferSpec offer in Offers)
             {
                 CardDefinition product =
                     RequireAsset<CardDefinition>(offer.ProductPath);
                 products[offer.Id] = product;
-                offerCards[offer.Id] = CreateOrUpdateServiceCard(
-                    offer.AssetName,
-                    offer.Id,
-                    offer.DisplayName,
-                    offer.Description,
-                    product.ArtTexture);
             }
 
             LocationDefinition market = CreateOrUpdateMarket(
                 grocer,
-                buyer,
                 pickup,
-                offerCards,
                 products);
             LocationDefinition riverbend =
                 RequireAsset<LocationDefinition>(RiverbendPath);
@@ -201,30 +186,24 @@ namespace CryingSnow.StackCraft.EditorTools
 
         private static LocationDefinition CreateOrUpdateMarket(
             CardDefinition grocer,
-            CardDefinition buyer,
             CardDefinition pickup,
-            IReadOnlyDictionary<string, CardDefinition> offerCards,
             IReadOnlyDictionary<string, CardDefinition> products)
         {
             var spawns = new List<LocationTemplateSpawn>
             {
-                new(buyer, new Vector3(0f, 0f, 2.75f)),
                 new(grocer, new Vector3(0f, 0f, 1.25f)),
                 new(pickup, new Vector3(4.6f, 0f, -2.65f))
             };
             var marketOffers = new List<LocationTemplateMarketOffer>();
             foreach (OfferSpec offer in Offers)
             {
-                CardDefinition offerCard = offerCards[offer.Id];
-                spawns.Add(new LocationTemplateSpawn(
-                    offerCard,
-                    offer.Position));
                 marketOffers.Add(new LocationTemplateMarketOffer(
-                    offerCard,
+                    grocer,
                     products[offer.Id],
                     offer.BuyPrice,
                     offer.MinimumDailyStock,
-                    offer.MaximumDailyStock));
+                    offer.MaximumDailyStock,
+                    offer.Id));
             }
 
             return LocationTemplateBuilder.CreateOrUpdate(
@@ -248,7 +227,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     Entrances = Array.Empty<LocationTemplateEntrance>(),
                     MarketCurrencyCardDefinition =
                         RequireAsset<CardDefinition>(CoinPath),
-                    MarketBuyerCardDefinition = buyer,
+                    MarketBuyerCardDefinition = null,
                     MarketPickupCardDefinition = pickup,
                     MarketOffers = marketOffers
                 });

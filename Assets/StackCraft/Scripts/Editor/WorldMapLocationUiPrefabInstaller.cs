@@ -147,6 +147,122 @@ namespace CryingSnow.StackCraft.EditorTools
                     new Vector2(0.93f, 0.1f));
                 enterButton.interactable = false;
 
+                GameObject npcTradePanel = CreateUiObject(
+                    "NpcTradePanel",
+                    locationViewObject.transform,
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                SetRect(
+                    (RectTransform)npcTradePanel.transform,
+                    new Vector2(0.04f, 0.11f),
+                    new Vector2(0.96f, 0.61f),
+                    Vector2.zero,
+                    Vector2.zero);
+                npcTradePanel.GetComponent<Image>().color =
+                    new Color(0.035f, 0.045f, 0.055f, 0.98f);
+
+                Button npcBuyTab = CreateButton(
+                    "NpcBuyTabButton",
+                    npcTradePanel.transform,
+                    font,
+                    "购买",
+                    new Color(0.18f, 0.48f, 0.36f, 1f),
+                    new Vector2(0.02f, 0.87f),
+                    new Vector2(0.32f, 0.98f));
+                Button npcSellTab = CreateButton(
+                    "NpcSellTabButton",
+                    npcTradePanel.transform,
+                    font,
+                    "出售",
+                    new Color(0.48f, 0.34f, 0.16f, 1f),
+                    new Vector2(0.35f, 0.87f),
+                    new Vector2(0.65f, 0.98f));
+                Button npcTalkTab = CreateButton(
+                    "NpcTalkTabButton",
+                    npcTradePanel.transform,
+                    font,
+                    "交谈",
+                    new Color(0.25f, 0.38f, 0.55f, 1f),
+                    new Vector2(0.68f, 0.87f),
+                    new Vector2(0.98f, 0.98f));
+
+                GameObject scrollObject = CreateUiObject(
+                    "NpcTradeScrollView",
+                    npcTradePanel.transform,
+                    typeof(CanvasRenderer),
+                    typeof(Image),
+                    typeof(ScrollRect));
+                SetRect(
+                    (RectTransform)scrollObject.transform,
+                    new Vector2(0.02f, 0.18f),
+                    new Vector2(0.98f, 0.84f),
+                    Vector2.zero,
+                    Vector2.zero);
+                scrollObject.GetComponent<Image>().color =
+                    new Color(0f, 0f, 0f, 0.22f);
+
+                GameObject viewport = CreateUiObject(
+                    "Viewport",
+                    scrollObject.transform,
+                    typeof(CanvasRenderer),
+                    typeof(Image),
+                    typeof(Mask));
+                SetRect(
+                    (RectTransform)viewport.transform,
+                    Vector2.zero,
+                    Vector2.one,
+                    Vector2.zero,
+                    Vector2.zero);
+                viewport.GetComponent<Image>().color =
+                    new Color(1f, 1f, 1f, 0.01f);
+                viewport.GetComponent<Mask>().showMaskGraphic = false;
+
+                GameObject contentObject = CreateUiObject(
+                    "NpcTradeListContent",
+                    viewport.transform,
+                    typeof(VerticalLayoutGroup),
+                    typeof(ContentSizeFitter));
+                RectTransform content = (RectTransform)contentObject.transform;
+                SetRect(
+                    content,
+                    new Vector2(0f, 1f),
+                    Vector2.one,
+                    Vector2.zero,
+                    Vector2.zero);
+                content.pivot = new Vector2(0.5f, 1f);
+                var layout = contentObject.GetComponent<VerticalLayoutGroup>();
+                layout.spacing = 8f;
+                layout.padding = new RectOffset(8, 8, 8, 8);
+                layout.childControlWidth = true;
+                layout.childForceExpandWidth = true;
+                layout.childControlHeight = true;
+                layout.childForceExpandHeight = false;
+                contentObject.GetComponent<ContentSizeFitter>().verticalFit =
+                    ContentSizeFitter.FitMode.PreferredSize;
+
+                ScrollRect scroll = scrollObject.GetComponent<ScrollRect>();
+                scroll.viewport = (RectTransform)viewport.transform;
+                scroll.content = content;
+                scroll.horizontal = false;
+                scroll.vertical = true;
+                scroll.movementType = ScrollRect.MovementType.Clamped;
+
+                NpcTradeListRowView rowTemplate = CreateNpcTradeRowTemplate(
+                    contentObject.transform,
+                    font);
+                rowTemplate.gameObject.SetActive(false);
+                TMP_Text npcTradeHint = CreateText(
+                    "NpcTradeHint",
+                    npcTradePanel.transform,
+                    font,
+                    "选择购买、出售或交谈。",
+                    18f,
+                    new Color(0.88f, 0.88f, 0.82f),
+                    TextAlignmentOptions.TopLeft,
+                    new Vector2(0.03f, 0.02f),
+                    new Vector2(0.97f, 0.16f));
+                npcTradeHint.enableWordWrapping = true;
+
                 var serializedView = new SerializedObject(
                     locationViewObject.GetComponent<WorldMapLocationView>());
                 SetReference(serializedView, "locationToggle", locationToggle);
@@ -159,7 +275,15 @@ namespace CryingSnow.StackCraft.EditorTools
                 SetReference(serializedView, "resourcesLabel", resources);
                 SetReference(serializedView, "descriptionLabel", description);
                 SetReference(serializedView, "enterLocationButton", enterButton);
+                SetReference(serializedView, "npcTradePanel", npcTradePanel);
+                SetReference(serializedView, "npcBuyTabButton", npcBuyTab);
+                SetReference(serializedView, "npcSellTabButton", npcSellTab);
+                SetReference(serializedView, "npcTalkTabButton", npcTalkTab);
+                SetReference(serializedView, "npcTradeListRoot", content);
+                SetReference(serializedView, "npcTradeRowTemplate", rowTemplate);
+                SetReference(serializedView, "npcTradeHint", npcTradeHint);
                 serializedView.ApplyModifiedPropertiesWithoutUndo();
+                npcTradePanel.SetActive(false);
 
                 CanvasGroup canvasGroup = locationViewObject.GetComponent<CanvasGroup>();
                 canvasGroup.alpha = 0f;
@@ -227,7 +351,8 @@ namespace CryingSnow.StackCraft.EditorTools
             string text,
             Color color,
             Vector2 anchorMin,
-            Vector2 anchorMax)
+            Vector2 anchorMax,
+            float fontSize = 27f)
         {
             GameObject gameObject = CreateUiObject(
                 name,
@@ -245,12 +370,93 @@ namespace CryingSnow.StackCraft.EditorTools
                 gameObject.transform,
                 font,
                 text,
-                27f,
+                fontSize,
                 Color.white,
                 TextAlignmentOptions.Center,
                 Vector2.zero,
                 Vector2.one);
             return button;
+        }
+
+        private static NpcTradeListRowView CreateNpcTradeRowTemplate(
+            Transform parent,
+            TMP_FontAsset font)
+        {
+            GameObject rowObject = CreateUiObject(
+                "NpcTradeRowTemplate",
+                parent,
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(LayoutElement),
+                typeof(NpcTradeListRowView));
+            rowObject.GetComponent<Image>().color =
+                new Color(0.12f, 0.14f, 0.16f, 0.96f);
+            LayoutElement rowLayout =
+                rowObject.GetComponent<LayoutElement>();
+            rowLayout.preferredHeight = 104f;
+            rowLayout.flexibleWidth = 1f;
+
+            GameObject iconObject = CreateUiObject(
+                "Icon",
+                rowObject.transform,
+                typeof(CanvasRenderer),
+                typeof(RawImage));
+            SetRect(
+                (RectTransform)iconObject.transform,
+                new Vector2(0.02f, 0.12f),
+                new Vector2(0.18f, 0.88f),
+                Vector2.zero,
+                Vector2.zero);
+            RawImage icon = iconObject.GetComponent<RawImage>();
+            icon.raycastTarget = false;
+
+            TMP_Text details = CreateText(
+                "Details",
+                rowObject.transform,
+                font,
+                "商品\n价格 · 库存",
+                18f,
+                Color.white,
+                TextAlignmentOptions.MidlineLeft,
+                new Vector2(0.2f, 0.08f),
+                new Vector2(0.56f, 0.92f));
+            details.enableWordWrapping = true;
+
+            Button primary = CreateButton(
+                "PrimaryButton",
+                rowObject.transform,
+                font,
+                "购买",
+                new Color(0.16f, 0.55f, 0.36f, 1f),
+                new Vector2(0.58f, 0.18f),
+                new Vector2(0.78f, 0.82f),
+                18f);
+            Button secondary = CreateButton(
+                "SecondaryButton",
+                rowObject.transform,
+                font,
+                "全部",
+                new Color(0.46f, 0.34f, 0.16f, 1f),
+                new Vector2(0.79f, 0.18f),
+                new Vector2(0.99f, 0.82f),
+                18f);
+
+            var serializedRow = new SerializedObject(
+                rowObject.GetComponent<NpcTradeListRowView>());
+            SetReference(serializedRow, "icon", icon);
+            SetReference(serializedRow, "detailsLabel", details);
+            SetReference(serializedRow, "primaryButton", primary);
+            SetReference(
+                serializedRow,
+                "primaryButtonLabel",
+                primary.GetComponentInChildren<TMP_Text>(true));
+            SetReference(serializedRow, "secondaryButton", secondary);
+            SetReference(
+                serializedRow,
+                "secondaryButtonLabel",
+                secondary.GetComponentInChildren<TMP_Text>(true));
+            serializedRow.ApplyModifiedPropertiesWithoutUndo();
+            return rowObject.GetComponent<NpcTradeListRowView>();
         }
 
         private static void SetRect(

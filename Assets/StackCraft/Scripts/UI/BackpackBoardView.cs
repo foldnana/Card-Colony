@@ -33,6 +33,8 @@ namespace CryingSnow.StackCraft
         private bool hasSurfaceCameraTarget;
         private bool isSurfaceDragging;
         private bool hasEverOpened;
+        private bool isClearingProxies;
+        private bool visualRepairPending;
 
         public float SurfaceHeight => BaseThickness;
         public Vector2 Size => DefaultSize;
@@ -61,6 +63,7 @@ namespace CryingSnow.StackCraft
         private void LateUpdate()
         {
             UpdateSurfaceCameraMotion(Time.unscaledDeltaTime);
+            RepairMissingVisuals();
         }
 
         public void Initialize(BackpackView backpackView, Texture texture)
@@ -101,7 +104,7 @@ namespace CryingSnow.StackCraft
                     .SetEase(Ease.OutBack)
                     .SetUpdate(true)
                     .OnUpdate(SynchronizeStackTargetsToVisuals)
-                    .OnComplete(SynchronizeStackTargetsToVisuals);
+                    .OnComplete(HandleOpeningCompleted);
                 return;
             }
 
@@ -131,13 +134,33 @@ namespace CryingSnow.StackCraft
                 });
         }
 
+        private void HandleOpeningCompleted()
+        {
+            SynchronizeStackTargetsToVisuals();
+            if (owner != null &&
+                owner.IsOpen &&
+                gameObject.activeInHierarchy)
+            {
+                owner.Refresh();
+            }
+        }
+
         public void Rebuild(BackpackData backpack)
         {
-            ClearProxies();
-            if (!gameObject.activeSelf || backpack?.Entries == null ||
-                CardManager.Instance == null)
+            if (!gameObject.activeSelf || backpack?.Entries == null)
+            {
+                ClearProxies();
                 return;
+            }
 
+            if (CardManager.Instance == null)
+            {
+                visualRepairPending = true;
+                return;
+            }
+
+            visualRepairPending = false;
+            ClearProxies();
             foreach (IGrouping<string, BackpackEntryData> group in backpack.Entries
                          .Where(entry => entry?.Card != null)
                          .GroupBy(entry => string.IsNullOrWhiteSpace(entry.TableStackId)
@@ -607,6 +630,24 @@ namespace CryingSnow.StackCraft
                 DestroyImmediate(proxy);
         }
 
+        internal void NotifyProxyUnavailable(BackpackCardProxy proxy)
+        {
+            if (isClearingProxies ||
+                proxy == null ||
+                string.IsNullOrWhiteSpace(proxy.EntryId))
+            {
+                return;
+            }
+
+            if (proxies.TryGetValue(
+                    proxy.EntryId,
+                    out BackpackCardProxy registeredProxy) &&
+                registeredProxy == proxy)
+            {
+                visualRepairPending = true;
+            }
+        }
+
         private void BuildVisuals()
         {
             if (surfaceCollider != null)
@@ -765,6 +806,19 @@ namespace CryingSnow.StackCraft
                         visualAnchor);
                 }
             }
+        }
+
+        private void RepairMissingVisuals()
+        {
+            if (!visualRepairPending ||
+                owner == null ||
+                !owner.IsOpen ||
+                !gameObject.activeInHierarchy)
+            {
+                return;
+            }
+
+            Rebuild(BackpackService.Current);
         }
 
         private static bool NeedsVisualLayoutRepair(
@@ -990,9 +1044,18 @@ namespace CryingSnow.StackCraft
 
         private void ClearProxies()
         {
-            foreach (BackpackCardProxy proxy in proxies.Values.ToList())
-                DestroyProxyCard(proxy);
-            proxies.Clear();
+            visualRepairPending = false;
+            isClearingProxies = true;
+            try
+            {
+                foreach (BackpackCardProxy proxy in proxies.Values.ToList())
+                    DestroyProxyCard(proxy);
+                proxies.Clear();
+            }
+            finally
+            {
+                isClearingProxies = false;
+            }
         }
 
         private static void DestroyProxyCard(BackpackCardProxy proxy)

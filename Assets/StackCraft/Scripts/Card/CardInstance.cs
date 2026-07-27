@@ -27,6 +27,7 @@ namespace CryingSnow.StackCraft
         private TextMeshPro healthText;
 
         public CardDefinition Definition { get; protected set; }
+        public string PersistentId { get; private set; }
         public CardSettings Settings { get; private set; }
         public CardStack Stack { get; set; }
         public Vector2 Size { get; private set; }
@@ -88,6 +89,7 @@ namespace CryingSnow.StackCraft
             gameObject.name = $"{(definition is PackDefinition ? "Pack" : "Card")}_{definition.DisplayName}";
 
             Definition = definition;
+            PersistentId = System.Guid.NewGuid().ToString("N");
             Settings = settings;
             Size = new Vector2(_col.size.x, _col.size.z) + settings.Margin;
 
@@ -593,6 +595,8 @@ namespace CryingSnow.StackCraft
         /// <param name="cardData">The data object containing the saved stat values.</param>
         public void RestoreSavedStats(CardData cardData)
         {
+            if (!string.IsNullOrWhiteSpace(cardData.PersistentId))
+                PersistentId = cardData.PersistentId;
             UsesLeft = cardData.UsesLeft;
             CurrentHealth = cardData.CurrentHealth;
             CurrentNutrition = cardData.CurrentNutrition;

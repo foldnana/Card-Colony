@@ -393,6 +393,27 @@ namespace CryingSnow.StackCraft
                 if (card?.Definition == null)
                     continue;
 
+                if (card.Definition.Category == CardCategory.Character &&
+                    card.Definition.Faction == CardFaction.Neutral)
+                {
+                    NpcTrader trader = card.GetComponent<NpcTrader>();
+                    if (trader == null)
+                        trader = card.gameObject.AddComponent<NpcTrader>();
+                    trader.Configure(
+                        card,
+                        locationDefinition?.MarketOffers.Where(offer =>
+                            offer.SourceCardDefinition != null &&
+                            offer.SourceCardDefinition.Id ==
+                            card.Definition.Id),
+                        marketCurrency,
+                        marketPickup,
+                        locationDefinition?.NpcTradeProfiles.FirstOrDefault(
+                            profile => profile != null &&
+                                profile.NpcDefinition != null &&
+                                profile.NpcDefinition.Id ==
+                                card.Definition.Id));
+                }
+
                 if (locationDefinition?.MarketBuyerCardDefinition != null &&
                     card.Definition.Id ==
                     locationDefinition.MarketBuyerCardDefinition.Id)
@@ -409,7 +430,8 @@ namespace CryingSnow.StackCraft
                         offer.SourceCardDefinition != null &&
                         offer.SourceCardDefinition.Id == card.Definition.Id) ??
                     default;
-                if (marketOffer.SourceCardDefinition != null &&
+                if (card.Definition.Category != CardCategory.Character &&
+                    marketOffer.SourceCardDefinition != null &&
                     marketOffer.ProductDefinition != null)
                 {
                     MarketProductVendor vendor =

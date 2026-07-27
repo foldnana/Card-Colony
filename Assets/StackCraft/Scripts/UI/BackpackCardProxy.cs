@@ -30,6 +30,11 @@ namespace CryingSnow.StackCraft
             SlotIndex = slotIndex;
         }
 
+        private void OnDisable()
+        {
+            board?.NotifyProxyUnavailable(this);
+        }
+
         public bool HandleDrop(CardInstance card, Vector3 dropPosition)
         {
             if (card != Card)

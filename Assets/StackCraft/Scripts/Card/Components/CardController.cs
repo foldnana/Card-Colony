@@ -46,6 +46,7 @@ namespace CryingSnow.StackCraft
         private CardInstance equipperCard => _equipmentComponent?.Equipper;
 
         public bool CanBeDragged => _card != null &&
+            GetComponent<NpcTrader>() == null &&
             (_card.Definition == null || _card.Definition.PlayerDraggable) &&
             _card.Stack != null &&
             !_card.Stack.IsLocked;
@@ -77,6 +78,7 @@ namespace CryingSnow.StackCraft
             LocationEntrance.NotifyCardClicked(_card);
             MarketProductVendor.NotifyCardClicked(_card);
             MarketCardBuyer.NotifyCardClicked(_card);
+            NpcTrader.NotifyCardClicked(_card);
 
             if (!CanBeDragged) return;
 
@@ -286,6 +288,7 @@ namespace CryingSnow.StackCraft
                 TryStoreInBackpack,
                 TryDockAtNearbyBuilding,
                 TryTradeWithNearbyZone,
+                TryPreviewSaleWithNearbyNpc,
                 TryEquipOnNearbyCharacter,
                 TryInitiateDialogueWithNearbyNpc,
                 TryJoinCombatWithExistingTask,
@@ -508,6 +511,31 @@ namespace CryingSnow.StackCraft
             }
 
             return false;
+        }
+
+        private bool TryPreviewSaleWithNearbyNpc()
+        {
+            if (!ShouldAttemptNpcSalePreview(_card?.Definition))
+                return false;
+
+            if (!NpcTrader.TryFindDropTarget(
+                    _card,
+                    _card.Settings.AttachRadius,
+                    out NpcTrader trader))
+            {
+                return false;
+            }
+
+            trader.PreviewWorldSale(_card.Stack, out _);
+            _card.Stack?.SetTargetPosition(_dragStartPosition);
+            return true;
+        }
+
+        public static bool ShouldAttemptNpcSalePreview(
+            CardDefinition definition)
+        {
+            return definition != null &&
+                definition.Category != CardCategory.Character;
         }
 
         private bool TryEquipOnNearbyCharacter()

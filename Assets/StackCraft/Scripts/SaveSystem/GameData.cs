@@ -141,6 +141,7 @@ namespace CryingSnow.StackCraft
         public List<QuestData> ActiveQuests = new();
         public List<VendorData> SavedVendors = new();
         public List<MarketStockData> MarketStock = new();
+        public List<NpcTradeStateData> NpcTrades = new();
         public HashSet<string> CompletedEncounters = new();
         public TimeData SavedTime;
         public int QuestProgress;
@@ -243,6 +244,7 @@ namespace CryingSnow.StackCraft
     public class CardData
     {
         public string Id;
+        public string PersistentId;
         public int UsesLeft;
         public int CurrentHealth;
         public int CurrentNutrition;
@@ -257,6 +259,7 @@ namespace CryingSnow.StackCraft
         public CardData(CardInstance card)
         {
             Id = card.Definition.Id;
+            PersistentId = card.PersistentId;
             UsesLeft = card.UsesLeft;
             CurrentHealth = card.CurrentHealth;
             CurrentNutrition = card.CurrentNutrition;

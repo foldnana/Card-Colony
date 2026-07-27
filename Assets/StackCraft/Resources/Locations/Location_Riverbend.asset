@@ -49,6 +49,7 @@ MonoBehaviour:
   randomSpawnMinSpacing: 0.8
   randomSpawnPartyClearance: 2
   randomCardSpawns: []
+  marketCurrencyCardDefinition: {fileID: 0}
   marketBuyerCardDefinition: {fileID: 0}
   marketPickupCardDefinition: {fileID: 0}
   marketOffers: []

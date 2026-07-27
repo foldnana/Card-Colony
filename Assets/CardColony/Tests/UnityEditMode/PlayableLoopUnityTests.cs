@@ -617,6 +617,188 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void BackpackBoard_QueuesRepairWhenAVisualProxyIsUnexpectedlyDisabled()
+        {
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type proxyType =
+                FindType("CryingSnow.StackCraft.BackpackCardProxy");
+            GameObject boardObject =
+                new("Backpack Missing Visual Repair Board");
+            Component card = CreateUninitializedCard(
+                null,
+                "Backpack Unexpectedly Disabled Card");
+            Object settings = (Object)card.GetType()
+                .GetProperty("Settings").GetValue(card);
+
+            try
+            {
+                Component board = boardObject.AddComponent(boardType);
+                Component proxy = card.gameObject.AddComponent(proxyType);
+                proxyType.GetMethod("Bind").Invoke(
+                    proxy,
+                    new object[] { null, board, card, "stored-card", 0 });
+
+                var proxies = (IDictionary)boardType.GetField(
+                        "proxies",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetValue(board);
+                proxies.Add("stored-card", proxy);
+
+                FieldInfo repairPending = boardType.GetField(
+                    "visualRepairPending",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(repairPending, Is.Not.Null,
+                    "The backpack board must remember that its visual cache no longer matches BackpackData.");
+
+                proxyType.GetMethod(
+                        "OnDisable",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(proxy, null);
+
+                Assert.That(
+                    (bool)repairPending.GetValue(board),
+                    Is.True,
+                    "Disabling a live backpack proxy must queue a rebuild instead of leaving the stored card invisible until another item is added.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                DestroyTestCard(card);
+                if (settings != null)
+                    Object.DestroyImmediate(settings);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_OpeningCompletionRefreshesCardsAtTheStableBoardPosition()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType =
+                FindType("CryingSnow.StackCraft.GameDirector");
+            System.Type gameDataType =
+                FindType("CryingSnow.StackCraft.GameData");
+            System.Type gameplayPrefsType =
+                FindType("CryingSnow.StackCraft.GameplayPrefs");
+            System.Type backpackType =
+                FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType =
+                FindType("CryingSnow.StackCraft.CardData");
+            System.Type viewType =
+                FindType("CryingSnow.StackCraft.BackpackView");
+
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject(
+                    "Stable Open Backpack Test GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(gameplayPrefsType));
+            gameDirectorType.GetProperty("GameData")
+                .SetValue(gameDirector, gameData);
+
+            MonoBehaviour cardManager =
+                Object.FindObjectsOfType<MonoBehaviour>(true)
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.CardManager");
+            System.Type cardManagerType = cardManager.GetType();
+            cardManagerType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            cardManagerType.GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+            cardManagerType.GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            object backpack = gameDataType.GetMethod("EnsureBackpack")
+                .Invoke(gameData, null);
+            Object berryDefinition =
+                AssetDatabase.LoadAssetAtPath<Object>(
+                    "Assets/StackCraft/Resources/Cards/Consumables/Card_Berry.asset");
+            object berryData =
+                System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id").SetValue(
+                berryData,
+                berryDefinition.GetType().GetProperty("Id")
+                    .GetValue(berryDefinition));
+            backpackType.GetMethod("TryAdd")
+                .Invoke(backpack, new object[] { berryData, null });
+
+            Component existing =
+                viewType.GetProperty("Instance").GetValue(null) as Component;
+            if (existing != null)
+                Object.DestroyImmediate(existing.gameObject);
+
+            var viewObject = new GameObject("Stable Open Backpack View");
+            var panelObject = new GameObject(
+                "Stable Open Backpack Panel",
+                typeof(RectTransform));
+            try
+            {
+                Component view = viewObject.AddComponent(viewType);
+                viewType.GetField(
+                        "tablePanel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(view, panelObject.GetComponent<RectTransform>());
+                panelObject.SetActive(true);
+                viewType.GetMethod(
+                        "EnsureBoard3D",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(view, null);
+
+                Component board = viewType.GetProperty("Board3D")
+                    .GetValue(view) as Component;
+                Assert.That(board, Is.Not.Null);
+                board.GetType().GetMethod("SetVisible")
+                    .Invoke(board, new object[] { true });
+                Assert.That(
+                    board.GetComponentsInChildren<MonoBehaviour>(true)
+                        .Count(component => component.GetType().FullName ==
+                            "CryingSnow.StackCraft.BackpackCardProxy"),
+                    Is.Zero,
+                    "This test must begin before any explicit backpack rebuild.");
+
+                LogAssert.Expect(
+                    LogType.Error,
+                    new System.Text.RegularExpressions.Regex(
+                        "Instantiating material due to calling renderer.material during edit mode"));
+                System.Type dotweenType = FindType("DG.Tweening.DOTween");
+                MethodInfo complete = dotweenType.GetMethod(
+                    "Complete",
+                    BindingFlags.Public | BindingFlags.Static,
+                    null,
+                    new[] { typeof(object), typeof(bool) },
+                    null);
+                Assert.That(complete, Is.Not.Null);
+                complete.Invoke(null, new object[] { board.transform, true });
+
+                Assert.That(
+                    board.GetComponentsInChildren<MonoBehaviour>(true)
+                        .Count(component => component.GetType().FullName ==
+                            "CryingSnow.StackCraft.BackpackCardProxy"),
+                    Is.EqualTo(1),
+                    "Finishing the opening animation must rebuild cards once the board has reached its stable visible position.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(viewObject);
+                Object.DestroyImmediate(panelObject);
+                Object.DestroyImmediate(gameDirector.gameObject);
+            }
+        }
+
+        [Test]
         public void BackpackCardProxy_ProvidesDragHeightAboveRaisedSurface()
         {
             System.Type providerType =
@@ -2335,6 +2517,166 @@ namespace CardColony.Tests
             finally
             {
                 Object.DestroyImmediate(boardObject);
+                Object.DestroyImmediate(gameDirector.gameObject);
+            }
+        }
+
+        [Test]
+        public void BackpackBoard_RestoresTheExactBerryAndCoinSaleResultAsVisibleCards()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            System.Type gameDirectorType =
+                FindType("CryingSnow.StackCraft.GameDirector");
+            System.Type gameDataType =
+                FindType("CryingSnow.StackCraft.GameData");
+            System.Type gameplayPrefsType =
+                FindType("CryingSnow.StackCraft.GameplayPrefs");
+            System.Type boardType =
+                FindType("CryingSnow.StackCraft.BackpackBoardView");
+            System.Type backpackType =
+                FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType =
+                FindType("CryingSnow.StackCraft.CardData");
+
+            MonoBehaviour gameDirector = (MonoBehaviour)new GameObject(
+                    "Sale Result Backpack Test GameDirector")
+                .AddComponent(gameDirectorType);
+            gameDirectorType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, gameDirector);
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("GameplayPrefs").SetValue(
+                gameData,
+                System.Activator.CreateInstance(gameplayPrefsType));
+            gameDirectorType.GetProperty("GameData")
+                .SetValue(gameDirector, gameData);
+
+            MonoBehaviour cardManager =
+                Object.FindObjectsOfType<MonoBehaviour>(true)
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.CardManager");
+            System.Type cardManagerType = cardManager.GetType();
+            cardManagerType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static)
+                .SetValue(null, cardManager);
+            cardManagerType.GetMethod(
+                    "InitializePrefabLookup",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+            cardManagerType.GetMethod(
+                    "BuildDefinitionDatabase",
+                    BindingFlags.Instance | BindingFlags.NonPublic)
+                .Invoke(cardManager, null);
+
+            var cameraObject = new GameObject("Sale Result Backpack Camera");
+            Camera camera = cameraObject.AddComponent<Camera>();
+            camera.orthographic = true;
+            camera.orthographicSize = 4f;
+            camera.transform.rotation = Quaternion.Euler(85f, 0f, 0f);
+            var boardObject = new GameObject("Sale Result Backpack Board");
+            Component board = boardObject.AddComponent(boardType);
+            try
+            {
+                boardType.GetMethod("Initialize")
+                    .Invoke(board, new object[] { null, null });
+                boardType.GetMethod("ConfigureOverlay")
+                    .Invoke(board, new object[] { camera, 30 });
+                boardType.GetMethod("SetVisible")
+                    .Invoke(board, new object[] { true });
+
+                object backpack =
+                    System.Activator.CreateInstance(backpackType);
+                Object berryDefinition =
+                    AssetDatabase.LoadAssetAtPath<Object>(
+                        "Assets/StackCraft/Resources/Cards/Consumables/Card_Berry.asset");
+                Object coinDefinition =
+                    AssetDatabase.LoadAssetAtPath<Object>(
+                        "Assets/StackCraft/Resources/Cards/Currencies/Card_Coin.asset");
+                string berryId = (string)berryDefinition.GetType()
+                    .GetProperty("Id").GetValue(berryDefinition);
+                string coinId = (string)coinDefinition.GetType()
+                    .GetProperty("Id").GetValue(coinDefinition);
+
+                object berryData =
+                    System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(berryData, berryId);
+                object[] berryAdd = { berryData, null };
+                backpackType.GetMethod("TryAdd")
+                    .Invoke(backpack, berryAdd);
+                object berryEntry = berryAdd[1];
+                backpackType.GetMethod("TrySetTablePlacement")
+                    .Invoke(backpack, new object[]
+                    {
+                        berryEntry.GetType().GetField("InstanceId")
+                            .GetValue(berryEntry),
+                        1.27832031f,
+                        -0.474609375f,
+                        "berry-stack",
+                        0
+                    });
+
+                for (int index = 0; index < 3; index++)
+                {
+                    object coinData =
+                        System.Activator.CreateInstance(cardDataType);
+                    cardDataType.GetField("Id").SetValue(coinData, coinId);
+                    object[] coinAdd = { coinData, null };
+                    backpackType.GetMethod("TryAdd")
+                        .Invoke(backpack, coinAdd);
+                    object coinEntry = coinAdd[1];
+                    backpackType.GetMethod("TrySetTablePlacement")
+                        .Invoke(backpack, new object[]
+                        {
+                            coinEntry.GetType().GetField("InstanceId")
+                                .GetValue(coinEntry),
+                            0.37890625f,
+                            0f,
+                            "sale-coins",
+                            index
+                        });
+                }
+
+                for (int index = 0; index < 4; index++)
+                {
+                    LogAssert.Expect(
+                        LogType.Error,
+                        new System.Text.RegularExpressions.Regex(
+                            "Instantiating material due to calling renderer.material during edit mode"));
+                }
+                boardType.GetMethod("Rebuild")
+                    .Invoke(board, new[] { backpack });
+
+                MonoBehaviour[] proxies = boardObject
+                    .GetComponentsInChildren<MonoBehaviour>(true)
+                    .Where(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.BackpackCardProxy")
+                    .ToArray();
+                Assert.That(proxies, Has.Length.EqualTo(4),
+                    "The saved berry and all three sale coins must each have a visual proxy.");
+                Assert.That(proxies.All(proxy =>
+                {
+                    Component card = proxy.GetType().GetProperty("Card")
+                        .GetValue(proxy) as Component;
+                    MeshRenderer renderer =
+                        card != null ? card.GetComponent<MeshRenderer>() : null;
+                    return card != null &&
+                        card.gameObject.activeInHierarchy &&
+                        card.gameObject.layer == 30 &&
+                        renderer != null &&
+                        renderer.enabled &&
+                        renderer.bounds.center.y >
+                            boardObject.transform.position.y + 0.32f;
+                }), Is.True,
+                    "Sale-result cards must be active, on the overlay layer, and above the backpack surface.");
+            }
+            finally
+            {
+                Object.DestroyImmediate(boardObject);
+                Object.DestroyImmediate(cameraObject);
                 Object.DestroyImmediate(gameDirector.gameObject);
             }
         }
