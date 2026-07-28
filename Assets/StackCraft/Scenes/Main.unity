@@ -597,7 +597,7 @@ MonoBehaviour:
     explorationProgress: 1
     description: "\u6CBF\u6CB3\u5EFA\u7ACB\u7684\u5B89\u9759\u6751\u5E84\uFF0C\u662F\u5C0F\u961F\u6574\u5907\u3001\u4EA4\u6613\u548C\u63A5\u53D7\u59D4\u6258\u7684\u8D77\u70B9\u3002"
   - locationId: white-stone-city
-    localMapImplemented: 0
+    localMapImplemented: 1
     locationType: "\u57CE\u9547"
     dangerLevel: 3
     travelTime: "1\u79D2\uFF08\u4E34\u65F6\uFF09"

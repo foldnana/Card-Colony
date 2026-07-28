@@ -1,0 +1,64 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71c7f5a4d4a14b09a7d9fd4b1fc9aa11, type: 3}
+  m_Name: Location_WhiteStoneCity
+  m_EditorClassIdentifier: 
+  id: white-stone-city
+  displayName: "\u767D\u77F3\u57CE"
+  backgroundTexture: {fileID: 2800000, guid: 730a367403149d149926a0e8c3483628, type: 3}
+  mapSize: {x: 23, y: 12.94}
+  cameraMinDistance: 3
+  cameraMaxDistance: 30
+  cameraInitialDistance: 9
+  cameraZoomSpeed: 3.8
+  expandedPartyMemberDefinition: {fileID: 11400000, guid: 3e0351bd595e3654d9d80dc4286c0a65, type: 2}
+  partySpawnPosition: {x: 0, y: 0, z: -5.15}
+  partyMemberSpacing: 0.9
+  initialCardSpawns:
+  - definition: {fileID: 11400000, guid: a51e2ce22b6d3324d81315b6c2c4ee92, type: 2}
+    position: {x: 0, y: 0, z: 4.4}
+  - definition: {fileID: 11400000, guid: f08091e8c9e75894bbfab3ee40ac5edc, type: 2}
+    position: {x: -7, y: 0, z: 1.8}
+  - definition: {fileID: 11400000, guid: bfa896147ad97ec4f854517ee985ae90, type: 2}
+    position: {x: 7, y: 0, z: 1.8}
+  - definition: {fileID: 11400000, guid: 53e37d90cf5a19749a8405c1898b362c, type: 2}
+    position: {x: -7, y: 0, z: -2.4}
+  - definition: {fileID: 11400000, guid: 33fe9125f18d05c4983649d8622aac10, type: 2}
+    position: {x: 7, y: 0, z: -2.4}
+  - definition: {fileID: 11400000, guid: bae74a91d519bfb409b2eb6ebbb66f41, type: 2}
+    position: {x: 0, y: 0, z: 2.35}
+  - definition: {fileID: 11400000, guid: 94bde53f002850b49ba73567456307c0, type: 2}
+    position: {x: -5.15, y: 0, z: 0.25}
+  - definition: {fileID: 11400000, guid: 6e65fdc06008de448adcddd83d20ccae, type: 2}
+    position: {x: 5.15, y: 0, z: 0.25}
+  - definition: {fileID: 11400000, guid: 2f971843d9b537a42ae491c88d2403dc, type: 2}
+    position: {x: -5.45, y: 0, z: -3.55}
+  - definition: {fileID: 11400000, guid: 47a15186a3696364abd0b42b094e1b96, type: 2}
+    position: {x: 5.45, y: 0, z: -3.55}
+  - definition: {fileID: 11400000, guid: 586e81614d961cc438d1c486ecb4a339, type: 2}
+    position: {x: -2.8, y: 0, z: 0.8}
+  - definition: {fileID: 11400000, guid: 4072b9d4f5e54644dbaa42b47f50d99c, type: 2}
+    position: {x: 2.8, y: 0, z: 0.8}
+  - definition: {fileID: 11400000, guid: 1e834e23a2bc28b42bff7718eebb33de, type: 2}
+    position: {x: 0, y: 0, z: -3.55}
+  entrances: []
+  randomizeCardsOnEntry: 0
+  randomSpawnAreaCenter: {x: 0, y: 0}
+  randomSpawnAreaSize: {x: 14, y: 7}
+  randomSpawnMinSpacing: 0.8
+  randomSpawnPartyClearance: 2
+  randomCardSpawns: []
+  marketCurrencyCardDefinition: {fileID: 0}
+  marketBuyerCardDefinition: {fileID: 0}
+  marketPickupCardDefinition: {fileID: 0}
+  marketOffers: []
+  npcTradeProfiles: []

@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_WhiteStone_Guild
+  m_EditorClassIdentifier: 
+  id: white-stone-guild
+  displayName: "\u5192\u9669\u8005\u516C\u4F1A"
+  description: "\u53D1\u5E03\u57CE\u5E02\u4E0E\u5468\u8FB9\u5730\u533A\u59D4\u6258\u7684\u5192\u9669\u8005\u636E\u70B9\u3002"
+  artTexture: {fileID: 2800000, guid: 0b51d2a4081047e45960da48386f8ab4, type: 3}
+  baseTextureOverride: {fileID: 2800000, guid: 0b295f4dbce32834c8f32a5e82526f9e, type: 3}
+  category: 6
+  faction: 0
+  isLocationStatic: 1
+  playerDraggable: 0
+  ambientNpcAiEnabled: 0
+  ambientWanderRadius: 0.85
+  ambientMoveSpeed: 0.45
+  ambientIdleRange: {x: 2.5, y: 5}
+  dialogueEnabled: 0
+  dialogueOpeningText: 
+  dialogueReplyText: 
+  dialogueResponseText: 
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 0
+  defense: 0
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}

@@ -3331,11 +3331,11 @@ namespace CardColony.Tests
                 Assert.That(
                     controller.GetType().GetProperty("CurrentLocationIndex").GetValue(controller),
                     Is.EqualTo(destinationIndex));
-                Assert.That(actionButton.interactable, Is.False);
+                Assert.That(actionButton.interactable, Is.True);
                 Assert.That(
                     actionButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
-                    Is.EqualTo("地点地图开发中"),
-                    "第一阶段抵达河湾村以外的地点后，应保留旅行结果但不能进入未实现的局部地图");
+                    Is.EqualTo("进入地点"),
+                    "抵达已经完成局部地图的白石城后，应允许直接进入地点");
             }
             finally
             {
@@ -3424,12 +3424,13 @@ namespace CardColony.Tests
                 string locationId =
                     entry.FindPropertyRelative("locationId").stringValue;
                 bool expected = locationId == "riverbend" ||
-                    locationId == "whispering-forest";
+                    locationId == "whispering-forest" ||
+                    locationId == "white-stone-city";
                 SerializedProperty implemented = entry.FindPropertyRelative("localMapImplemented");
                 Assert.That(implemented, Is.Not.Null,
                     "地点配置必须明确标记是否已有局部地图，避免未完成地点进入空场景");
                 Assert.That(implemented.boolValue, Is.EqualTo(expected),
-                    "当前只应开放已经完成局部地图的河湾村和低语森林");
+                    "当前只应开放已经完成局部地图的河湾村、低语森林和白石城");
             }
         }
 

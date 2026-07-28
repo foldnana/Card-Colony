@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
+  m_Name: Card_WhiteStone_Merchant
+  m_EditorClassIdentifier: 
+  id: white-stone-merchant
+  displayName: "\u884C\u4F1A\u5546\u4EBA"
+  description: "\u719F\u6089\u767D\u77F3\u57CE\u8D27\u4EF7\u548C\u5546\u8DEF\u6D88\u606F\u7684\u884C\u4F1A\u5546\u4EBA\u3002"
+  artTexture: {fileID: 2800000, guid: c7586b89177241d468372e1049388256, type: 3}
+  baseTextureOverride: {fileID: 2800000, guid: 1778b882b79e6fc4aa1ad7916922c280, type: 3}
+  category: 2
+  faction: 0
+  isLocationStatic: 1
+  playerDraggable: 0
+  ambientNpcAiEnabled: 1
+  ambientWanderRadius: 0.85
+  ambientMoveSpeed: 0.45
+  ambientIdleRange: {x: 2.5, y: 5}
+  dialogueEnabled: 1
+  dialogueOpeningText: "\u6CB3\u6E7E\u6751\u6765\u7684\u8D27\u7269\u6700\u8FD1\u5F88\u62A2\u624B\uFF0C\u4F60\u82E5\u6709\u4F59\u8D27\uFF0C\u53EF\u4EE5\u6765\u5E02\u573A\u95EE\u4EF7\u3002"
+  dialogueReplyText: "\u8FD9\u91CC\u6700\u7F3A\u4EC0\u4E48\u8D27\uFF1F"
+  dialogueResponseText: "\u98DF\u7269\u603B\u6709\u4EBA\u8981\uFF0C\u771F\u6B63\u503C\u94B1\u7684\u5219\u662F\u77FF\u77F3\u3001\u836F\u6750\u548C\u8FDC\u65B9\u7684\u7A00\u7F55\u7269\u3002"
+  combatType: 0
+  loot: []
+  isAggressive: 0
+  aggroRadius: 5
+  attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
+  isSellable: 0
+  sellPrice: 1
+  hasDurability: 0
+  uses: 1
+  nutrition: 0
+  maxHealth: 15
+  attack: 0
+  defense: 0
+  attackSpeed: 100
+  accuracy: 95
+  dodge: 5
+  criticalChance: 5
+  criticalMultiplier: 150
+  equipmentSlot: 0
+  statModifiers: []
+  classChangeResult: {fileID: 0}
