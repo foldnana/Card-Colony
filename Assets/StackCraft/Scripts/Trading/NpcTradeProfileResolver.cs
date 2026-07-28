@@ -20,7 +20,12 @@ namespace CryingSnow.StackCraft
                 null,
                 1f,
                 1f,
-                null)
+                null,
+                null,
+                null,
+                null,
+                true,
+                0)
         {
         }
 
@@ -32,6 +37,35 @@ namespace CryingSnow.StackCraft
             float buyPriceModifier,
             float sellPriceModifier,
             string refusalText)
+            : this(
+                roleLabel,
+                startingFunds,
+                buyCategories,
+                rejectedDefinitions,
+                buyPriceModifier,
+                sellPriceModifier,
+                refusalText,
+                null,
+                null,
+                null,
+                true,
+                0)
+        {
+        }
+
+        public ResolvedNpcTradeProfile(
+            string roleLabel,
+            int startingFunds,
+            IEnumerable<CardCategory> buyCategories,
+            IEnumerable<CardDefinition> rejectedDefinitions,
+            float buyPriceModifier,
+            float sellPriceModifier,
+            string refusalText,
+            MarketProfile marketProfile,
+            IEnumerable<string> sellCommodityTags,
+            IEnumerable<string> buyCommodityTags,
+            bool usesMarketFunds,
+            int personalFundLimit)
         {
             RoleLabel = string.IsNullOrWhiteSpace(roleLabel)
                 ? "居民"
@@ -49,6 +83,11 @@ namespace CryingSnow.StackCraft
             RefusalText = string.IsNullOrWhiteSpace(refusalText)
                 ? "这个人物不收购该物品。"
                 : refusalText;
+            MarketProfile = marketProfile;
+            SellCommodityTags = CleanTags(sellCommodityTags);
+            BuyCommodityTags = CleanTags(buyCommodityTags);
+            UsesMarketFunds = usesMarketFunds;
+            PersonalFundLimit = Mathf.Max(0, personalFundLimit);
         }
 
         public string RoleLabel { get; }
@@ -58,6 +97,11 @@ namespace CryingSnow.StackCraft
         public string RefusalText { get; }
         public IReadOnlyCollection<CardCategory> BuyCategories =>
             buyCategories;
+        public MarketProfile MarketProfile { get; }
+        public IReadOnlyCollection<string> SellCommodityTags { get; }
+        public IReadOnlyCollection<string> BuyCommodityTags { get; }
+        public bool UsesMarketFunds { get; }
+        public int PersonalFundLimit { get; }
 
         public bool CanBuyCategory(CardCategory category)
         {
@@ -90,6 +134,18 @@ namespace CryingSnow.StackCraft
             return basePrice <= 0
                 ? 0
                 : Mathf.Max(1, Mathf.RoundToInt(basePrice * modifier));
+        }
+
+        private static IReadOnlyCollection<string> CleanTags(
+            IEnumerable<string> tags)
+        {
+            return tags == null
+                ? System.Array.Empty<string>()
+                : tags
+                    .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                    .Distinct(
+                        System.StringComparer.OrdinalIgnoreCase)
+                    .ToArray();
         }
     }
 
@@ -126,7 +182,12 @@ namespace CryingSnow.StackCraft
                     explicitProfile.RejectedDefinitions,
                     explicitProfile.BuyPriceModifier,
                     explicitProfile.SellPriceModifier,
-                    explicitProfile.RefusalText);
+                    explicitProfile.RefusalText,
+                    explicitProfile.MarketProfile,
+                    explicitProfile.SellCommodityTags,
+                    explicitProfile.BuyCommodityTags,
+                    explicitProfile.UsesMarketFunds,
+                    explicitProfile.PersonalFundLimit);
             }
 
             string id = definition?.Id?.ToLowerInvariant() ?? string.Empty;

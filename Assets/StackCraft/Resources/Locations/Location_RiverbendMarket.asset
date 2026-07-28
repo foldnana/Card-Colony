@@ -81,3 +81,5 @@ MonoBehaviour:
     buyPrice: 5
     minimumDailyStock: 1
     maximumDailyStock: 3
+  npcTradeProfiles:
+  - {fileID: 11400000, guid: 0921af273900bf54b847d3e3a4069c99, type: 2}

@@ -33,6 +33,12 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0.01f)] private float buyPriceModifier = 1f;
         [SerializeField, Min(0.01f)] private float sellPriceModifier = 1f;
         [SerializeField] private string refusalText = "这个人物不收购该物品。";
+        [Header("Regional market")]
+        [SerializeField] private MarketProfile marketProfile;
+        [SerializeField] private List<string> sellCommodityTags = new();
+        [SerializeField] private List<string> buyCommodityTags = new();
+        [SerializeField] private bool usesMarketFunds = true;
+        [SerializeField, Min(0)] private int personalFundLimit;
 
         public CardDefinition NpcDefinition => npcDefinition;
         public NpcTradeRoleTemplate RoleTemplate => roleTemplate;
@@ -45,5 +51,12 @@ namespace CryingSnow.StackCraft
         public float BuyPriceModifier => buyPriceModifier;
         public float SellPriceModifier => sellPriceModifier;
         public string RefusalText => refusalText;
+        public MarketProfile MarketProfile => marketProfile;
+        public IReadOnlyList<string> SellCommodityTags =>
+            sellCommodityTags;
+        public IReadOnlyList<string> BuyCommodityTags =>
+            buyCommodityTags;
+        public bool UsesMarketFunds => usesMarketFunds;
+        public int PersonalFundLimit => Mathf.Max(0, personalFundLimit);
     }
 }

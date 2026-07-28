@@ -547,6 +547,7 @@ namespace CryingSnow.StackCraft
 
         private void HandleBeforeSave(GameData gameData)
         {
+            NpcInteractionManager.Instance?.EndInteraction();
             DialogueManager.Instance?.EndDialogue();
 
             if (gameData.TryGetScene(out var sceneData))

@@ -181,6 +181,68 @@ namespace CryingSnow.StackCraft
         }
 
         /// <summary>
+        /// Finalizes a card removal after the owning trade transaction has
+        /// already committed its reversible data changes. Cleanup callbacks
+        /// are isolated so one faulty component cannot leave a half-consumed
+        /// currency stack.
+        /// </summary>
+        public void DestroyCardForCommittedTrade(CardInstance card)
+        {
+            if (card == null || !Cards.Remove(card))
+                return;
+
+            try
+            {
+                if (IsCrafting)
+                    CraftingManager.Instance?.StopCraftingTask(this);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            try
+            {
+                card.KillTweens();
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            try
+            {
+                card.GetComponent<WorldMapLocation>()?
+                    .ReleaseDockedParty();
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+
+            card.Stack = null;
+            try
+            {
+                Object.Destroy(card.gameObject);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+            if (Cards.Count == 0)
+            {
+                CardManager.Instance?.UnregisterStack(this);
+                return;
+            }
+            try
+            {
+                SetTargetPosition(TargetPosition);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogException(exception);
+            }
+        }
+
+        /// <summary>
         /// Destroys all card instances within the stack and unregisters
         /// the entire stack from the <see cref="CardManager"/>.
         /// </summary>

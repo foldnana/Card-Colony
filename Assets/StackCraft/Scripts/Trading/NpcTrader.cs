@@ -78,12 +78,28 @@ namespace CryingSnow.StackCraft
 
         public int GetPlayerBuyPrice(LocationMarketOffer offer)
         {
+            if (NpcTradeService.TryGetMarketQuote(
+                    this,
+                    offer.ProductDefinition,
+                    out MarketQuote quote))
+            {
+                return quote.PlayerBuyUnitPrice;
+            }
+
             return Profile?.CalculatePlayerBuyPrice(offer.BuyPrice) ??
                 offer.BuyPrice;
         }
 
         public int GetPlayerSellPrice(CardDefinition definition)
         {
+            if (NpcTradeService.TryGetMarketQuote(
+                    this,
+                    definition,
+                    out MarketQuote quote))
+            {
+                return quote.PlayerSellUnitPrice;
+            }
+
             return Profile?.CalculatePlayerSellPrice(
                 definition?.SellPrice ?? 0) ?? 0;
         }
@@ -104,6 +120,18 @@ namespace CryingSnow.StackCraft
         public bool TryPurchase(LocationMarketOffer offer, out string reason)
         {
             return NpcTradeService.TryPurchase(this, offer, out reason);
+        }
+
+        public bool TryPurchase(
+            LocationMarketOffer offer,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            return NpcTradeService.TryPurchase(
+                this,
+                offer,
+                expectedQuote,
+                out reason);
         }
 
         public bool TryPurchaseAcquired(
@@ -131,6 +159,20 @@ namespace CryingSnow.StackCraft
                 this,
                 productId,
                 count,
+                out reason);
+        }
+
+        public bool TrySellFromBackpack(
+            string productId,
+            int count,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            return NpcTradeService.TrySellFromBackpack(
+                this,
+                productId,
+                count,
+                expectedQuote,
                 out reason);
         }
 

@@ -9,6 +9,7 @@ namespace CryingSnow.StackCraft
     public enum NpcInteractionState
     {
         None,
+        Approaching,
         ChoosingAction,
         Dialogue,
         Trade
@@ -17,49 +18,68 @@ namespace CryingSnow.StackCraft
     [DisallowMultipleComponent]
     public sealed class NpcInteractionManager : MonoBehaviour
     {
+        private const float ApproachDistance = 0.04f;
+        private static readonly Color PlayerInteractionTint =
+            new(0.14f, 0.95f, 0.36f, 1f);
+        private static readonly Color SocialInteractionTint =
+            new(0.35f, 0.72f, 1f, 1f);
+
         public static NpcInteractionManager Instance { get; private set; }
         public static event Action<NpcInteractionManager> SessionChanged;
         public static event Action<NpcInteractionState> StateChanged;
 
         private CombatRect interactionRect;
+        private CardInstance initiator;
+        private CardInstance target;
+
+        // Compatibility aliases retained for existing dialogue/trade callers.
         private CardInstance player;
         private CardInstance npc;
-        private Vector3 playerReturnPosition;
-        private Vector3 npcReturnPosition;
-        private Vector3 playerInteractionPosition;
-        private Vector3 npcInteractionPosition;
-        private Tween playerFloatTween;
-        private Tween npcFloatTween;
+
+        private Vector3 initiatorReturnPosition;
+        private Vector3 targetReturnPosition;
+        private Vector3 initiatorInteractionPosition;
+        private Vector3 targetInteractionPosition;
+        private Tween initiatorFloatTween;
+        private Tween targetFloatTween;
         private bool participantAnimationPositionsValid;
         private bool endingInteraction;
         private bool initialized;
+        private bool autonomous;
+        private float autonomousConversationRemaining;
 
         public bool IsActive =>
             State != NpcInteractionState.None &&
-            player != null &&
-            npc != null;
+            initiator != null &&
+            target != null;
         private bool HasSessionArtifacts =>
             State != NpcInteractionState.None ||
-            player != null ||
-            npc != null ||
+            initiator != null ||
+            target != null ||
             interactionRect != null;
+
         public NpcInteractionState State { get; private set; }
+        public CardInstance Initiator => initiator;
+        public CardInstance Target => target;
         public CardInstance Player => player;
         public CardInstance Npc => npc;
+        public bool IsPlayerInvolved => player != null;
+        public bool IsAutonomous => autonomous;
         public CombatRect InteractionRect => interactionRect;
         public bool HasActiveParticipantAnimation =>
-            playerFloatTween != null &&
-            playerFloatTween.IsActive() &&
-            npcFloatTween != null &&
-            npcFloatTween.IsActive();
+            initiatorFloatTween != null &&
+            initiatorFloatTween.IsActive() &&
+            targetFloatTween != null &&
+            targetFloatTween.IsActive();
+
         public IEnumerable<CardInstance> Participants
         {
             get
             {
-                if (player != null)
-                    yield return player;
-                if (npc != null && npc != player)
-                    yield return npc;
+                if (initiator != null)
+                    yield return initiator;
+                if (target != null && target != initiator)
+                    yield return target;
             }
         }
 
@@ -70,10 +90,52 @@ namespace CryingSnow.StackCraft
 
         private void Update()
         {
+            Tick(Time.unscaledDeltaTime);
+        }
+
+        public void Tick(float deltaTime)
+        {
             if (HasSessionArtifacts &&
-                (player == null || npc == null))
+                (initiator == null ||
+                 target == null ||
+                 interactionRect == null))
             {
                 EndInteraction();
+                return;
+            }
+
+            if (!IsActive)
+                return;
+
+            if (State == NpcInteractionState.Approaching)
+            {
+                Vector3 destination =
+                    interactionRect != null
+                        ? interactionRect.GetLayoutPosition(initiator)
+                        : initiator.transform.position;
+                if ((initiator.transform.position - destination)
+                    .sqrMagnitude <=
+                    ApproachDistance * ApproachDistance)
+                {
+                    initiator.SetTargetInstant(
+                        destination,
+                        forceGround: true);
+                    StartParticipantAnimations();
+                    SetState(
+                        autonomous
+                            ? NpcInteractionState.Dialogue
+                            : NpcInteractionState.ChoosingAction);
+                    return;
+                }
+            }
+
+            if (autonomous &&
+                State == NpcInteractionState.Dialogue)
+            {
+                autonomousConversationRemaining -=
+                    Mathf.Max(0f, deltaTime);
+                if (autonomousConversationRemaining <= 0f)
+                    EndInteraction();
             }
         }
 
@@ -144,14 +206,30 @@ namespace CryingSnow.StackCraft
                 return false;
 
             if (Instance?.IsActive == true &&
-                Instance.player == candidatePlayer &&
-                Instance.npc == candidateNpc)
+                Instance.IsPlayerInvolved &&
+                Instance.initiator == candidatePlayer &&
+                Instance.target == candidateNpc)
             {
                 return true;
             }
 
             return IsAvailableParticipant(candidatePlayer) &&
                 IsAvailableParticipant(candidateNpc);
+        }
+
+        public static bool CanStartSocialInteraction(
+            CardInstance first,
+            CardInstance second)
+        {
+            return first != null &&
+                second != null &&
+                first != second &&
+                IsNeutralNpc(first) &&
+                IsNeutralNpc(second) &&
+                first.Definition.DialogueEnabled &&
+                second.Definition.DialogueEnabled &&
+                IsAvailableParticipant(first) &&
+                IsAvailableParticipant(second);
         }
 
         public bool TryStartInteractionFromDrop(
@@ -182,64 +260,122 @@ namespace CryingSnow.StackCraft
             CardInstance first,
             CardInstance second)
         {
-            if (!CanStartInteraction(first, second) ||
-                CombatManager.Instance == null)
-            {
+            if (!CanStartInteraction(first, second))
                 return false;
-            }
 
             CardInstance nextPlayer =
                 IsPlayerCharacter(first) ? first : second;
             CardInstance nextNpc =
                 IsNeutralNpc(first) ? first : second;
             if (IsActive &&
-                player == nextPlayer &&
-                npc == nextNpc)
+                IsPlayerInvolved &&
+                initiator == nextPlayer &&
+                target == nextNpc)
             {
-                ShowActions();
+                if (State != NpcInteractionState.Approaching)
+                    ShowActions();
                 return true;
             }
 
             if (IsActive)
                 EndInteraction();
 
-            player = nextPlayer;
-            npc = nextNpc;
-            playerReturnPosition = DetachFromWorldStack(player);
-            npcReturnPosition = DetachFromWorldStack(npc);
+            return StartSession(
+                nextPlayer,
+                nextNpc,
+                isAutonomous: false,
+                conversationDuration: 0f);
+        }
 
-            interactionRect = CombatManager.Instance.CreateInteractionRect(
-                new[] { player },
-                new[] { npc });
+        public bool TryStartSocialInteraction(
+            CardInstance socialInitiator,
+            CardInstance socialTarget,
+            float conversationDuration)
+        {
+            if (IsActive ||
+                !CanStartSocialInteraction(
+                    socialInitiator,
+                    socialTarget))
+            {
+                return false;
+            }
+
+            return StartSession(
+                socialInitiator,
+                socialTarget,
+                isAutonomous: true,
+                conversationDuration:
+                    Mathf.Max(0.5f, conversationDuration));
+        }
+
+        private bool StartSession(
+            CardInstance nextInitiator,
+            CardInstance nextTarget,
+            bool isAutonomous,
+            float conversationDuration)
+        {
+            if (CombatManager.Instance == null)
+                return false;
+
+            initiator = nextInitiator;
+            target = nextTarget;
+            autonomous = isAutonomous;
+            autonomousConversationRemaining = conversationDuration;
+            player = isAutonomous ? null : nextInitiator;
+            npc = nextTarget;
+
+            initiatorReturnPosition =
+                DetachFromWorldStack(initiator);
+            targetReturnPosition =
+                DetachFromWorldStack(target);
+
+            interactionRect =
+                CombatManager.Instance.CreateAnchoredInteractionRect(
+                    new[] { initiator },
+                    new[] { target },
+                    targetReturnPosition);
             if (interactionRect == null)
             {
-                RestoreParticipant(player, playerReturnPosition);
-                RestoreParticipant(npc, npcReturnPosition);
+                RestoreParticipant(
+                    initiator,
+                    initiatorReturnPosition);
+                RestoreParticipant(
+                    target,
+                    targetReturnPosition);
                 ClearParticipants();
                 return false;
             }
 
             interactionRect.ConfigureInteractionTint(
-                new Color(0.14f, 0.95f, 0.36f, 1f));
-            npc.GetComponent<LocationNpcActivity>()
-                ?.SetInteractionPaused(true);
-            InputManager.Instance?.AddLock(
-                this,
-                allowCameraInput: true);
-            StartParticipantAnimations();
+                autonomous
+                    ? SocialInteractionTint
+                    : PlayerInteractionTint);
+            SetActivityPaused(initiator, true);
+            SetActivityPaused(target, true);
 
-            npc.GetComponent<NpcTrader>()?.SelectForInteraction();
-            SetState(NpcInteractionState.ChoosingAction);
-            SessionChanged?.Invoke(this);
+            if (!autonomous)
+            {
+                InputManager.Instance?.AddLock(
+                    this,
+                    allowCameraInput: true);
+                target.GetComponent<NpcTrader>()
+                    ?.SelectForInteraction();
+            }
+
+            SetState(NpcInteractionState.Approaching);
+            if (!autonomous)
+                SessionChanged?.Invoke(this);
             return true;
         }
 
         public bool BeginDialogue(out string reason)
         {
             reason = string.Empty;
-            if (!IsActive)
+            if (!IsActive ||
+                !IsPlayerInvolved ||
+                State != NpcInteractionState.ChoosingAction)
             {
-                reason = "请先开始人物互动。";
+                reason = "请先等待人物靠近并开始互动。";
                 return false;
             }
             if (!DialogueManager.CanStartDialogue(player, npc))
@@ -263,9 +399,11 @@ namespace CryingSnow.StackCraft
         public bool BeginTrade(out string reason)
         {
             reason = string.Empty;
-            if (!IsActive)
+            if (!IsActive ||
+                !IsPlayerInvolved ||
+                State != NpcInteractionState.ChoosingAction)
             {
-                reason = "请先开始人物互动。";
+                reason = "请先等待人物靠近并开始互动。";
                 return false;
             }
 
@@ -285,8 +423,12 @@ namespace CryingSnow.StackCraft
 
         public void ShowActions()
         {
-            if (!IsActive)
+            if (!IsActive ||
+                !IsPlayerInvolved ||
+                State == NpcInteractionState.Approaching)
+            {
                 return;
+            }
 
             if (DialogueManager.Instance?.IsActive == true)
                 DialogueManager.Instance.EndDialogue();
@@ -296,8 +438,12 @@ namespace CryingSnow.StackCraft
 
         public void HandleDialogueEnded()
         {
-            if (IsActive && !endingInteraction)
+            if (IsActive &&
+                IsPlayerInvolved &&
+                !endingInteraction)
+            {
                 SetState(NpcInteractionState.ChoosingAction);
+            }
         }
 
         public void EndInteraction()
@@ -306,33 +452,37 @@ namespace CryingSnow.StackCraft
                 return;
 
             endingInteraction = true;
-            DialogueManager.Instance?.EndDialogueForInteractionEnd();
+            bool endedAutonomousSession = autonomous;
+            DialogueManager.Instance
+                ?.EndDialogueForInteractionEnd();
             InputManager.Instance?.RemoveLock(this);
-            if (npc != null)
-            {
-                npc.GetComponent<LocationNpcActivity>()
-                    ?.SetInteractionPaused(false);
-            }
+            SetActivityPaused(initiator, false);
+            SetActivityPaused(target, false);
             StopParticipantAnimations();
 
             if (interactionRect != null)
                 interactionRect.Close();
             interactionRect = null;
 
-            RestoreParticipant(player, playerReturnPosition);
-            RestoreParticipant(npc, npcReturnPosition);
+            RestoreParticipant(
+                initiator,
+                initiatorReturnPosition);
+            RestoreParticipant(
+                target,
+                targetReturnPosition);
             CardManager.Instance?.ResolveOverlaps();
             ClearParticipants();
             SetState(NpcInteractionState.None);
             endingInteraction = false;
-            SessionChanged?.Invoke(null);
+            if (!endedAutonomousSession)
+                SessionChanged?.Invoke(null);
         }
 
         public bool IsCardInInteraction(CardInstance card)
         {
             return IsActive &&
                 card != null &&
-                (card == player || card == npc);
+                (card == initiator || card == target);
         }
 
         private void SetState(NpcInteractionState state)
@@ -348,24 +498,24 @@ namespace CryingSnow.StackCraft
         {
             StopParticipantAnimations();
             if (interactionRect == null ||
-                player == null ||
-                npc == null)
+                initiator == null ||
+                target == null)
             {
                 return;
             }
 
-            playerInteractionPosition =
-                interactionRect.GetLayoutPosition(player);
-            npcInteractionPosition =
-                interactionRect.GetLayoutPosition(npc);
+            initiatorInteractionPosition =
+                interactionRect.GetLayoutPosition(initiator);
+            targetInteractionPosition =
+                interactionRect.GetLayoutPosition(target);
             participantAnimationPositionsValid = true;
-            playerFloatTween = CreateFloatTween(
-                player,
-                playerInteractionPosition,
+            initiatorFloatTween = CreateFloatTween(
+                initiator,
+                initiatorInteractionPosition,
                 0f);
-            npcFloatTween = CreateFloatTween(
-                npc,
-                npcInteractionPosition,
+            targetFloatTween = CreateFloatTween(
+                target,
+                targetInteractionPosition,
                 0.18f);
         }
 
@@ -384,27 +534,38 @@ namespace CryingSnow.StackCraft
 
         private void StopParticipantAnimations()
         {
-            playerFloatTween?.Kill();
-            npcFloatTween?.Kill();
-            playerFloatTween = null;
-            npcFloatTween = null;
+            initiatorFloatTween?.Kill();
+            targetFloatTween?.Kill();
+            initiatorFloatTween = null;
+            targetFloatTween = null;
 
             if (participantAnimationPositionsValid)
             {
-                if (player != null)
+                if (initiator != null)
                 {
-                    player.SetTargetInstant(
-                        playerInteractionPosition,
+                    initiator.SetTargetInstant(
+                        initiatorInteractionPosition,
                         forceGround: true);
                 }
-                if (npc != null)
+                if (target != null)
                 {
-                    npc.SetTargetInstant(
-                        npcInteractionPosition,
+                    target.SetTargetInstant(
+                        targetInteractionPosition,
                         forceGround: true);
                 }
             }
             participantAnimationPositionsValid = false;
+        }
+
+        private static void SetActivityPaused(
+            CardInstance card,
+            bool paused)
+        {
+            if (card == null)
+                return;
+
+            card.GetComponent<LocationNpcActivity>()
+                ?.SetInteractionPaused(paused);
         }
 
         private static bool IsPlayerCharacter(CardInstance card)
@@ -427,7 +588,8 @@ namespace CryingSnow.StackCraft
                 card.Stack != null &&
                 !card.Stack.IsLocked &&
                 !card.Stack.IsCrafting &&
-                (card.Combatant == null || !card.Combatant.IsInCombat);
+                (card.Combatant == null ||
+                 !card.Combatant.IsInCombat);
         }
 
         private static Vector3 DetachFromWorldStack(CardInstance card)
@@ -463,15 +625,21 @@ namespace CryingSnow.StackCraft
             var stack = new CardStack(card, position);
             CardManager.Instance?.RegisterStack(stack);
             Vector3 finalPosition = Board.Instance != null
-                ? Board.Instance.EnforcePlacementRules(position, stack)
+                ? Board.Instance.EnforcePlacementRules(
+                    position,
+                    stack)
                 : position;
             stack.SetTargetPosition(finalPosition);
         }
 
         private void ClearParticipants()
         {
+            initiator = null;
+            target = null;
             player = null;
             npc = null;
+            autonomous = false;
+            autonomousConversationRemaining = 0f;
         }
     }
 }

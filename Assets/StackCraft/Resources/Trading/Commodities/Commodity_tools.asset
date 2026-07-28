@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f366ca127fdbc2c4290bb20f8647336f, type: 3}
+  m_Name: Commodity_tools
+  m_EditorClassIdentifier: 
+  id: tools
+  displayName: "\u5DE5\u5177"
+  cardDefinition: {fileID: 11400000, guid: c7c554e773779c44b935ac769f24c3aa, type: 2}
+  basePrice: 18
+  unitWeight: 1
+  stackLimit: 20
+  category: 2
+  volatility: 0.4
+  perishableHours: 0
+  tradeTags:
+  - tools
+  - processed
+  isTradeCommodity: 1

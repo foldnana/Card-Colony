@@ -77,6 +77,7 @@ namespace CryingSnow.StackCraft
             NpcInteractionManager interaction =
                 NpcInteractionManager.Ensure(gameObject);
             if (interaction == null ||
+                interaction.IsActive ||
                 !interaction.TryStartInteractionFromDrop(
                     droppedCard,
                     searchRadius))
@@ -84,7 +85,11 @@ namespace CryingSnow.StackCraft
                 return false;
             }
 
-            return interaction.BeginDialogue(out _);
+            if (interaction.BeginDialogue(out _))
+                return true;
+
+            interaction.EndInteraction();
+            return false;
         }
 
         public bool StartDialogue(
@@ -97,21 +102,16 @@ namespace CryingSnow.StackCraft
                 return false;
 
             if (!interaction.IsActive)
-            {
-                if (!interaction.StartInteraction(first, second))
-                    return false;
-            }
-            else
-            {
-                bool matchesPlayer =
-                    interaction.Player == first ||
-                    interaction.Player == second;
-                bool matchesNpc =
-                    interaction.Npc == first ||
-                    interaction.Npc == second;
-                if (!matchesPlayer || !matchesNpc)
-                    return false;
-            }
+                return false;
+
+            bool matchesPlayer =
+                interaction.Player == first ||
+                interaction.Player == second;
+            bool matchesNpc =
+                interaction.Npc == first ||
+                interaction.Npc == second;
+            if (!matchesPlayer || !matchesNpc)
+                return false;
 
             return interaction.BeginDialogue(out _);
         }

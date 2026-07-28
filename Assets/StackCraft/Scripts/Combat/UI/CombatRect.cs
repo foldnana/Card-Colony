@@ -50,6 +50,32 @@ namespace CryingSnow.StackCraft
             ArrangeCards();
         }
 
+        public void InitializeAnchored(
+            List<CardInstance> initiators,
+            List<CardInstance> targets,
+            Vector3 targetAnchor)
+        {
+            _attackers = initiators;
+            _defenders = targets;
+
+            CardInstance firstCard =
+                initiators.FirstOrDefault() ??
+                targets.FirstOrDefault();
+            if (firstCard == null)
+                return;
+
+            cellSize = firstCard.Size + Margin;
+            Rect = GetComponent<RectTransform>();
+            AdjustRectSize();
+
+            Vector3 targetLocalSlot =
+                new(0f, cellSize.y * 0.5f, 0f);
+            transform.position =
+                targetAnchor.Flatten() -
+                Rect.TransformVector(targetLocalSlot);
+            ArrangeCards(animateAttackers: true);
+        }
+
         public bool ConfigureInteractionTint(Color color)
         {
             Image visual = GetComponentInChildren<Image>(true);
@@ -125,20 +151,23 @@ namespace CryingSnow.StackCraft
             ArrangeCards();
         }
 
-        private void ArrangeCards()
+        private void ArrangeCards(bool animateAttackers = false)
         {
-            ArrangeRow(_attackers, -cellSize.y * 0.5f);  // Top Row
-            ArrangeRow(_defenders, +cellSize.y * 0.5f);  // Bottom Row
-
             _cardPositions.Clear();
-
-            foreach (var card in _attackers.Concat(_defenders))
-            {
-                _cardPositions.TryAdd(card, card.transform.position);
-            }
+            ArrangeRow(
+                _attackers,
+                -cellSize.y * 0.5f,
+                animateAttackers);
+            ArrangeRow(
+                _defenders,
+                +cellSize.y * 0.5f,
+                animate: false);
         }
 
-        private void ArrangeRow(List<CardInstance> rowCards, float rowY)
+        private void ArrangeRow(
+            List<CardInstance> rowCards,
+            float rowY,
+            bool animate)
         {
             if (rowCards.Count == 0) return;
 
@@ -149,7 +178,12 @@ namespace CryingSnow.StackCraft
             {
                 Vector3 localSlot = new Vector3(offset + i * cellSize.x, rowY, 0);
                 Vector3 worldSlot = Rect.TransformPoint(localSlot);
-                rowCards[i].SetTargetInstant(worldSlot, forceGround: true);
+                worldSlot.y = 0f;
+                _cardPositions[rowCards[i]] = worldSlot;
+                if (animate)
+                    rowCards[i].SetTargetAnimated(worldSlot, forceGround: true);
+                else
+                    rowCards[i].SetTargetInstant(worldSlot, forceGround: true);
             }
         }
 

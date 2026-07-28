@@ -35,6 +35,8 @@ namespace CryingSnow.StackCraft
         private NpcTradeTab npcTradeTab;
         private string pendingSellProductId;
         private int pendingSellCount;
+        private MarketQuote pendingSellMarketQuote;
+        private bool hasPendingSellMarketQuote;
         private bool pendingWorldSale;
         private bool standardDescriptionColorCaptured;
         private Color standardDescriptionColor;
@@ -286,6 +288,7 @@ namespace CryingSnow.StackCraft
             SelectedMarketBuyer = null;
             pendingSellProductId = null;
             pendingSellCount = 0;
+            hasPendingSellMarketQuote = false;
             pendingWorldSale = trader.PendingWorldSale != null;
             SetLocationTabLabel("人物");
 
@@ -294,7 +297,9 @@ namespace CryingSnow.StackCraft
             artImage.texture = definition.ArtTexture;
             artImage.enabled = artImage.texture != null;
             typeAndDangerLabel.text =
-                HasActiveInteractionWithSelectedNpc()
+                IsSelectedNpcApproaching()
+                    ? "正在接近 · 请稍候"
+                    : HasActiveInteractionWithSelectedNpc()
                     ? "互动中 · 请选择行动"
                     : "可互动 · 拖入人物卡开始";
             discoveryLabel.text =
@@ -324,19 +329,20 @@ namespace CryingSnow.StackCraft
 
         public void ShowNpcBuyList()
         {
-            if (!TryBeginSelectedNpcTrade())
+            if (!IsSelectedNpcTradeState())
                 return;
 
             npcTradeTab = NpcTradeTab.Buy;
             pendingSellProductId = null;
             pendingSellCount = 0;
+            hasPendingSellMarketQuote = false;
             pendingWorldSale = false;
             RefreshNpcTradeView();
         }
 
         public void ShowNpcSellList()
         {
-            if (!TryBeginSelectedNpcTrade())
+            if (!IsSelectedNpcTradeState())
                 return;
 
             npcTradeTab = NpcTradeTab.Sell;
@@ -352,6 +358,7 @@ namespace CryingSnow.StackCraft
             npcTradeTab = NpcTradeTab.Actions;
             pendingSellProductId = null;
             pendingSellCount = 0;
+            hasPendingSellMarketQuote = false;
             pendingWorldSale = false;
             RefreshNpcTradeView();
         }
@@ -366,10 +373,15 @@ namespace CryingSnow.StackCraft
                 NpcInteractionManager.Ensure(
                     DialogueManager.Instance?.gameObject);
             CardInstance player = CardManager.Instance?.AllCards
-                .FirstOrDefault(card =>
+                .Where(card =>
                     NpcInteractionManager.CanStartInteraction(
                         card,
-                        SelectedNpcTrader.Card));
+                        SelectedNpcTrader.Card))
+                .OrderBy(card =>
+                    (card.transform.position -
+                     SelectedNpcTrader.Card.transform.position)
+                    .sqrMagnitude)
+                .FirstOrDefault();
             if (interaction == null || player == null)
             {
                 npcTradeHint.text =
@@ -503,6 +515,12 @@ namespace CryingSnow.StackCraft
         private void HandleNpcInteractionSessionChanged(
             NpcInteractionManager interaction)
         {
+            if (interaction != null &&
+                !interaction.IsPlayerInvolved)
+            {
+                return;
+            }
+
             if (interaction?.Npc != null)
             {
                 NpcTrader trader =
@@ -530,6 +548,9 @@ namespace CryingSnow.StackCraft
 
             switch (state)
             {
+                case NpcInteractionState.Approaching:
+                    npcTradeTab = NpcTradeTab.Actions;
+                    break;
                 case NpcInteractionState.Dialogue:
                     ToggleView(false);
                     return;
@@ -795,21 +816,40 @@ namespace CryingSnow.StackCraft
                      SelectedNpcTrader.SellOffers)
             {
                 LocationMarketOffer capturedOffer = offer;
-                int stock = SelectedNpcTrader.GetStock(capturedOffer);
-                int price =
-                    SelectedNpcTrader.GetPlayerBuyPrice(capturedOffer);
+                bool hasMarketQuote =
+                    NpcTradeService.TryGetMarketQuote(
+                        SelectedNpcTrader,
+                        capturedOffer.ProductDefinition,
+                        out MarketQuote marketQuote);
+                int stock = hasMarketQuote
+                    ? marketQuote.AvailableStock
+                    : SelectedNpcTrader.GetStock(capturedOffer);
+                int price = hasMarketQuote
+                    ? marketQuote.PlayerBuyUnitPrice
+                    : SelectedNpcTrader.GetPlayerBuyPrice(capturedOffer);
+                int owned = BackpackService.Current?.Entries?.Count(entry =>
+                    entry?.Card?.Id ==
+                    capturedOffer.ProductDefinition.Id) ?? 0;
                 NpcTradeListRowView row = CreateNpcTradeRow();
                 row.Bind(
                     capturedOffer.ProductDefinition,
                     $"{capturedOffer.ProductDefinition.DisplayName}\n" +
-                    $"{price} 金币 · 库存 {stock}",
+                    (hasMarketQuote
+                        ? $"{price} 金币 · {GetTrendLabel(marketQuote.Trend)}" +
+                          $" · 库存 {stock} · 持有 {owned}"
+                        : $"{price} 金币 · 库存 {stock}"),
                     stock > 0 ? "购买" : null,
                     stock > 0
                         ? () =>
                         {
-                            bool purchased = SelectedNpcTrader.TryPurchase(
-                                capturedOffer,
-                                out string reason);
+                            bool purchased = hasMarketQuote
+                                ? SelectedNpcTrader.TryPurchase(
+                                    capturedOffer,
+                                    marketQuote,
+                                    out string reason)
+                                : SelectedNpcTrader.TryPurchase(
+                                    capturedOffer,
+                                    out reason);
                             RefreshNpcTradeView();
                             npcTradeHint.text = purchased
                                 ? "购买成功，商品已放入背包。"
@@ -898,17 +938,38 @@ namespace CryingSnow.StackCraft
 
                     string productId = group.Key;
                     int owned = group.Count();
-                    int unitPrice =
-                        SelectedNpcTrader.GetPlayerSellPrice(definition);
+                    bool hasMarketQuote =
+                        NpcTradeService.TryGetMarketQuote(
+                            SelectedNpcTrader,
+                            definition,
+                            out MarketQuote marketQuote);
+                    int unitPrice = hasMarketQuote
+                        ? marketQuote.PlayerSellUnitPrice
+                        : SelectedNpcTrader.GetPlayerSellPrice(definition);
                     NpcTradeListRowView row = CreateNpcTradeRow();
                     row.Bind(
                         definition,
-                        $"{definition.DisplayName}\n持有 {owned} · 单价 {unitPrice}",
+                        $"{definition.DisplayName}\n" +
+                        (hasMarketQuote
+                            ? $"卖价 {unitPrice} · " +
+                              $"{GetTrendLabel(marketQuote.Trend)} · " +
+                              $"最多收购 " +
+                              $"{marketQuote.MarketAffordableQuantity} · " +
+                              $"持有 {owned}"
+                            : $"持有 {owned} · 单价 {unitPrice}"),
                         "卖 1",
-                        () => SelectNpcSale(productId, 1),
+                        () => SelectNpcSale(
+                            productId,
+                            1,
+                            hasMarketQuote,
+                            marketQuote),
                         owned > 1 ? "卖全部" : null,
                         owned > 1
-                            ? () => SelectNpcSale(productId, owned)
+                            ? () => SelectNpcSale(
+                                productId,
+                                owned,
+                                hasMarketQuote,
+                                marketQuote)
                             : null);
                     count++;
                 }
@@ -923,6 +984,17 @@ namespace CryingSnow.StackCraft
                     : npcTradeHint.text;
         }
 
+        private static string GetTrendLabel(MarketTrend trend)
+        {
+            return trend switch
+            {
+                MarketTrend.Abundant => "盛产",
+                MarketTrend.Shortage => "短缺",
+                MarketTrend.Emergency => "紧急",
+                _ => "正常"
+            };
+        }
+
         private NpcTradeListRowView CreateNpcTradeRow()
         {
             NpcTradeListRowView row = Instantiate(
@@ -932,15 +1004,24 @@ namespace CryingSnow.StackCraft
             return row;
         }
 
-        private void SelectNpcSale(string productId, int count)
+        private void SelectNpcSale(
+            string productId,
+            int count,
+            bool hasMarketQuote,
+            MarketQuote marketQuote)
         {
             pendingSellProductId = productId;
             pendingSellCount = Mathf.Max(1, count);
+            hasPendingSellMarketQuote = hasMarketQuote;
+            pendingSellMarketQuote = marketQuote;
             CardDefinition definition =
                 CardManager.Instance?.GetDefinitionById(productId);
+            int unitPrice = hasMarketQuote
+                ? marketQuote.PlayerSellUnitPrice
+                : SelectedNpcTrader.GetPlayerSellPrice(definition);
             npcTradeHint.text =
                 $"待售：{definition?.DisplayName ?? productId} ×{pendingSellCount}，" +
-                $"可得 {SelectedNpcTrader.GetPlayerSellPrice(definition) * pendingSellCount} 金币。";
+                $"可得 {unitPrice * pendingSellCount} 金币。";
             RefreshLocationAction();
         }
 
@@ -951,6 +1032,19 @@ namespace CryingSnow.StackCraft
             if (definition == null)
             {
                 npcTradeHint.text = "这个人物当前无法互动。";
+                return;
+            }
+
+            if (IsSelectedNpcApproaching())
+            {
+                NpcTradeListRowView approachRow =
+                    CreateNpcTradeRow();
+                approachRow.BindAction(
+                    "正在接近\n人物抵达后即可选择行动",
+                    null,
+                    null);
+                npcTradeHint.text =
+                    "玩家人物正在前往 NPC 所在位置。";
                 return;
             }
 
@@ -1053,8 +1147,16 @@ namespace CryingSnow.StackCraft
         {
             return SelectedNpcTrader?.Card != null &&
                 NpcInteractionManager.Instance?.IsActive == true &&
+                NpcInteractionManager.Instance.IsPlayerInvolved &&
                 NpcInteractionManager.Instance.Npc ==
                     SelectedNpcTrader.Card;
+        }
+
+        private bool IsSelectedNpcApproaching()
+        {
+            return HasActiveInteractionWithSelectedNpc() &&
+                NpcInteractionManager.Instance.State ==
+                    NpcInteractionState.Approaching;
         }
 
         private bool IsSelectedNpcTradeState()
@@ -1075,16 +1177,31 @@ namespace CryingSnow.StackCraft
             }
 
             string reason;
-            bool sold = pendingWorldSale
-                ? SelectedNpcTrader.ConfirmWorldSale(out reason)
-                : SelectedNpcTrader.TrySellFromBackpack(
+            bool sold;
+            if (pendingWorldSale)
+            {
+                sold = SelectedNpcTrader.ConfirmWorldSale(out reason);
+            }
+            else if (hasPendingSellMarketQuote)
+            {
+                sold = SelectedNpcTrader.TrySellFromBackpack(
+                    pendingSellProductId,
+                    pendingSellCount,
+                    pendingSellMarketQuote,
+                    out reason);
+            }
+            else
+            {
+                sold = SelectedNpcTrader.TrySellFromBackpack(
                     pendingSellProductId,
                     pendingSellCount,
                     out reason);
+            }
             if (sold)
             {
                 pendingSellProductId = null;
                 pendingSellCount = 0;
+                hasPendingSellMarketQuote = false;
                 pendingWorldSale = false;
             }
 

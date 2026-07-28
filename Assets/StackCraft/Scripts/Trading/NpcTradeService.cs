@@ -9,6 +9,17 @@ namespace CryingSnow.StackCraft
     {
         public static void EnsureState(NpcTrader trader)
         {
+            if (TryGetRegionalMarket(
+                    trader,
+                    out _,
+                    out MarketService marketService))
+            {
+                MarketStateData state = marketService.GetOrCreateState(
+                    trader.Profile.MarketProfile.Id);
+                MigrateLegacyRiverbendState(trader, state);
+                return;
+            }
+
             if (!TryGetContext(
                     trader,
                     out SceneData sceneData,
@@ -26,6 +37,17 @@ namespace CryingSnow.StackCraft
 
         public static int GetAvailableFunds(NpcTrader trader)
         {
+            if (TryGetRegionalMarket(
+                    trader,
+                    out _,
+                    out MarketService marketService))
+            {
+                MarketStateData state = marketService.GetOrCreateState(
+                    trader.Profile.MarketProfile.Id);
+                MigrateLegacyRiverbendState(trader, state);
+                return state?.AvailableFunds ?? 0;
+            }
+
             if (!TryGetContext(
                     trader,
                     out SceneData sceneData,
@@ -45,6 +67,14 @@ namespace CryingSnow.StackCraft
             NpcTrader trader,
             LocationMarketOffer offer)
         {
+            if (TryGetMarketQuote(
+                    trader,
+                    offer.ProductDefinition,
+                    out MarketQuote quote))
+            {
+                return quote.AvailableStock;
+            }
+
             if (trader == null ||
                 !TryGetContext(trader, out SceneData sceneData, out int day))
             {
@@ -86,6 +116,23 @@ namespace CryingSnow.StackCraft
                 return Reject("商品配置无效。", out reason);
             if (!CanTradeNow(trader, out reason))
                 return false;
+            if (trader.Profile?.MarketProfile != null)
+            {
+                if (!TryGetMarketQuote(
+                        trader,
+                        offer.ProductDefinition,
+                        out MarketQuote expectedQuote))
+                {
+                    return Reject(
+                        "该商品尚未加入地区市场。",
+                        out reason);
+                }
+                return TryPurchaseFromRegionalMarket(
+                    trader,
+                    offer,
+                    expectedQuote,
+                    out reason);
+            }
             if (trader.Currency == null || CardManager.Instance == null)
                 return Reject("交易服务尚未就绪。", out reason);
             if (!TryGetContext(trader, out SceneData sceneData, out int day))
@@ -164,6 +211,26 @@ namespace CryingSnow.StackCraft
             CardManager.Instance.NotifyStatsChanged();
             AudioManager.Instance?.PlaySFX(AudioId.CashRegister);
             return true;
+        }
+
+        public static bool TryPurchase(
+            NpcTrader trader,
+            LocationMarketOffer offer,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (trader?.Card == null || offer.ProductDefinition == null)
+                return Reject("商品配置无效。", out reason);
+            if (!CanTradeNow(trader, out reason))
+                return false;
+            if (trader.Profile?.MarketProfile == null)
+                return TryPurchase(trader, offer, out reason);
+            return TryPurchaseFromRegionalMarket(
+                trader,
+                offer,
+                expectedQuote,
+                out reason);
         }
 
         public static bool TryDeliverPurchasedItem(
@@ -296,6 +363,24 @@ namespace CryingSnow.StackCraft
                 return Reject(
                     trader.Profile.RefusalText,
                     out reason);
+            if (trader.Profile.MarketProfile != null)
+            {
+                if (!TryGetMarketQuote(
+                        trader,
+                        definition,
+                        out MarketQuote expectedQuote))
+                {
+                    return Reject(
+                        trader.Profile.RefusalText,
+                        out reason);
+                }
+                return TrySellToRegionalMarket(
+                    trader,
+                    definition,
+                    requestedCount,
+                    expectedQuote,
+                    out reason);
+            }
 
             List<BackpackEntryData> entries = backpack.Entries
                 .Where(entry => entry?.Card?.Id == productId)
@@ -356,6 +441,45 @@ namespace CryingSnow.StackCraft
             return true;
         }
 
+        public static bool TrySellFromBackpack(
+            NpcTrader trader,
+            string productId,
+            int requestedCount,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            reason = string.Empty;
+            BackpackData backpack = BackpackService.Current;
+            if (trader?.Profile == null || backpack == null)
+                return Reject("交易服务尚未就绪。", out reason);
+            if (!CanTradeNow(trader, out reason))
+                return false;
+            if (string.IsNullOrWhiteSpace(productId) ||
+                requestedCount <= 0)
+            {
+                return Reject("请选择要出售的物品。", out reason);
+            }
+
+            CardDefinition definition =
+                CardManager.Instance?.GetDefinitionById(productId);
+            if (!trader.CanBuy(definition))
+                return Reject(trader.Profile.RefusalText, out reason);
+            if (trader.Profile.MarketProfile == null)
+            {
+                return TrySellFromBackpack(
+                    trader,
+                    productId,
+                    requestedCount,
+                    out reason);
+            }
+            return TrySellToRegionalMarket(
+                trader,
+                definition,
+                requestedCount,
+                expectedQuote,
+                out reason);
+        }
+
         public static bool TrySellWorldStack(
             NpcTrader trader,
             CardStack stack,
@@ -376,6 +500,14 @@ namespace CryingSnow.StackCraft
                     (card.Combatant != null && card.Combatant.IsInCombat)))
             {
                 return Reject("该组物品当前无法出售。", out reason);
+            }
+            if (trader.Profile.MarketProfile != null)
+            {
+                return TrySellWorldStackToRegionalMarket(
+                    trader,
+                    stack,
+                    cards,
+                    out reason);
             }
 
             int proceeds = cards.Sum(card =>
@@ -461,9 +593,16 @@ namespace CryingSnow.StackCraft
             {
                 return Reject("请先结束当前交谈。", out reason);
             }
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
             bool isInteractionTarget =
-                NpcInteractionManager.Instance?.IsActive == true &&
-                NpcInteractionManager.Instance.Npc == trader.Card;
+                interaction?.IsActive == true &&
+                interaction.IsPlayerInvolved &&
+                interaction.Npc == trader.Card &&
+                (interaction.State ==
+                    NpcInteractionState.ChoosingAction ||
+                 interaction.State ==
+                    NpcInteractionState.Trade);
             if (!isInteractionTarget)
             {
                 return Reject(
@@ -475,6 +614,356 @@ namespace CryingSnow.StackCraft
 
             reason = string.Empty;
             return true;
+        }
+
+        public static bool TryGetMarketQuote(
+            NpcTrader trader,
+            CardDefinition definition,
+            out MarketQuote quote)
+        {
+            quote = default;
+            if (!TryGetRegionalMarket(
+                    trader,
+                    out ResourcesMarketCatalog catalog,
+                    out MarketService service))
+            {
+                return false;
+            }
+
+            CommodityDefinition commodity =
+                catalog.FindCommodity(definition);
+            if (commodity == null)
+                return false;
+
+            RegisterMerchantPolicy(trader, catalog, service);
+            quote = service.GetQuote(
+                trader.Profile.MarketProfile.Id,
+                commodity.Id,
+                GetModifiers(trader));
+            return !string.IsNullOrWhiteSpace(quote.CommodityId);
+        }
+
+        private static bool TryPurchaseFromRegionalMarket(
+            NpcTrader trader,
+            LocationMarketOffer offer,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (!TryGetRegionalMarket(
+                    trader,
+                    out ResourcesMarketCatalog catalog,
+                    out MarketService service))
+            {
+                return Reject("地区市场服务尚未就绪。", out reason);
+            }
+
+            CommodityDefinition commodity =
+                catalog.FindCommodity(offer.ProductDefinition);
+            if (commodity == null)
+            {
+                return Reject(
+                    "该商品尚未加入地区市场。",
+                    out reason);
+            }
+            if (expectedQuote.MarketId !=
+                    trader.Profile.MarketProfile.Id ||
+                expectedQuote.CommodityId != commodity.Id)
+            {
+                return Reject("报价与所选商品不匹配。", out reason);
+            }
+            RegisterMerchantPolicy(trader, catalog, service);
+            var request = new MarketTradeRequest(
+                expectedQuote.MarketId,
+                trader.TradeStateId,
+                commodity.Id,
+                MarketTradeDirection.PlayerBuys,
+                1,
+                expectedQuote.PlayerBuyUnitPrice,
+                expectedQuote.StateRevision,
+                GetModifiers(trader),
+                GetFilter(trader, catalog));
+            var inventory = new CardBackpackTradeInventory(
+                catalog,
+                trader.Currency,
+                commodity.Id,
+                offer.ProductDefinition);
+            MarketTradeResult result = service.Execute(
+                request,
+                inventory);
+            if (!result.Success)
+                return Reject(DescribeFailure(result.Failure), out reason);
+
+            CardManager.Instance?.NotifyStatsChanged();
+            AudioManager.Instance?.PlaySFX(AudioId.CashRegister);
+            return true;
+        }
+
+        private static bool TrySellToRegionalMarket(
+            NpcTrader trader,
+            CardDefinition definition,
+            int quantity,
+            MarketQuote expectedQuote,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (!TryGetRegionalMarket(
+                    trader,
+                    out ResourcesMarketCatalog catalog,
+                    out MarketService service))
+            {
+                return Reject("地区市场服务尚未就绪。", out reason);
+            }
+
+            CommodityDefinition commodity =
+                catalog.FindCommodity(definition);
+            if (commodity == null)
+                return Reject(trader.Profile.RefusalText, out reason);
+            if (expectedQuote.MarketId !=
+                    trader.Profile.MarketProfile.Id ||
+                expectedQuote.CommodityId != commodity.Id)
+            {
+                return Reject("报价与所选商品不匹配。", out reason);
+            }
+            RegisterMerchantPolicy(trader, catalog, service);
+            var request = new MarketTradeRequest(
+                expectedQuote.MarketId,
+                trader.TradeStateId,
+                commodity.Id,
+                MarketTradeDirection.PlayerSells,
+                quantity,
+                expectedQuote.PlayerSellUnitPrice,
+                expectedQuote.StateRevision,
+                GetModifiers(trader),
+                GetFilter(trader, catalog));
+            var inventory = new CardBackpackTradeInventory(
+                catalog,
+                trader.Currency,
+                commodity.Id,
+                definition);
+            MarketTradeResult result = service.Execute(
+                request,
+                inventory);
+            if (!result.Success)
+                return Reject(DescribeFailure(result.Failure), out reason);
+
+            if (TryGetContext(trader, out SceneData sceneData, out int day))
+            {
+                NpcTradeLedger.AddAcquiredStock(
+                    sceneData,
+                    GetNpcId(trader),
+                    day,
+                    trader.Profile.StartingFunds,
+                    definition.Id,
+                    quantity);
+            }
+            AudioManager.Instance?.PlaySFX(AudioId.Coins);
+            return true;
+        }
+
+        private static bool TrySellWorldStackToRegionalMarket(
+            NpcTrader trader,
+            CardStack stack,
+            IReadOnlyList<CardInstance> cards,
+            out string reason)
+        {
+            reason = string.Empty;
+            if (!TryGetRegionalMarket(
+                    trader,
+                    out ResourcesMarketCatalog catalog,
+                    out MarketService service))
+            {
+                return Reject("地区市场服务尚未就绪。", out reason);
+            }
+
+            CommodityDefinition commodity =
+                catalog.FindCommodity(cards[0].Definition);
+            if (commodity == null ||
+                cards.Any(card =>
+                    catalog.FindCommodity(card.Definition)?.Id !=
+                    commodity.Id))
+            {
+                return Reject(
+                    "地区市场一次只能收购同类商品。",
+                    out reason);
+            }
+
+            MarketQuote quote = service.GetQuote(
+                trader.Profile.MarketProfile.Id,
+                commodity.Id,
+                GetModifiers(trader));
+            RegisterMerchantPolicy(trader, catalog, service);
+            var request = new MarketTradeRequest(
+                quote.MarketId,
+                trader.TradeStateId,
+                commodity.Id,
+                MarketTradeDirection.PlayerSells,
+                cards.Count,
+                quote.PlayerSellUnitPrice,
+                quote.StateRevision,
+                GetModifiers(trader),
+                GetFilter(trader, catalog));
+            var inventory = new WorldStackTradeInventory(
+                trader.Currency,
+                commodity.Id,
+                stack);
+            MarketTradeResult result = service.Execute(
+                request,
+                inventory);
+            if (!result.Success)
+                return Reject(DescribeFailure(result.Failure), out reason);
+
+            if (TryGetContext(trader, out SceneData sceneData, out int day))
+            {
+                foreach (IGrouping<string, CardInstance> group in
+                         cards.GroupBy(card => card.Definition.Id))
+                {
+                    NpcTradeLedger.AddAcquiredStock(
+                        sceneData,
+                        GetNpcId(trader),
+                        day,
+                        trader.Profile.StartingFunds,
+                        group.Key,
+                        group.Count());
+                }
+            }
+            AudioManager.Instance?.PlaySFX(AudioId.Coins);
+            return true;
+        }
+
+        private static bool TryGetRegionalMarket(
+            NpcTrader trader,
+            out ResourcesMarketCatalog catalog,
+            out MarketService service)
+        {
+            catalog = null;
+            service = null;
+            return trader?.Profile?.MarketProfile != null &&
+                MarketRuntime.TryGet(out catalog, out service);
+        }
+
+        private static MerchantPriceModifiers GetModifiers(
+            NpcTrader trader)
+        {
+            return new MerchantPriceModifiers(
+                trader?.Profile?.SellPriceModifier ?? 1f,
+                trader?.Profile?.BuyPriceModifier ?? 1f);
+        }
+
+        private static MerchantTradeFilter GetFilter(
+            NpcTrader trader,
+            ResourcesMarketCatalog catalog)
+        {
+            return new MerchantTradeFilter(
+                ResolveCommodityIds(
+                    trader?.Profile?.MarketProfile,
+                    trader?.Profile?.SellCommodityTags),
+                ResolveCommodityIds(
+                    trader?.Profile?.MarketProfile,
+                    trader?.Profile?.BuyCommodityTags));
+        }
+
+        private static IEnumerable<string> ResolveCommodityIds(
+            MarketProfile market,
+            IReadOnlyCollection<string> tags)
+        {
+            if (market == null || tags == null || tags.Count == 0)
+                return null;
+
+            return market.CommodityRules
+                .Where(rule => rule?.Commodity != null &&
+                    tags.Any(tag =>
+                        tag == rule.Commodity.Id ||
+                        rule.Commodity.HasTag(tag)))
+                .Select(rule => rule.Commodity.Id)
+                .Distinct()
+                .ToArray();
+        }
+
+        private static void RegisterMerchantPolicy(
+            NpcTrader trader,
+            ResourcesMarketCatalog catalog,
+            MarketService service)
+        {
+            if (trader == null || service == null)
+                return;
+
+            service.RegisterMerchantPolicy(
+                trader.TradeStateId,
+                GetFilter(trader, catalog),
+                GetModifiers(trader));
+        }
+
+        private static string DescribeFailure(
+            MarketTradeFailure failure)
+        {
+            return failure switch
+            {
+                MarketTradeFailure.StaleQuote =>
+                    "行情刚刚变化，请重试。",
+                MarketTradeFailure.InsufficientMarketStock =>
+                    "市场库存不足。",
+                MarketTradeFailure.InsufficientMarketFunds =>
+                    "市场没有足够资金收购。",
+                MarketTradeFailure.InsufficientPlayerCurrency =>
+                    "金币不足。",
+                MarketTradeFailure.InsufficientPlayerGoods =>
+                    "持有数量不足。",
+                MarketTradeFailure.InventoryCannotReceive =>
+                    "背包无法接收这件商品。",
+                MarketTradeFailure.MarketFundsCapacityReached =>
+                    "市场资金已达上限，暂时停止销售。",
+                MarketTradeFailure.MarketStockCapacityReached =>
+                    "市场仓库已满，暂时停止收购。",
+                MarketTradeFailure.MerchantDoesNotTradeCommodity =>
+                    "这个人物不经营该商品。",
+                MarketTradeFailure.DirectionClosed =>
+                    "当前市场未开放这项交易。",
+                _ => "交易未完成，资产没有发生变化。"
+            };
+        }
+
+        private static void MigrateLegacyRiverbendState(
+            NpcTrader trader,
+            MarketStateData state)
+        {
+            GameData gameData = GameDirector.Instance?.GameData;
+            if (gameData == null || state == null)
+            {
+                return;
+            }
+
+            if (!TryGetContext(
+                    trader,
+                    out SceneData sceneData,
+                    out int day))
+            {
+                return;
+            }
+            ResourcesMarketCatalog catalog =
+                MarketRuntime.TryGet(out var runtimeCatalog, out _)
+                    ? runtimeCatalog
+                    : null;
+            var mappings =
+                new List<LegacyMarketCommodityMapping>();
+            foreach (LocationMarketOffer offer in trader.SellOffers)
+            {
+                CommodityDefinition commodity =
+                    catalog?.FindCommodity(offer.ProductDefinition);
+                if (commodity != null)
+                    mappings.Add(new LegacyMarketCommodityMapping(
+                        commodity.Id,
+                        offer.StockId));
+            }
+
+            MarketEconomyMigration.MigrateRiverbendLegacy(
+                gameData,
+                state,
+                sceneData,
+                GetNpcId(trader),
+                day,
+                trader.Profile.StartingFunds,
+                mappings);
         }
 
         private static string GetNpcId(NpcTrader trader)

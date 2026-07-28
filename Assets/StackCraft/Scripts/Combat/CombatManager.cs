@@ -62,6 +62,33 @@ namespace CryingSnow.StackCraft
             List<CardInstance> second = secondSide?.Where(card => card != null).ToList() ?? new();
             return CreateInteractionRect(first, second);
         }
+
+        public CombatRect CreateAnchoredInteractionRect(
+            IEnumerable<CardInstance> initiators,
+            IEnumerable<CardInstance> targets,
+            Vector3 targetAnchor)
+        {
+            if (combatRectPrefab == null)
+                return null;
+
+            List<CardInstance> first =
+                initiators?.Where(card => card != null).ToList() ??
+                new();
+            List<CardInstance> second =
+                targets?.Where(card => card != null).ToList() ??
+                new();
+            if (first.Count == 0 || second.Count == 0)
+                return null;
+
+            CombatRect rect = Instantiate(
+                combatRectPrefab,
+                WorldCanvas.Instance?.transform);
+            rect.InitializeAnchored(
+                first,
+                second,
+                targetAnchor);
+            return rect;
+        }
         #endregion
 
         private readonly List<CombatTask> _activeCombats = new();

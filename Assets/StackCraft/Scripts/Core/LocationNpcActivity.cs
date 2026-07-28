@@ -13,6 +13,9 @@ namespace CryingSnow.StackCraft
     [RequireComponent(typeof(CardInstance))]
     public sealed class LocationNpcActivity : MonoBehaviour
     {
+        private static readonly HashSet<LocationNpcActivity>
+            ActiveActivities = new();
+
         private CardInstance card;
         private float wanderRadius;
         private float moveSpeed;
@@ -21,14 +24,43 @@ namespace CryingSnow.StackCraft
         private bool configured;
         private bool interactionPaused;
 
+        [Header("Social Interaction")]
+        [SerializeField, Min(0.5f)]
+        private float socialSearchRadius = 2.5f;
+        [SerializeField]
+        private Vector2 socialCooldownRange = new(12f, 24f);
+        [SerializeField, Min(0.5f)]
+        private float socialConversationDuration = 4f;
+
         public LocationNpcActivityState State { get; private set; } = LocationNpcActivityState.Idle;
         public Vector3 HomePosition { get; private set; }
         public Vector3 Destination { get; private set; }
         public bool IsInteractionPaused => interactionPaused;
+        public float SocialSearchRadius
+        {
+            get => socialSearchRadius;
+            set => socialSearchRadius = Mathf.Max(0.5f, value);
+        }
+        public float SocialCooldownRemaining { get; private set; }
 
         private void Awake()
         {
             card = GetComponent<CardInstance>();
+        }
+
+        private void OnEnable()
+        {
+            ActiveActivities.Add(this);
+        }
+
+        private void OnDisable()
+        {
+            ActiveActivities.Remove(this);
+        }
+
+        private void OnDestroy()
+        {
+            ActiveActivities.Remove(this);
         }
 
         private void Update()
@@ -44,6 +76,7 @@ namespace CryingSnow.StackCraft
             Vector2 idleDurationRange)
         {
             card = owner != null ? owner : GetComponent<CardInstance>();
+            ActiveActivities.Add(this);
             HomePosition = homePosition.Flatten();
             Destination = HomePosition;
             wanderRadius = Mathf.Max(0.1f, maximumWanderRadius);
@@ -53,6 +86,7 @@ namespace CryingSnow.StackCraft
                 Mathf.Max(0f, Mathf.Max(idleDurationRange.x, idleDurationRange.y)));
             configured = true;
             EnterIdle();
+            ResetSocialCooldown();
         }
 
         public void SetDestination(Vector3 destination)
@@ -80,6 +114,14 @@ namespace CryingSnow.StackCraft
 
         public void Tick(float deltaTime)
         {
+            if (deltaTime > 0f &&
+                SocialCooldownRemaining > 0f)
+            {
+                SocialCooldownRemaining = Mathf.Max(
+                    0f,
+                    SocialCooldownRemaining - deltaTime);
+            }
+
             if (!configured ||
                 interactionPaused ||
                 deltaTime <= 0f ||
@@ -91,6 +133,12 @@ namespace CryingSnow.StackCraft
 
             if (State == LocationNpcActivityState.Idle)
             {
+                if (SocialCooldownRemaining <= 0f &&
+                    TryStartSocialConversation())
+                {
+                    return;
+                }
+
                 idleTimeRemaining -= deltaTime;
                 if (idleTimeRemaining <= 0f)
                     ChooseWanderDestination();
@@ -180,6 +228,91 @@ namespace CryingSnow.StackCraft
         {
             State = LocationNpcActivityState.Idle;
             idleTimeRemaining = Random.Range(idleRange.x, idleRange.y);
+        }
+
+        private bool TryStartSocialConversation()
+        {
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            if (interaction == null ||
+                interaction.IsActive ||
+                !IsSociallyAvailable)
+            {
+                return false;
+            }
+
+            float radiusSqr =
+                socialSearchRadius * socialSearchRadius;
+            LocationNpcActivity partner = null;
+            float closestDistanceSqr = float.PositiveInfinity;
+            foreach (LocationNpcActivity candidate in
+                     ActiveActivities)
+            {
+                if (candidate == null ||
+                    candidate == this ||
+                    !candidate.IsSociallyAvailable)
+                {
+                    continue;
+                }
+
+                float distanceSqr =
+                    (candidate.CurrentPosition -
+                     CurrentPosition).sqrMagnitude;
+                if (distanceSqr > radiusSqr ||
+                    distanceSqr >= closestDistanceSqr)
+                {
+                    continue;
+                }
+
+                partner = candidate;
+                closestDistanceSqr = distanceSqr;
+            }
+            if (partner == null ||
+                !interaction.TryStartSocialInteraction(
+                    card,
+                    partner.card,
+                    socialConversationDuration))
+            {
+                ResetSocialCooldown();
+                return false;
+            }
+
+            ResetSocialCooldown();
+            partner.ResetSocialCooldown();
+            return true;
+        }
+
+        private bool IsSociallyAvailable =>
+            configured &&
+            !interactionPaused &&
+            State == LocationNpcActivityState.Idle &&
+            card?.Stack != null &&
+            card.Stack.Cards.Count == 1 &&
+            !card.Stack.IsLocked &&
+            !card.Stack.IsCrafting &&
+            !card.IsBeingDragged &&
+            SocialCooldownRemaining <= 0f &&
+            card.Definition != null &&
+            card.Definition.Category == CardCategory.Character &&
+            card.Definition.Faction == CardFaction.Neutral &&
+            card.Definition.DialogueEnabled &&
+            (card.Combatant == null ||
+             !card.Combatant.IsInCombat);
+
+        private void ResetSocialCooldown()
+        {
+            float minimum = Mathf.Max(
+                0.5f,
+                Mathf.Min(
+                    socialCooldownRange.x,
+                    socialCooldownRange.y));
+            float maximum = Mathf.Max(
+                minimum,
+                Mathf.Max(
+                    socialCooldownRange.x,
+                    socialCooldownRange.y));
+            SocialCooldownRemaining =
+                Random.Range(minimum, maximum);
         }
     }
 }

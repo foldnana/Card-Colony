@@ -735,6 +735,14 @@ namespace CardColony.Tests
                         "npc",
                         BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.SetValue(interaction, card);
+                interactionType.GetField(
+                        "initiator",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.SetValue(interaction, card);
+                interactionType.GetField(
+                        "target",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.SetValue(interaction, card);
                 FieldInfo stateField = interactionType.GetField(
                     "<State>k__BackingField",
                     BindingFlags.Instance | BindingFlags.NonPublic);
@@ -768,6 +776,31 @@ namespace CardColony.Tests
                     "Trade navigation should appear after the interaction enters Trade.");
                 Assert.That(sellTab.gameObject.activeSelf, Is.True);
                 Assert.That(actionTab.gameObject.activeSelf, Is.True);
+
+                viewType.GetMethod("ShowNpcSellList")
+                    ?.Invoke(view, null);
+                Assert.That(
+                    stateField.GetValue(interaction),
+                    Is.EqualTo(tradeState),
+                    "Switching to Sell must keep the interaction in Trade.");
+                Assert.That(buyTab.gameObject.activeSelf, Is.True);
+                Assert.That(sellTab.gameObject.activeSelf, Is.True,
+                    "Switching to Sell must not collapse the trade navigation.");
+                Assert.That(actionTab.gameObject.activeSelf, Is.True);
+                Assert.That(buyTab.interactable, Is.True);
+                Assert.That(sellTab.interactable, Is.False);
+
+                viewType.GetMethod("ShowNpcBuyList")
+                    ?.Invoke(view, null);
+                Assert.That(
+                    stateField.GetValue(interaction),
+                    Is.EqualTo(tradeState),
+                    "Switching back to Buy must keep the interaction in Trade.");
+                Assert.That(buyTab.gameObject.activeSelf, Is.True);
+                Assert.That(sellTab.gameObject.activeSelf, Is.True);
+                Assert.That(actionTab.gameObject.activeSelf, Is.True);
+                Assert.That(buyTab.interactable, Is.False);
+                Assert.That(sellTab.interactable, Is.True);
             }
             finally
             {
@@ -780,6 +813,14 @@ namespace CardColony.Tests
                         ?.SetValue(interaction, null);
                     interactionType.GetField(
                             "npc",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        ?.SetValue(interaction, null);
+                    interactionType.GetField(
+                            "initiator",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        ?.SetValue(interaction, null);
+                    interactionType.GetField(
+                            "target",
                             BindingFlags.Instance | BindingFlags.NonPublic)
                         ?.SetValue(interaction, null);
                     FieldInfo stateField = interactionType.GetField(

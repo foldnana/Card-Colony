@@ -14,10 +14,16 @@ namespace CryingSnow.StackCraft
     [System.Serializable]
     public class GameData
     {
+        public const int CurrentEconomyStateVersion = 1;
+
         public int SlotNumber;
         public string CurrentScene;
         public string ActiveLocationId;
         public int WorldDay;
+        public int EconomyStateVersion;
+        public int EconomySeed;
+        public long WorldElapsedHours;
+        public List<MarketStateData> Markets = new();
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
         public BackpackData Backpack = new();
@@ -76,6 +82,34 @@ namespace CryingSnow.StackCraft
         public void SetWorldDay(int day)
         {
             WorldDay = Mathf.Max(1, day);
+            WorldElapsedHours = System.Math.Max(
+                WorldElapsedHours,
+                (long)(WorldDay - 1) * 24L);
+        }
+
+        public void EnsureEconomyState()
+        {
+            Markets ??= new List<MarketStateData>();
+            if (EconomySeed == 0)
+            {
+                unchecked
+                {
+                    uint hash = 2166136261u;
+                    hash ^= (uint)SlotNumber;
+                    hash *= 16777619u;
+                    foreach (char character in
+                             CurrentScene ?? string.Empty)
+                    {
+                        hash ^= character;
+                        hash *= 16777619u;
+                    }
+                    EconomySeed = hash == 0u
+                        ? 1
+                        : (int)hash;
+                }
+            }
+            if (WorldElapsedHours <= 0 && WorldDay > 1)
+                WorldElapsedHours = (long)(WorldDay - 1) * 24L;
         }
 
         public void PushLocation(string locationId)

@@ -4375,9 +4375,15 @@ namespace CardColony.Tests
                 SetTestCardStackPosition(
                     player,
                     new Vector3(-0.2f, 0f, 0f));
+                Vector3 playerOriginalPosition =
+                    player.transform.position;
+                playerOriginalPosition.y = 0f;
                 SetTestCardStackPosition(
                     chief,
                     new Vector3(0.2f, 0f, 0f));
+                Vector3 chiefOriginalPosition =
+                    chief.transform.position;
+                chiefOriginalPosition.y = 0f;
                 SetTestCardStackPosition(
                     blacksmith,
                     new Vector3(0.6f, 0f, 0f));
@@ -4416,6 +4422,22 @@ namespace CardColony.Tests
                     Is.False,
                     "交易事务必须要求人物先进入对应 NPC 的互动会话。");
 
+                object dialogue = FindType(
+                        "CryingSnow.StackCraft.DialogueManager")
+                    .GetProperty("Instance").GetValue(null);
+                Assert.That(
+                    dialogue.GetType().GetMethod("StartDialogue")
+                        .Invoke(
+                            dialogue,
+                            new object[] { player, chief }),
+                    Is.False,
+                    "The legacy dialogue entry point must not bypass the approach-and-action flow.");
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.False,
+                    "A rejected direct dialogue request must not leave a hidden interaction session active.");
+
                 object playerWorldStack = player.GetType()
                     .GetProperty("Stack").GetValue(player);
                 playerWorldStack.GetType().GetProperty("IsLocked")
@@ -4439,14 +4461,62 @@ namespace CardColony.Tests
                 Assert.That(
                     interactionType.GetProperty("State")
                         .GetValue(interaction).ToString(),
-                    Is.EqualTo("ChoosingAction"));
+                    Is.EqualTo("Approaching"),
+                    "Starting an interaction should move the initiator toward the target before actions become available.");
+                Assert.That(
+                    interactionType.GetProperty("Initiator")
+                        ?.GetValue(interaction),
+                    Is.SameAs(player));
+                Assert.That(
+                    interactionType.GetProperty("Target")
+                        ?.GetValue(interaction),
+                    Is.SameAs(chief));
+                Vector3 chiefCurrentPosition =
+                    chief.transform.position;
+                chiefCurrentPosition.y = 0f;
+                Assert.That(
+                    chiefCurrentPosition,
+                    Is.EqualTo(chiefOriginalPosition),
+                    "The target NPC should remain at its world position while the initiator approaches.");
                 Assert.That(
                     interactionType.GetProperty("InteractionRect")
                         .GetValue(interaction),
                     Is.Not.Null);
 
-                object dialogue = FindType("CryingSnow.StackCraft.DialogueManager")
-                    .GetProperty("Instance").GetValue(null);
+                object interactionRect = interactionType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interaction);
+                Vector3 approachPosition = (Vector3)interactionRect
+                    .GetType()
+                    .GetMethod("GetLayoutPosition")
+                    .Invoke(interactionRect, new object[] { player });
+                Vector3 flattenedApproachPosition = approachPosition;
+                flattenedApproachPosition.y = 0f;
+                Assert.That(
+                    flattenedApproachPosition,
+                    Is.Not.EqualTo(playerOriginalPosition),
+                    "The initiator layout slot must be the destination beside the NPC, not the initiator's original position.");
+                MethodInfo tickInteraction = interactionType.GetMethod(
+                    "Tick",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(tickInteraction, Is.Not.Null,
+                    "Approach completion needs a deterministic tick entry for runtime and tests.");
+                tickInteraction.Invoke(
+                    interaction,
+                    new object[] { 0.1f });
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("Approaching"),
+                    "The interaction must remain in Approaching until the initiator reaches its actual destination.");
+                player.GetType().GetMethod("SetTargetInstant")
+                    .Invoke(player, new object[] { approachPosition, true });
+                tickInteraction.Invoke(interaction, new object[] { 0.1f });
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("ChoosingAction"));
+
                 Assert.That(
                     dialogue.GetType().GetProperty("IsActive")
                         .GetValue(dialogue),
@@ -4515,14 +4585,68 @@ namespace CardColony.Tests
                         .GetValue(chief),
                     Is.Not.Null);
 
+                MethodInfo updateInteraction = interactionType.GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(updateInteraction, Is.Not.Null,
+                    "The interaction manager must monitor invalidated sessions.");
                 Assert.That(
                     interactionType.GetMethod("StartInteraction")
                         .Invoke(interaction, new object[] { player, chief }),
                     Is.True);
+                Component invalidRectSession = (Component)interactionType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interaction);
+                Object.DestroyImmediate(
+                    invalidRectSession.gameObject);
+                updateInteraction.Invoke(interaction, null);
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("None"),
+                    "Destroying the interaction rectangle must terminate the session.");
+                Assert.That(
+                    player.GetType().GetProperty("Stack")
+                        .GetValue(player),
+                    Is.Not.Null);
+                Assert.That(
+                    chief.GetType().GetProperty("Stack")
+                        .GetValue(chief),
+                    Is.Not.Null);
+
+                Assert.That(
+                    interactionType.GetMethod("StartInteraction")
+                        .Invoke(interaction, new object[] { player, chief }),
+                    Is.True);
+                object secondInteractionRect = interactionType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interaction);
+                Vector3 secondApproachPosition =
+                    (Vector3)secondInteractionRect.GetType()
+                        .GetMethod("GetLayoutPosition")
+                        .Invoke(
+                            secondInteractionRect,
+                            new object[] { player });
+                player.GetType().GetMethod("SetTargetInstant")
+                    .Invoke(
+                        player,
+                        new object[] { secondApproachPosition, true });
+                tickInteraction.Invoke(
+                    interaction,
+                    new object[] { 0.1f });
+                object[] secondDialogueArgs = { null };
+                Assert.That(
+                    interactionType.GetMethod("BeginDialogue")
+                        .Invoke(
+                            interaction,
+                            secondDialogueArgs),
+                    Is.True,
+                    secondDialogueArgs[0] as string);
+                Assert.That(
+                    dialogue.GetType().GetProperty("IsActive")
+                        .GetValue(dialogue),
+                    Is.True);
                 Object.DestroyImmediate(chief.gameObject);
-                MethodInfo updateInteraction = interactionType.GetMethod(
-                    "Update",
-                    BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.That(updateInteraction, Is.Not.Null,
                     "互动管理器需要监测参与者被销毁的异常会话。");
                 updateInteraction.Invoke(interaction, null);
@@ -4535,6 +4659,11 @@ namespace CardColony.Tests
                         .GetValue(interaction),
                     Is.Null);
                 Assert.That(
+                    dialogue.GetType().GetProperty("IsActive")
+                        .GetValue(dialogue),
+                    Is.False,
+                    "Destroying a participant must close the dialogue panel and clear its state.");
+                Assert.That(
                     player.GetType().GetProperty("Stack")
                         .GetValue(player),
                     Is.Not.Null,
@@ -4543,6 +4672,245 @@ namespace CardColony.Tests
             finally
             {
                 DestroyTestCard(player);
+                DestroyTestCard(chief);
+                DestroyTestCard(blacksmith);
+            }
+        }
+
+        [Test]
+        public void NpcInteractionManager_ExposesAutonomousNpcConversationSession()
+        {
+            System.Type interactionType =
+                FindType("CryingSnow.StackCraft.NpcInteractionManager");
+            Assert.That(interactionType, Is.Not.Null);
+            Assert.That(
+                interactionType.GetMethod(
+                    "TryStartSocialInteraction",
+                    new[]
+                    {
+                        FindType("CryingSnow.StackCraft.CardInstance"),
+                        FindType("CryingSnow.StackCraft.CardInstance"),
+                        typeof(float)
+                    }),
+                Is.Not.Null,
+                "Neutral NPCs need a player-independent social interaction entry point.");
+            Assert.That(
+                interactionType.GetProperty("IsPlayerInvolved"),
+                Is.Not.Null);
+            Assert.That(
+                interactionType.GetProperty("IsAutonomous"),
+                Is.Not.Null);
+
+            System.Type activityType =
+                FindType("CryingSnow.StackCraft.LocationNpcActivity");
+            Assert.That(
+                activityType.GetProperty("SocialSearchRadius"),
+                Is.Not.Null,
+                "NPC social search must expose a configurable radius.");
+            Assert.That(
+                activityType.GetProperty("SocialCooldownRemaining"),
+                Is.Not.Null,
+                "NPC conversations need a cooldown to prevent constant chatter.");
+        }
+
+        [Test]
+        public void NpcInteractionManager_AutonomousNpcConversationApproachesAndEnds()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            string[] singletonTypes =
+            {
+                "CryingSnow.StackCraft.Board",
+                "CryingSnow.StackCraft.InputManager",
+                "CryingSnow.StackCraft.CardManager",
+                "CryingSnow.StackCraft.CombatManager",
+                "CryingSnow.StackCraft.DialogueManager"
+            };
+            foreach (string typeName in singletonTypes)
+            {
+                MonoBehaviour component = Object
+                    .FindObjectsOfType<MonoBehaviour>(true)
+                    .First(item => item.GetType().FullName == typeName);
+                component.GetType()
+                    .GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(component, null);
+            }
+
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Object blacksmithDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Blacksmith.asset");
+            Component chief = CreateUninitializedCard(
+                chiefDefinition,
+                "Autonomous Conversation Chief");
+            Component blacksmith = CreateUninitializedCard(
+                blacksmithDefinition,
+                "Autonomous Conversation Blacksmith");
+            try
+            {
+                chief.GetType().GetProperty("Size")
+                    .SetValue(chief, Vector2.one);
+                blacksmith.GetType().GetProperty("Size")
+                    .SetValue(blacksmith, Vector2.one);
+                SetTestCardStackPosition(
+                    chief,
+                    new Vector3(-0.75f, 0f, 0f));
+                SetTestCardStackPosition(
+                    blacksmith,
+                    new Vector3(0.75f, 0f, 0f));
+                Vector3 targetOriginalPosition =
+                    blacksmith.transform.position;
+                targetOriginalPosition.y = 0f;
+
+                System.Type cardManagerType =
+                    FindType("CryingSnow.StackCraft.CardManager");
+                object cardManager = cardManagerType
+                    .GetProperty("Instance").GetValue(null);
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        chief.GetType().GetProperty("Stack")
+                            .GetValue(chief)
+                    });
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        blacksmith.GetType().GetProperty("Stack")
+                            .GetValue(blacksmith)
+                    });
+                System.Type traderType =
+                    FindType("CryingSnow.StackCraft.NpcTrader");
+                Component trader =
+                    blacksmith.gameObject.AddComponent(traderType);
+                traderType.GetMethod(
+                        "Configure",
+                        new[] { blacksmith.GetType() })
+                    .Invoke(trader, new object[] { blacksmith });
+
+                System.Type interactionType =
+                    FindType("CryingSnow.StackCraft.NpcInteractionManager");
+                object interaction = interactionType
+                    .GetProperty("Instance").GetValue(null);
+                System.Type activityType =
+                    FindType("CryingSnow.StackCraft.LocationNpcActivity");
+                Component chiefActivity =
+                    chief.gameObject.AddComponent(activityType);
+                Component blacksmithActivity =
+                    blacksmith.gameObject.AddComponent(activityType);
+                activityType.GetMethod("Configure").Invoke(
+                    chiefActivity,
+                    new object[]
+                    {
+                        chief,
+                        chief.transform.position,
+                        1f,
+                        0.5f,
+                        new Vector2(2f, 3f)
+                    });
+                activityType.GetMethod("Configure").Invoke(
+                    blacksmithActivity,
+                    new object[]
+                    {
+                        blacksmith,
+                        blacksmith.transform.position,
+                        1f,
+                        0.5f,
+                        new Vector2(2f, 3f)
+                    });
+                PropertyInfo socialRadius = activityType
+                    .GetProperty("SocialSearchRadius");
+                FieldInfo socialCooldown = activityType.GetField(
+                    "<SocialCooldownRemaining>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                activityType.GetField(
+                        "socialConversationDuration",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(chiefActivity, 0.5f);
+                socialRadius.SetValue(chiefActivity, 0.5f);
+                socialCooldown.SetValue(chiefActivity, 0f);
+                socialCooldown.SetValue(blacksmithActivity, 0f);
+                activityType.GetMethod("Tick")
+                    .Invoke(chiefActivity, new object[] { 0.1f });
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.False,
+                    "NPCs outside the configured social radius must not start a conversation.");
+
+                socialRadius.SetValue(chiefActivity, 2f);
+                socialCooldown.SetValue(chiefActivity, 0f);
+                activityType.GetMethod("Tick")
+                    .Invoke(chiefActivity, new object[] { 0.1f });
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.True,
+                    "An idle NPC should start a social session with an eligible nearby NPC after its cooldown.");
+                Assert.That(
+                    interactionType.GetProperty("IsAutonomous")
+                        .GetValue(interaction),
+                    Is.True);
+                Assert.That(
+                    interactionType.GetProperty("IsPlayerInvolved")
+                        .GetValue(interaction),
+                    Is.False);
+                object[] tradeArgs = { trader, null };
+                Assert.That(
+                    FindType("CryingSnow.StackCraft.NpcTradeService")
+                        .GetMethod("CanTradeNow")
+                        .Invoke(null, tradeArgs),
+                    Is.False,
+                    "An autonomous NPC conversation must not unlock player trading.");
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("Approaching"));
+                Vector3 targetCurrentPosition =
+                    blacksmith.transform.position;
+                targetCurrentPosition.y = 0f;
+                Assert.That(
+                    targetCurrentPosition,
+                    Is.EqualTo(targetOriginalPosition),
+                    "The social target should stay put while the initiating NPC approaches.");
+
+                object interactionRect = interactionType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interaction);
+                Vector3 approachPosition = (Vector3)interactionRect
+                    .GetType()
+                    .GetMethod("GetLayoutPosition")
+                    .Invoke(interactionRect, new object[] { chief });
+                chief.GetType().GetMethod("SetTargetInstant")
+                    .Invoke(chief, new object[] { approachPosition, true });
+                MethodInfo tick = interactionType.GetMethod("Tick");
+                tick.Invoke(interaction, new object[] { 0.5f });
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("Dialogue"),
+                    "The arrival tick must not consume the autonomous conversation duration.");
+
+                tick.Invoke(interaction, new object[] { 0.5f });
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("None"));
+                Assert.That(
+                    chief.GetType().GetProperty("Stack")
+                        .GetValue(chief),
+                    Is.Not.Null);
+                Assert.That(
+                    blacksmith.GetType().GetProperty("Stack")
+                        .GetValue(blacksmith),
+                    Is.Not.Null);
+            }
+            finally
+            {
                 DestroyTestCard(chief);
                 DestroyTestCard(blacksmith);
             }
@@ -4627,16 +4995,49 @@ namespace CardColony.Tests
 
                 System.Type managerType = FindType("CryingSnow.StackCraft.DialogueManager");
                 object manager = managerType.GetProperty("Instance").GetValue(null);
-                bool started = (bool)managerType.GetMethod("StartDialogue")
-                    .Invoke(manager, new object[] { player, chief });
+                System.Type interactionManagerType =
+                    FindType("CryingSnow.StackCraft.NpcInteractionManager");
+                object interactionManager = interactionManagerType
+                    .GetProperty("Instance").GetValue(null);
+                bool started = (bool)interactionManagerType
+                    .GetMethod("StartInteraction")
+                    .Invoke(
+                        interactionManager,
+                        new object[] { player, chief });
                 Assert.That(started, Is.True);
+                interactionRect = (Component)interactionManagerType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interactionManager);
+                Vector3 dialogueApproachPosition =
+                    (Vector3)interactionRect.GetType()
+                        .GetMethod("GetLayoutPosition")
+                        .Invoke(
+                            interactionRect,
+                            new object[] { player });
+                player.GetType().GetMethod("SetTargetInstant")
+                    .Invoke(
+                        player,
+                        new object[]
+                        {
+                            dialogueApproachPosition,
+                            true
+                        });
+                interactionManagerType.GetMethod("Tick")
+                    .Invoke(interactionManager, new object[] { 0.1f });
+                object[] beginDialogueArgs = { null };
+                Assert.That(
+                    interactionManagerType.GetMethod("BeginDialogue")
+                        .Invoke(
+                            interactionManager,
+                            beginDialogueArgs),
+                    Is.True,
+                    beginDialogueArgs[0] as string);
                 Assert.That(managerType.GetProperty("IsActive").GetValue(manager), Is.True);
                 Assert.That(player.GetType().GetProperty("Stack").GetValue(player), Is.Null);
                 Assert.That(chief.GetType().GetProperty("Stack").GetValue(chief), Is.Null);
                 Assert.That(combatantType.GetProperty("IsInCombat").GetValue(playerCombatant), Is.False);
                 Assert.That(combatantType.GetProperty("IsInCombat").GetValue(chiefCombatant), Is.False);
                 Assert.That(activityType.GetProperty("IsInteractionPaused").GetValue(activity), Is.True);
-                interactionRect = (Component)managerType.GetProperty("InteractionRect").GetValue(manager);
                 Assert.That(interactionRect, Is.Not.Null);
                 Image interactionVisual = interactionRect.GetComponentInChildren<Image>(true);
                 Assert.That(interactionVisual.material, Is.Not.Null);
@@ -4678,12 +5079,16 @@ namespace CardColony.Tests
                 Assert.That(panel, Is.Not.Null);
                 Assert.That(panel.activeSelf, Is.True);
 
-                MethodInfo beforeSave = managerType.GetMethod(
+                MethodInfo beforeSave = cardManagerType.GetMethod(
                     "HandleBeforeSave",
                     BindingFlags.Instance | BindingFlags.NonPublic);
                 Assert.That(beforeSave, Is.Not.Null,
                     "保存前应主动结束临时对话，把双方恢复到可序列化的卡堆中");
-                beforeSave.Invoke(manager, new object[] { null });
+                object saveData = System.Activator.CreateInstance(
+                    FindType("CryingSnow.StackCraft.GameData"));
+                beforeSave.Invoke(
+                    cardManager,
+                    new[] { saveData });
                 Assert.That(managerType.GetProperty("IsActive").GetValue(manager), Is.False);
                 Assert.That(
                     managerType.GetProperty("HasActiveParticipantAnimation").GetValue(manager),
