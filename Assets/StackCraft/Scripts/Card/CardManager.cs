@@ -73,8 +73,11 @@ namespace CryingSnow.StackCraft
                     cards = cards.Concat(combatCards);
                 }
 
-                if (DialogueManager.Instance != null && DialogueManager.Instance.IsActive)
-                    cards = cards.Concat(DialogueManager.Instance.Participants);
+                if (NpcInteractionManager.Instance?.IsActive == true)
+                {
+                    cards = cards.Concat(
+                        NpcInteractionManager.Instance.Participants);
+                }
 
                 return cards.Where(card => card != null).Distinct();
             }
@@ -827,9 +830,13 @@ namespace CryingSnow.StackCraft
             List<CombatRect> combatRects = CombatManager.Instance != null
                 ? CombatManager.Instance.ActiveCombatRects.Where(rect => rect != null).ToList()
                 : new List<CombatRect>();
-            CombatRect dialogueRect = DialogueManager.Instance?.InteractionRect;
-            if (dialogueRect != null && !combatRects.Contains(dialogueRect))
-                combatRects.Add(dialogueRect);
+            CombatRect interactionRect =
+                NpcInteractionManager.Instance?.InteractionRect;
+            if (interactionRect != null &&
+                !combatRects.Contains(interactionRect))
+            {
+                combatRects.Add(interactionRect);
+            }
 
             CardPhysicsSolver.ResolveOverlaps(
                 stacks,
@@ -849,9 +856,13 @@ namespace CryingSnow.StackCraft
             List<CombatRect> combatRects = CombatManager.Instance != null
                 ? CombatManager.Instance.ActiveCombatRects.Where(rect => rect != null).ToList()
                 : new List<CombatRect>();
-            CombatRect dialogueRect = DialogueManager.Instance?.InteractionRect;
-            if (dialogueRect != null && !combatRects.Contains(dialogueRect))
-                combatRects.Add(dialogueRect);
+            CombatRect interactionRect =
+                NpcInteractionManager.Instance?.InteractionRect;
+            if (interactionRect != null &&
+                !combatRects.Contains(interactionRect))
+            {
+                combatRects.Add(interactionRect);
+            }
             if (combatRect != null && !combatRects.Contains(combatRect))
                 combatRects.Add(combatRect);
 

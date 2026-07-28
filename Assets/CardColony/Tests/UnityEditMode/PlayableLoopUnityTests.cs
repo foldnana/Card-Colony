@@ -4306,6 +4306,268 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void NpcInteractionManager_StartsWithActionsAndDialogueReturnsToSession()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            string[] singletonTypes =
+            {
+                "CryingSnow.StackCraft.Board",
+                "CryingSnow.StackCraft.InputManager",
+                "CryingSnow.StackCraft.CardManager",
+                "CryingSnow.StackCraft.CombatManager",
+                "CryingSnow.StackCraft.DialogueManager"
+            };
+            foreach (string typeName in singletonTypes)
+            {
+                MonoBehaviour component = Object
+                    .FindObjectsOfType<MonoBehaviour>(true)
+                    .First(item => item.GetType().FullName == typeName);
+                component.GetType()
+                    .GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(component, null);
+            }
+
+            System.Type interactionType =
+                FindType("CryingSnow.StackCraft.NpcInteractionManager");
+            Assert.That(interactionType, Is.Not.Null,
+                "人物交互框必须由通用交互管理器持有，不能继续属于对话系统。");
+            MonoBehaviour interaction = Object
+                .FindObjectsOfType<MonoBehaviour>(true)
+                .FirstOrDefault(component =>
+                    component.GetType() == interactionType);
+            Assert.That(interaction, Is.Not.Null,
+                "地点场景必须能够获得通用人物交互管理器。");
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component player = CreateUninitializedCard(
+                playerDefinition,
+                "Interaction Session Player");
+            Component chief = CreateUninitializedCard(
+                chiefDefinition,
+                "Interaction Session Chief");
+            Object blacksmithDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Blacksmith.asset");
+            Component blacksmith = CreateUninitializedCard(
+                blacksmithDefinition,
+                "Interaction Session Other Npc");
+            try
+            {
+                System.Type traderType =
+                    FindType("CryingSnow.StackCraft.NpcTrader");
+                Component trader = chief.gameObject.AddComponent(traderType);
+                traderType.GetMethod(
+                        "Configure",
+                        new[] { chief.GetType() })
+                    .Invoke(trader, new object[] { chief });
+                player.GetType().GetProperty("Size")
+                    .SetValue(player, Vector2.one);
+                chief.GetType().GetProperty("Size")
+                    .SetValue(chief, Vector2.one);
+                blacksmith.GetType().GetProperty("Size")
+                    .SetValue(blacksmith, Vector2.one);
+                SetTestCardStackPosition(
+                    player,
+                    new Vector3(-0.2f, 0f, 0f));
+                SetTestCardStackPosition(
+                    chief,
+                    new Vector3(0.2f, 0f, 0f));
+                SetTestCardStackPosition(
+                    blacksmith,
+                    new Vector3(0.6f, 0f, 0f));
+
+                System.Type cardManagerType =
+                    FindType("CryingSnow.StackCraft.CardManager");
+                object cardManager = cardManagerType
+                    .GetProperty("Instance").GetValue(null);
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        player.GetType().GetProperty("Stack")
+                            .GetValue(player)
+                    });
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        chief.GetType().GetProperty("Stack")
+                            .GetValue(chief)
+                    });
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        blacksmith.GetType().GetProperty("Stack")
+                            .GetValue(blacksmith)
+                    });
+
+                object[] outsideTradeArgs = { trader, null };
+                Assert.That(
+                    FindType("CryingSnow.StackCraft.NpcTradeService")
+                        .GetMethod("CanTradeNow")
+                        .Invoke(null, outsideTradeArgs),
+                    Is.False,
+                    "交易事务必须要求人物先进入对应 NPC 的互动会话。");
+
+                object playerWorldStack = player.GetType()
+                    .GetProperty("Stack").GetValue(player);
+                playerWorldStack.GetType().GetProperty("IsLocked")
+                    .SetValue(playerWorldStack, true);
+                Assert.That(
+                    interactionType.GetMethod("StartInteraction")
+                        .Invoke(interaction, new object[] { player, chief }),
+                    Is.False,
+                    "锁定、战斗或制作中的玩家人物不能被开始互动按钮强制抽走。");
+                playerWorldStack.GetType().GetProperty("IsLocked")
+                    .SetValue(playerWorldStack, false);
+
+                bool started = (bool)interactionType
+                    .GetMethod("StartInteraction")
+                    .Invoke(interaction, new object[] { player, chief });
+                Assert.That(started, Is.True);
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.True);
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("ChoosingAction"));
+                Assert.That(
+                    interactionType.GetProperty("InteractionRect")
+                        .GetValue(interaction),
+                    Is.Not.Null);
+
+                object dialogue = FindType("CryingSnow.StackCraft.DialogueManager")
+                    .GetProperty("Instance").GetValue(null);
+                Assert.That(
+                    dialogue.GetType().GetProperty("IsActive")
+                        .GetValue(dialogue),
+                    Is.False,
+                    "拖入人物后只能显示行动，不得立即开始对话。");
+                object[] tradeArgs = { trader, null };
+                Assert.That(
+                    FindType("CryingSnow.StackCraft.NpcTradeService")
+                        .GetMethod("CanTradeNow")
+                        .Invoke(null, tradeArgs),
+                    Is.True,
+                    tradeArgs[1] as string);
+
+                object[] beginArgs = { null };
+                bool dialogueStarted = (bool)interactionType
+                    .GetMethod("BeginDialogue")
+                    .Invoke(interaction, beginArgs);
+                Assert.That(
+                    dialogueStarted,
+                    Is.True,
+                    beginArgs[0] as string);
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("Dialogue"));
+
+                dialogue.GetType().GetMethod("EndDialogue")
+                    .Invoke(dialogue, null);
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.True,
+                    "结束对话后应返回行动选择，而不是关闭整个交互框。");
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("ChoosingAction"));
+                Assert.That(
+                    dialogue.GetType().GetMethod("StartDialogue")
+                        .Invoke(
+                            dialogue,
+                            new object[] { player, blacksmith }),
+                    Is.False,
+                    "已有互动会话时，旧对话 API 不能忽略传入的另一个 NPC。");
+                Assert.That(
+                    player.GetType().GetProperty("Stack")
+                        .GetValue(player),
+                    Is.Null);
+                Assert.That(
+                    chief.GetType().GetProperty("Stack")
+                        .GetValue(chief),
+                    Is.Null);
+
+                interactionType.GetMethod("EndInteraction")
+                    .Invoke(interaction, null);
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.False);
+                Assert.That(
+                    player.GetType().GetProperty("Stack")
+                        .GetValue(player),
+                    Is.Not.Null);
+                Assert.That(
+                    chief.GetType().GetProperty("Stack")
+                        .GetValue(chief),
+                    Is.Not.Null);
+
+                Assert.That(
+                    interactionType.GetMethod("StartInteraction")
+                        .Invoke(interaction, new object[] { player, chief }),
+                    Is.True);
+                Object.DestroyImmediate(chief.gameObject);
+                MethodInfo updateInteraction = interactionType.GetMethod(
+                    "Update",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                Assert.That(updateInteraction, Is.Not.Null,
+                    "互动管理器需要监测参与者被销毁的异常会话。");
+                updateInteraction.Invoke(interaction, null);
+                Assert.That(
+                    interactionType.GetProperty("State")
+                        .GetValue(interaction).ToString(),
+                    Is.EqualTo("None"));
+                Assert.That(
+                    interactionType.GetProperty("InteractionRect")
+                        .GetValue(interaction),
+                    Is.Null);
+                Assert.That(
+                    player.GetType().GetProperty("Stack")
+                        .GetValue(player),
+                    Is.Not.Null,
+                    "参与者异常销毁后必须恢复仍存活的人物卡。");
+            }
+            finally
+            {
+                DestroyTestCard(player);
+                DestroyTestCard(chief);
+                DestroyTestCard(blacksmith);
+            }
+        }
+
+        [Test]
+        public void CardController_DropsCharactersIntoGenericNpcInteraction()
+        {
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            Assert.That(
+                controllerType.GetMethod(
+                    "TryStartInteractionWithNearbyNpc",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null,
+                "人物拖到 NPC 时必须建立通用交互会话。");
+            Assert.That(
+                controllerType.GetMethod(
+                    "TryInitiateDialogueWithNearbyNpc",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Null,
+                "拖拽入口不能继续直接启动对话。");
+        }
+
+        [Test]
         public void DialogueManager_StartAndEndMovesCardsThroughInteractionRectWithoutCombat()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);

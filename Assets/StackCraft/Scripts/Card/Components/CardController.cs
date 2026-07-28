@@ -290,7 +290,7 @@ namespace CryingSnow.StackCraft
                 TryTradeWithNearbyZone,
                 TryPreviewSaleWithNearbyNpc,
                 TryEquipOnNearbyCharacter,
-                TryInitiateDialogueWithNearbyNpc,
+                TryStartInteractionWithNearbyNpc,
                 TryJoinCombatWithExistingTask,
                 TryInitiateCombatWithNearbyEnemy
             };
@@ -622,10 +622,14 @@ namespace CryingSnow.StackCraft
             return false;
         }
 
-        private bool TryInitiateDialogueWithNearbyNpc()
+        private bool TryStartInteractionWithNearbyNpc()
         {
-            return DialogueManager.Instance != null &&
-                DialogueManager.Instance.TryStartDialogueFromDrop(
+            NpcInteractionManager manager =
+                NpcInteractionManager.Instance ??
+                NpcInteractionManager.Ensure(
+                    DialogueManager.Instance?.gameObject);
+            return manager != null &&
+                manager.TryStartInteractionFromDrop(
                     _card,
                     _card.Settings.AttachRadius);
         }

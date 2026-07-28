@@ -116,6 +116,12 @@ namespace CryingSnow.StackCraft
                 out reason);
         }
 
+        public void SelectForInteraction()
+        {
+            LastMessage = string.Empty;
+            SetSelected(true);
+        }
+
         public bool TrySellFromBackpack(
             string productId,
             int count,

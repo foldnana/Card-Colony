@@ -2330,6 +2330,7 @@ GameObject:
   - component: {fileID: 1701861183609761526}
   - component: {fileID: 4827101545748425772}
   - component: {fileID: 551491244323272193}
+  - component: {fileID: 610000000000000001}
   m_Layer: 5
   m_Name: LocationArt
   m_TagString: Untagged
@@ -2391,6 +2392,20 @@ MonoBehaviour:
     y: 0
     width: 1
     height: 1
+--- !u!114 &610000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2370301515747716931}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_AspectMode: 2
+  m_AspectRatio: 1
 --- !u!1 &2403409358881083842
 GameObject:
   m_ObjectHideFlags: 0
@@ -3209,7 +3224,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5828425806553082866
 RectTransform:
   m_ObjectHideFlags: 0
@@ -4047,7 +4062,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 30, y: 30}
+  m_AnchoredPosition: {x: 30, y: 102}
   m_SizeDelta: {x: 420, y: 0}
   m_Pivot: {x: 0, y: 0}
 --- !u!222 &4063908388830025780
@@ -4157,7 +4172,7 @@ GameObject:
   - component: {fileID: 3755805466757084264}
   - component: {fileID: 1613273054009632358}
   m_Layer: 5
-  m_Name: NpcTalkTabButton
+  m_Name: NpcActionTabButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -6626,6 +6641,7 @@ GameObject:
   - component: {fileID: 3633197815236330357}
   - component: {fileID: 341776763825001423}
   - component: {fileID: 572144139593312560}
+  - component: {fileID: 610000000000000002}
   m_Layer: 5
   m_Name: Icon
   m_TagString: Untagged
@@ -6687,6 +6703,20 @@ MonoBehaviour:
     y: 0
     width: 1
     height: 1
+--- !u!114 &610000000000000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4832929223110135895}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 86710e43de46f6f4bac7c8e50813a599, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  m_AspectMode: 1
+  m_AspectRatio: 1
 --- !u!1 &4849370578926155052
 GameObject:
   m_ObjectHideFlags: 0
@@ -6752,7 +6782,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u4EA4\u8C08"
+  m_text: "\u884C\u52A8"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 783292a670aa37343bb5102aeae09af1, type: 2}
   m_sharedMaterial: {fileID: 7291942746965578735, guid: 783292a670aa37343bb5102aeae09af1, type: 2}
@@ -8912,7 +8942,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "\u9009\u62E9\u8D2D\u4E70\u3001\u51FA\u552E\u6216\u4EA4\u8C08\u3002"
+  m_text: "\u5148\u5F00\u59CB\u4EBA\u7269\u4E92\u52A8\uFF0C\u518D\u9009\u62E9\u884C\u52A8\u3002"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 783292a670aa37343bb5102aeae09af1, type: 2}
   m_sharedMaterial: {fileID: 7291942746965578735, guid: 783292a670aa37343bb5102aeae09af1, type: 2}
@@ -9372,7 +9402,7 @@ MonoBehaviour:
   npcTradePanel: {fileID: 3267887112131963714}
   npcBuyTabButton: {fileID: 7121913047078072336}
   npcSellTabButton: {fileID: 6748161319053761443}
-  npcTalkTabButton: {fileID: 1613273054009632358}
+  npcActionTabButton: {fileID: 1613273054009632358}
   npcTradeListRoot: {fileID: 8907499934467474691}
   npcTradeRowTemplate: {fileID: 2637634722743428815}
   npcTradeHint: {fileID: 7118786020344259126}
@@ -10825,7 +10855,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &5930919427072868099
 RectTransform:
   m_ObjectHideFlags: 0

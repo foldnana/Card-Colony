@@ -20,6 +20,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 Transform header = FindDescendant(menuPanel, "Header");
                 Toggle questsToggle = FindDescendant(header, "QuestsToggle").GetComponent<Toggle>();
                 Toggle recipesToggle = FindDescendant(header, "RecipesToggle").GetComponent<Toggle>();
+                Transform recipesView =
+                    FindDescendant(menuPanel, "RecipesView");
                 TMP_FontAsset font = questsToggle.GetComponentInChildren<TMP_Text>(true).font;
 
                 Transform oldLocationToggle = FindDescendant(header, "LocationToggle");
@@ -75,7 +77,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     "LocationArt",
                     locationViewObject.transform,
                     typeof(CanvasRenderer),
-                    typeof(RawImage));
+                    typeof(RawImage),
+                    typeof(AspectRatioFitter));
                 SetRect(
                     (RectTransform)artObject.transform,
                     new Vector2(0.32f, 0.67f),
@@ -84,6 +87,11 @@ namespace CryingSnow.StackCraft.EditorTools
                     Vector2.zero);
                 RawImage art = artObject.GetComponent<RawImage>();
                 art.raycastTarget = false;
+                AspectRatioFitter artAspect =
+                    artObject.GetComponent<AspectRatioFitter>();
+                artAspect.aspectMode =
+                    AspectRatioFitter.AspectMode.HeightControlsWidth;
+                artAspect.aspectRatio = 1f;
 
                 TMP_Text typeAndDanger = CreateText(
                     "LocationTypeAndDanger",
@@ -177,11 +185,11 @@ namespace CryingSnow.StackCraft.EditorTools
                     new Color(0.48f, 0.34f, 0.16f, 1f),
                     new Vector2(0.35f, 0.87f),
                     new Vector2(0.65f, 0.98f));
-                Button npcTalkTab = CreateButton(
-                    "NpcTalkTabButton",
+                Button npcActionTab = CreateButton(
+                    "NpcActionTabButton",
                     npcTradePanel.transform,
                     font,
-                    "交谈",
+                    "行动",
                     new Color(0.25f, 0.38f, 0.55f, 1f),
                     new Vector2(0.68f, 0.87f),
                     new Vector2(0.98f, 0.98f));
@@ -255,7 +263,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     "NpcTradeHint",
                     npcTradePanel.transform,
                     font,
-                    "选择购买、出售或交谈。",
+                    "先开始人物互动，再选择行动。",
                     18f,
                     new Color(0.88f, 0.88f, 0.82f),
                     TextAlignmentOptions.TopLeft,
@@ -278,7 +286,10 @@ namespace CryingSnow.StackCraft.EditorTools
                 SetReference(serializedView, "npcTradePanel", npcTradePanel);
                 SetReference(serializedView, "npcBuyTabButton", npcBuyTab);
                 SetReference(serializedView, "npcSellTabButton", npcSellTab);
-                SetReference(serializedView, "npcTalkTabButton", npcTalkTab);
+                SetReference(
+                    serializedView,
+                    "npcActionTabButton",
+                    npcActionTab);
                 SetReference(serializedView, "npcTradeListRoot", content);
                 SetReference(serializedView, "npcTradeRowTemplate", rowTemplate);
                 SetReference(serializedView, "npcTradeHint", npcTradeHint);
@@ -291,6 +302,9 @@ namespace CryingSnow.StackCraft.EditorTools
                 canvasGroup.blocksRaycasts = false;
                 questsToggle.SetIsOnWithoutNotify(true);
                 recipesToggle.SetIsOnWithoutNotify(false);
+                recipesToggle.gameObject.SetActive(false);
+                if (recipesView != null)
+                    recipesView.gameObject.SetActive(false);
 
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
                 AssetDatabase.SaveAssets();
@@ -400,7 +414,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 "Icon",
                 rowObject.transform,
                 typeof(CanvasRenderer),
-                typeof(RawImage));
+                typeof(RawImage),
+                typeof(AspectRatioFitter));
             SetRect(
                 (RectTransform)iconObject.transform,
                 new Vector2(0.02f, 0.12f),
@@ -409,6 +424,11 @@ namespace CryingSnow.StackCraft.EditorTools
                 Vector2.zero);
             RawImage icon = iconObject.GetComponent<RawImage>();
             icon.raycastTarget = false;
+            AspectRatioFitter iconAspect =
+                iconObject.GetComponent<AspectRatioFitter>();
+            iconAspect.aspectMode =
+                AspectRatioFitter.AspectMode.WidthControlsHeight;
+            iconAspect.aspectRatio = 1f;
 
             TMP_Text details = CreateText(
                 "Details",

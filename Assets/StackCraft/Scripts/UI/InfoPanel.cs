@@ -31,6 +31,7 @@ namespace CryingSnow.StackCraft
 
         private const float PanelWidth = 420f;
         private const float ActionButtonHeight = 54f;
+        private const float PanelBottomOffset = 102f;
 
         private RectTransform panelRect;
         private RectTransform textRect;
@@ -191,6 +192,9 @@ namespace CryingSnow.StackCraft
             if (TryGetComponent(out ContentSizeFitter sizeFitter))
                 sizeFitter.enabled = false;
 
+            panelRect.anchoredPosition = new Vector2(
+                panelRect.anchoredPosition.x,
+                PanelBottomOffset);
             panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, PanelWidth);
 
             textRect.anchorMin = new Vector2(0f, 1f);

@@ -461,7 +461,16 @@ namespace CryingSnow.StackCraft
             {
                 return Reject("请先结束当前交谈。", out reason);
             }
-            if (trader.Card.Stack == null || trader.Card.Stack.IsLocked)
+            bool isInteractionTarget =
+                NpcInteractionManager.Instance?.IsActive == true &&
+                NpcInteractionManager.Instance.Npc == trader.Card;
+            if (!isInteractionTarget)
+            {
+                return Reject(
+                    "请先让玩家人物与这个人物开始互动。",
+                    out reason);
+            }
+            if (trader.Card.Stack?.IsLocked == true)
                 return Reject("这个人物正忙，暂时不能交易。", out reason);
 
             reason = string.Empty;

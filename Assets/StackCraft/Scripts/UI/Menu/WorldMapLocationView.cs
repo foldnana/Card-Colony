@@ -26,7 +26,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private GameObject npcTradePanel;
         [SerializeField] private Button npcBuyTabButton;
         [SerializeField] private Button npcSellTabButton;
-        [SerializeField] private Button npcTalkTabButton;
+        [SerializeField] private Button npcActionTabButton;
         [SerializeField] private RectTransform npcTradeListRoot;
         [SerializeField] private NpcTradeListRowView npcTradeRowTemplate;
         [SerializeField] private TMP_Text npcTradeHint;
@@ -36,6 +36,8 @@ namespace CryingSnow.StackCraft
         private string pendingSellProductId;
         private int pendingSellCount;
         private bool pendingWorldSale;
+        private bool standardDescriptionColorCaptured;
+        private Color standardDescriptionColor;
 
         public WorldMapLocation SelectedLocation { get; private set; }
         public LocationEntrance SelectedBuilding { get; private set; }
@@ -50,7 +52,7 @@ namespace CryingSnow.StackCraft
             enterLocationButton?.onClick.AddListener(PerformLocationAction);
             npcBuyTabButton?.onClick.AddListener(ShowNpcBuyList);
             npcSellTabButton?.onClick.AddListener(ShowNpcSellList);
-            npcTalkTabButton?.onClick.AddListener(ShowNpcTalk);
+            npcActionTabButton?.onClick.AddListener(ShowNpcActions);
             WorldMapLocation.SelectionChanged += HandleSelectionChanged;
             LocationEntrance.SelectionChanged += HandleBuildingSelectionChanged;
             MarketProductVendor.SelectionChanged +=
@@ -58,6 +60,10 @@ namespace CryingSnow.StackCraft
             MarketCardBuyer.SelectionChanged +=
                 HandleMarketBuyerSelectionChanged;
             NpcTrader.SelectionChanged += HandleNpcTraderSelectionChanged;
+            NpcInteractionManager.SessionChanged +=
+                HandleNpcInteractionSessionChanged;
+            NpcInteractionManager.StateChanged +=
+                HandleNpcInteractionStateChanged;
             WorldMapBootstrap.PartyMapStateChanged += HandlePartyMapStateChanged;
             BackpackService.Changed += HandleMarketFundsChanged;
             if (CardManager.Instance != null)
@@ -89,6 +95,10 @@ namespace CryingSnow.StackCraft
             MarketCardBuyer.SelectionChanged -=
                 HandleMarketBuyerSelectionChanged;
             NpcTrader.SelectionChanged -= HandleNpcTraderSelectionChanged;
+            NpcInteractionManager.SessionChanged -=
+                HandleNpcInteractionSessionChanged;
+            NpcInteractionManager.StateChanged -=
+                HandleNpcInteractionStateChanged;
             WorldMapBootstrap.PartyMapStateChanged -= HandlePartyMapStateChanged;
             BackpackService.Changed -= HandleMarketFundsChanged;
             if (CardManager.Instance != null)
@@ -97,7 +107,7 @@ namespace CryingSnow.StackCraft
             enterLocationButton?.onClick.RemoveListener(PerformLocationAction);
             npcBuyTabButton?.onClick.RemoveListener(ShowNpcBuyList);
             npcSellTabButton?.onClick.RemoveListener(ShowNpcSellList);
-            npcTalkTabButton?.onClick.RemoveListener(ShowNpcTalk);
+            npcActionTabButton?.onClick.RemoveListener(ShowNpcActions);
         }
 
         public void ShowLocation(WorldMapLocation location)
@@ -138,8 +148,7 @@ namespace CryingSnow.StackCraft
                 locationToggle.interactable = true;
                 locationToggle.isOn = true;
             }
-            else
-                ToggleView(true);
+            ToggleView(true);
         }
 
         public void ShowBuilding(LocationEntrance building)
@@ -176,8 +185,7 @@ namespace CryingSnow.StackCraft
                 locationToggle.interactable = true;
                 locationToggle.isOn = true;
             }
-            else
-                ToggleView(true);
+            ToggleView(true);
         }
 
         public void ShowMarketOffer(MarketProductVendor vendor)
@@ -286,19 +294,24 @@ namespace CryingSnow.StackCraft
             artImage.texture = definition.ArtTexture;
             artImage.enabled = artImage.texture != null;
             typeAndDangerLabel.text =
-                $"{trader.Profile?.RoleLabel ?? "居民"} · 可交易";
+                HasActiveInteractionWithSelectedNpc()
+                    ? "互动中 · 请选择行动"
+                    : "可互动 · 拖入人物卡开始";
             discoveryLabel.text =
                 $"● 可用资金 {trader.AvailableFunds} 金币";
-            travelTimeLabel.text = string.Empty;
+            travelTimeLabel.text = HasActiveInteractionWithSelectedNpc()
+                ? "双方已进入人物交互框"
+                : "拖动玩家人物卡到 NPC 身边开始互动";
             resourcesLabel.text = string.Empty;
             descriptionLabel.text = definition.Description ?? string.Empty;
             SetNpcTradePanelVisible(true);
 
-            npcTradeTab = pendingWorldSale ||
-                !string.IsNullOrWhiteSpace(trader.LastMessage) ||
-                trader.SellOffers.Count == 0
-                ? NpcTradeTab.Sell
-                : NpcTradeTab.Buy;
+            bool isTradeState = IsSelectedNpcTradeState();
+            npcTradeTab = isTradeState
+                ? pendingWorldSale
+                    ? NpcTradeTab.Sell
+                    : NpcTradeTab.Buy
+                : NpcTradeTab.Actions;
             RefreshNpcTradeView();
 
             if (locationToggle != null)
@@ -311,6 +324,9 @@ namespace CryingSnow.StackCraft
 
         public void ShowNpcBuyList()
         {
+            if (!TryBeginSelectedNpcTrade())
+                return;
+
             npcTradeTab = NpcTradeTab.Buy;
             pendingSellProductId = null;
             pendingSellCount = 0;
@@ -320,17 +336,67 @@ namespace CryingSnow.StackCraft
 
         public void ShowNpcSellList()
         {
+            if (!TryBeginSelectedNpcTrade())
+                return;
+
             npcTradeTab = NpcTradeTab.Sell;
             pendingWorldSale = SelectedNpcTrader?.PendingWorldSale != null;
             RefreshNpcTradeView();
         }
 
-        public void ShowNpcTalk()
+        public void ShowNpcActions()
         {
-            npcTradeTab = NpcTradeTab.Talk;
+            if (HasActiveInteractionWithSelectedNpc())
+                NpcInteractionManager.Instance.ShowActions();
+
+            npcTradeTab = NpcTradeTab.Actions;
             pendingSellProductId = null;
             pendingSellCount = 0;
             pendingWorldSale = false;
+            RefreshNpcTradeView();
+        }
+
+        public void StartSelectedNpcInteraction()
+        {
+            if (SelectedNpcTrader?.Card == null)
+                return;
+
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance ??
+                NpcInteractionManager.Ensure(
+                    DialogueManager.Instance?.gameObject);
+            CardInstance player = CardManager.Instance?.AllCards
+                .FirstOrDefault(card =>
+                    NpcInteractionManager.CanStartInteraction(
+                        card,
+                        SelectedNpcTrader.Card));
+            if (interaction == null || player == null)
+            {
+                npcTradeHint.text =
+                    "当前场景中没有可用于互动的玩家人物。";
+                return;
+            }
+
+            if (!interaction.StartInteraction(
+                    player,
+                    SelectedNpcTrader.Card))
+            {
+                npcTradeHint.text =
+                    "现在无法开始人物互动。";
+                return;
+            }
+
+            npcTradeTab = NpcTradeTab.Actions;
+            RefreshNpcTradeView();
+        }
+
+        public void EndSelectedNpcInteraction()
+        {
+            if (!HasActiveInteractionWithSelectedNpc())
+                return;
+
+            NpcInteractionManager.Instance.EndInteraction();
+            npcTradeTab = NpcTradeTab.Actions;
             RefreshNpcTradeView();
         }
 
@@ -434,6 +500,52 @@ namespace CryingSnow.StackCraft
             ToggleView(false);
         }
 
+        private void HandleNpcInteractionSessionChanged(
+            NpcInteractionManager interaction)
+        {
+            if (interaction?.Npc != null)
+            {
+                NpcTrader trader =
+                    interaction.Npc.GetComponent<NpcTrader>();
+                if (trader != null)
+                    ShowNpcTrader(trader);
+                return;
+            }
+
+            if (SelectedNpcTrader != null)
+            {
+                npcTradeTab = NpcTradeTab.Actions;
+                ShowNpcTrader(SelectedNpcTrader);
+            }
+        }
+
+        private void HandleNpcInteractionStateChanged(
+            NpcInteractionState state)
+        {
+            if (SelectedNpcTrader == null ||
+                !HasActiveInteractionWithSelectedNpc())
+            {
+                return;
+            }
+
+            switch (state)
+            {
+                case NpcInteractionState.Dialogue:
+                    ToggleView(false);
+                    return;
+                case NpcInteractionState.Trade:
+                    if (npcTradeTab == NpcTradeTab.Actions)
+                        npcTradeTab = NpcTradeTab.Buy;
+                    break;
+                case NpcInteractionState.ChoosingAction:
+                    npcTradeTab = NpcTradeTab.Actions;
+                    break;
+            }
+
+            ToggleView(true);
+            RefreshNpcTradeView();
+        }
+
         private void PerformLocationAction()
         {
             if (SelectedNpcTrader != null)
@@ -488,6 +600,7 @@ namespace CryingSnow.StackCraft
             if (SelectedNpcTrader != null)
             {
                 bool canConfirm = npcTradeTab == NpcTradeTab.Sell &&
+                    HasActiveInteractionWithSelectedNpc() &&
                     (pendingWorldSale ||
                         (!string.IsNullOrWhiteSpace(pendingSellProductId) &&
                          pendingSellCount > 0));
@@ -510,7 +623,8 @@ namespace CryingSnow.StackCraft
                         : "请选择要出售的物品";
                 }
                 enterLocationButton.gameObject.SetActive(
-                    npcTradeTab == NpcTradeTab.Sell);
+                    npcTradeTab == NpcTradeTab.Sell &&
+                    HasActiveInteractionWithSelectedNpc());
                 enterLocationButton.interactable = canConfirm;
                 return;
             }
@@ -612,22 +726,46 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            foreach (Transform child in npcTradeListRoot)
+            for (int index = npcTradeListRoot.childCount - 1;
+                 index >= 0;
+                 index--)
             {
+                Transform child = npcTradeListRoot.GetChild(index);
                 if (child != npcTradeRowTemplate.transform)
                 {
                     child.gameObject.SetActive(false);
-                    Destroy(child.gameObject);
+                    if (Application.isPlaying)
+                        Destroy(child.gameObject);
+                    else
+                        DestroyImmediate(child.gameObject);
                 }
             }
 
+            bool hasInteraction =
+                HasActiveInteractionWithSelectedNpc();
+            bool isTradePage =
+                IsSelectedNpcTradeState() &&
+                npcTradeTab != NpcTradeTab.Actions;
+            SetNpcTradeNavigationVisible(isTradePage);
             if (npcBuyTabButton != null)
-                npcBuyTabButton.interactable = npcTradeTab != NpcTradeTab.Buy;
+            {
+                npcBuyTabButton.interactable =
+                    hasInteraction &&
+                    npcTradeTab != NpcTradeTab.Buy;
+            }
             if (npcSellTabButton != null)
-                npcSellTabButton.interactable = npcTradeTab != NpcTradeTab.Sell;
-            if (npcTalkTabButton != null)
-                npcTalkTabButton.interactable = npcTradeTab != NpcTradeTab.Talk;
+            {
+                npcSellTabButton.interactable =
+                    hasInteraction &&
+                    npcTradeTab != NpcTradeTab.Sell;
+            }
+            if (npcActionTabButton != null)
+            {
+                npcActionTabButton.interactable =
+                    npcTradeTab != NpcTradeTab.Actions;
+            }
             enterLocationButton.gameObject.SetActive(
+                hasInteraction &&
                 npcTradeTab == NpcTradeTab.Sell);
 
             switch (npcTradeTab)
@@ -639,12 +777,14 @@ namespace CryingSnow.StackCraft
                     PopulateNpcSellList();
                     break;
                 default:
-                    PopulateNpcTalk();
+                    PopulateNpcActions();
                     break;
             }
 
             discoveryLabel.text =
-                $"● 可用资金 {SelectedNpcTrader.AvailableFunds} 金币";
+                hasInteraction
+                    ? $"● 互动中 · 可用资金 {SelectedNpcTrader.AvailableFunds} 金币"
+                    : $"● 可用资金 {SelectedNpcTrader.AvailableFunds} 金币";
             RefreshLocationAction();
         }
 
@@ -804,52 +944,124 @@ namespace CryingSnow.StackCraft
             RefreshLocationAction();
         }
 
-        private void PopulateNpcTalk()
+        private void PopulateNpcActions()
         {
             CardDefinition definition =
                 SelectedNpcTrader?.Card?.Definition;
             if (definition == null)
             {
-                npcTradeHint.text = "这个人物当前无法交谈。";
+                npcTradeHint.text = "这个人物当前无法互动。";
                 return;
             }
 
-            bool canTalk = definition.DialogueEnabled;
-            NpcTradeListRowView row = CreateNpcTradeRow();
-            row.Bind(
-                definition,
-                canTalk
-                    ? $"{definition.DisplayName}\n查看人物对话"
-                    : $"{definition.DisplayName}\n暂无可用对话",
-                canTalk ? "开始交谈" : null,
-                canTalk ? StartNpcDialogue : null);
-            npcTradeHint.text = canTalk
-                ? "点击按钮后，将由当前场景中的玩家人物开始交谈。"
-                : "这个人物暂时没有配置对话内容。";
+            if (!HasActiveInteractionWithSelectedNpc())
+            {
+                NpcTradeListRowView startRow = CreateNpcTradeRow();
+                startRow.BindAction(
+                    "开始互动\n选择一名玩家人物参与",
+                    "开始互动",
+                    StartSelectedNpcInteraction);
+                npcTradeHint.text =
+                    "拖动玩家人物卡到 NPC 身边，或点击“开始互动”。";
+                return;
+            }
+
+            CardInstance actor = NpcInteractionManager.Instance.Player;
+            if (definition.DialogueEnabled)
+            {
+                NpcTradeListRowView talkRow = CreateNpcTradeRow();
+                talkRow.BindAction(
+                    "交谈\n了解人物和当前地点的信息",
+                    "交谈",
+                    StartNpcDialogue);
+            }
+
+            bool canTrade = NpcTradeService.CanTradeNow(
+                SelectedNpcTrader,
+                out string tradeReason);
+            NpcTradeListRowView tradeRow = CreateNpcTradeRow();
+            tradeRow.BindAction(
+                canTrade
+                    ? "交易\n查看对方的购买与出售列表"
+                    : $"交易\n{tradeReason}",
+                canTrade ? "交易" : null,
+                canTrade ? BeginSelectedNpcTradeFromActions : null);
+
+            NpcTradeListRowView endRow = CreateNpcTradeRow();
+            endRow.BindAction(
+                "结束互动\n双方人物卡将返回原来的位置",
+                "结束",
+                EndSelectedNpcInteraction);
+
+            npcTradeHint.text =
+                $"当前参与者：{actor?.Definition?.DisplayName ?? "玩家人物"}。" +
+                "选择一项行动继续。";
         }
 
         private void StartNpcDialogue()
         {
-            CardInstance npc = SelectedNpcTrader?.Card;
-            DialogueManager dialogue = DialogueManager.Instance;
-            CardInstance player = CardManager.Instance?.AllCards
-                .FirstOrDefault(card =>
-                    DialogueManager.CanStartDialogue(card, npc));
-            if (dialogue == null || player == null)
+            if (!HasActiveInteractionWithSelectedNpc())
             {
                 npcTradeHint.text =
-                    "当前场景中没有可用于交谈的玩家人物。";
+                    "请先开始人物互动。";
                 return;
             }
 
-            if (!dialogue.StartDialogue(player, npc))
+            if (!NpcInteractionManager.Instance.BeginDialogue(
+                    out string reason))
             {
-                npcTradeHint.text =
-                    "现在无法开始交谈，请先结束其他互动。";
+                npcTradeHint.text = reason;
                 return;
             }
 
             ToggleView(false);
+        }
+
+        private void BeginSelectedNpcTradeFromActions()
+        {
+            if (!TryBeginSelectedNpcTrade())
+                return;
+
+            npcTradeTab = NpcTradeTab.Buy;
+            RefreshNpcTradeView();
+        }
+
+        private bool TryBeginSelectedNpcTrade()
+        {
+            if (!HasActiveInteractionWithSelectedNpc())
+            {
+                npcTradeTab = NpcTradeTab.Actions;
+                RefreshNpcTradeView();
+                npcTradeHint.text =
+                    "请先拖动玩家人物卡到 NPC 身边开始互动。";
+                return false;
+            }
+
+            if (!NpcInteractionManager.Instance.BeginTrade(
+                    out string reason))
+            {
+                npcTradeTab = NpcTradeTab.Actions;
+                RefreshNpcTradeView();
+                npcTradeHint.text = reason;
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool HasActiveInteractionWithSelectedNpc()
+        {
+            return SelectedNpcTrader?.Card != null &&
+                NpcInteractionManager.Instance?.IsActive == true &&
+                NpcInteractionManager.Instance.Npc ==
+                    SelectedNpcTrader.Card;
+        }
+
+        private bool IsSelectedNpcTradeState()
+        {
+            return HasActiveInteractionWithSelectedNpc() &&
+                NpcInteractionManager.Instance.State ==
+                    NpcInteractionState.Trade;
         }
 
         private void ConfirmNpcSale()
@@ -886,8 +1098,111 @@ namespace CryingSnow.StackCraft
         {
             if (npcTradePanel != null)
                 npcTradePanel.SetActive(visible);
+            ApplyNpcPresentationLayout(visible);
             if (!visible && enterLocationButton != null)
                 enterLocationButton.gameObject.SetActive(true);
+        }
+
+        private void SetNpcTradeNavigationVisible(bool visible)
+        {
+            if (npcBuyTabButton != null)
+                npcBuyTabButton.gameObject.SetActive(visible);
+            if (npcSellTabButton != null)
+                npcSellTabButton.gameObject.SetActive(visible);
+            if (npcActionTabButton != null)
+            {
+                npcActionTabButton.gameObject.SetActive(visible);
+                TMP_Text label = npcActionTabButton
+                    .GetComponentInChildren<TMP_Text>(true);
+                if (label != null)
+                    label.text = "返回";
+            }
+
+            RectTransform scrollRect =
+                npcTradeListRoot?.parent?.parent as RectTransform;
+            if (scrollRect != null)
+            {
+                Vector2 anchorMax = scrollRect.anchorMax;
+                anchorMax.y = visible ? 0.84f : 0.98f;
+                scrollRect.anchorMax = anchorMax;
+            }
+        }
+
+        private void ApplyNpcPresentationLayout(bool npcMode)
+        {
+            if (!standardDescriptionColorCaptured &&
+                descriptionLabel != null)
+            {
+                standardDescriptionColor = descriptionLabel.color;
+                standardDescriptionColorCaptured = true;
+            }
+
+            SetActive(discoveryLabel, !npcMode);
+            SetActive(travelTimeLabel, !npcMode);
+            SetActive(resourcesLabel, !npcMode);
+
+            if (npcMode)
+            {
+                SetAnchors(titleLabel?.rectTransform, 0.36f, 0.93f, 0.88f, 0.96f);
+                SetAnchors(artImage?.rectTransform, 0.07f, 0.31f, 0.77f, 0.91f);
+                SetAnchors(typeAndDangerLabel?.rectTransform, 0.36f, 0.93f, 0.80f, 0.87f);
+                SetAnchors(descriptionLabel?.rectTransform, 0.07f, 0.93f, 0.62f, 0.76f);
+
+                ConfigureText(titleLabel, 30f, TextAlignmentOptions.MidlineLeft);
+                ConfigureText(typeAndDangerLabel, 20f, TextAlignmentOptions.MidlineLeft);
+                ConfigureText(descriptionLabel, 19f, TextAlignmentOptions.TopLeft);
+                if (descriptionLabel != null)
+                    descriptionLabel.color = new Color(0.84f, 0.84f, 0.84f, 1f);
+                return;
+            }
+
+            SetAnchors(titleLabel?.rectTransform, 0.06f, 0.94f, 0.88f, 0.97f);
+            SetAnchors(artImage?.rectTransform, 0.32f, 0.68f, 0.67f, 0.87f);
+            SetAnchors(typeAndDangerLabel?.rectTransform, 0.06f, 0.94f, 0.61f, 0.67f);
+            SetAnchors(descriptionLabel?.rectTransform, 0.07f, 0.93f, 0.115f, 0.30f);
+
+            ConfigureText(titleLabel, 36f, TextAlignmentOptions.Center);
+            ConfigureText(typeAndDangerLabel, 24f, TextAlignmentOptions.Center);
+            ConfigureText(descriptionLabel, 21f, TextAlignmentOptions.TopLeft);
+            if (descriptionLabel != null &&
+                standardDescriptionColorCaptured)
+            {
+                descriptionLabel.color = standardDescriptionColor;
+            }
+        }
+
+        private static void SetActive(Component component, bool active)
+        {
+            if (component != null)
+                component.gameObject.SetActive(active);
+        }
+
+        private static void ConfigureText(
+            TMP_Text label,
+            float fontSize,
+            TextAlignmentOptions alignment)
+        {
+            if (label == null)
+                return;
+
+            label.fontSize = fontSize;
+            label.alignment = alignment;
+        }
+
+        private static void SetAnchors(
+            RectTransform rect,
+            float minX,
+            float maxX,
+            float minY,
+            float maxY)
+        {
+            if (rect == null)
+                return;
+
+            rect.anchorMin = new Vector2(minX, minY);
+            rect.anchorMax = new Vector2(maxX, maxY);
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = Vector2.zero;
         }
 
         private static string GetCategoryLabel(CardCategory category)
@@ -913,7 +1228,7 @@ namespace CryingSnow.StackCraft
         {
             Buy,
             Sell,
-            Talk
+            Actions
         }
     }
 }

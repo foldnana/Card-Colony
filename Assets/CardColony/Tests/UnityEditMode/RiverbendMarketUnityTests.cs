@@ -429,16 +429,16 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void WorldMapLocationView_ProvidesActionableNpcDialogueEntry()
+        public void WorldMapLocationView_ProvidesGenericNpcActionEntry()
         {
             Type viewType =
                 FindType("CryingSnow.StackCraft.WorldMapLocationView");
             Assert.That(
                 viewType.GetMethod(
-                    "PopulateNpcTalk",
+                    "PopulateNpcActions",
                     BindingFlags.Instance | BindingFlags.NonPublic),
                 Is.Not.Null,
-                "The talk tab must create an actionable dialogue entry.");
+                "The action tab must create contextual NPC actions.");
             Assert.That(
                 viewType.GetMethod(
                     "StartNpcDialogue",
@@ -566,7 +566,8 @@ namespace CardColony.Tests
             Assert.That(FindChild(prefab.transform, "NpcTradePanel"), Is.Not.Null);
             Assert.That(FindChild(prefab.transform, "NpcBuyTabButton"), Is.Not.Null);
             Assert.That(FindChild(prefab.transform, "NpcSellTabButton"), Is.Not.Null);
-            Assert.That(FindChild(prefab.transform, "NpcTalkTabButton"), Is.Not.Null);
+            Assert.That(FindChild(prefab.transform, "NpcActionTabButton"), Is.Not.Null,
+                "人物侧栏需要统一的行动页签，交谈不再作为拖拽后的默认动作。");
             Assert.That(FindChild(prefab.transform, "NpcTradeScrollView"), Is.Not.Null);
             Assert.That(FindChild(prefab.transform, "NpcTradeRowTemplate"), Is.Not.Null);
 
@@ -576,6 +577,15 @@ namespace CardColony.Tests
             Assert.That(viewType.GetProperty("SelectedNpcTrader"), Is.Not.Null);
             Assert.That(
                 viewType.GetMethod("ShowNpcTrader", new[] { traderType }),
+                Is.Not.Null);
+            Assert.That(
+                viewType.GetMethod("ShowNpcActions"),
+                Is.Not.Null);
+            Assert.That(
+                viewType.GetMethod("StartSelectedNpcInteraction"),
+                Is.Not.Null);
+            Assert.That(
+                viewType.GetMethod("EndSelectedNpcInteraction"),
                 Is.Not.Null);
         }
 
@@ -594,6 +604,10 @@ namespace CardColony.Tests
                 false);
             PropertyInfo cardManagerInstance = null;
             object previousCardManager = null;
+            GameObject interactionHost = null;
+            PropertyInfo interactionInstance = null;
+            object previousInteraction = null;
+            object interaction = null;
             try
             {
                 Type viewType =
@@ -659,14 +673,256 @@ namespace CardColony.Tests
                 Assert.That(canvasGroup.interactable, Is.True);
                 Assert.That(tradePanel, Is.Not.Null);
                 Assert.That(tradePanel.activeSelf, Is.True);
+
+                Button buyTab = viewType.GetField(
+                        "npcBuyTabButton",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as Button;
+                Button sellTab = viewType.GetField(
+                        "npcSellTabButton",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as Button;
+                Button actionTab = viewType.GetField(
+                        "npcActionTabButton",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as Button;
+                TMP_Text discovery = viewType.GetField(
+                        "discoveryLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as TMP_Text;
+                TMP_Text travelTime = viewType.GetField(
+                        "travelTimeLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as TMP_Text;
+                TMP_Text resources = viewType.GetField(
+                        "resourcesLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as TMP_Text;
+                TMP_Text description = viewType.GetField(
+                        "descriptionLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as TMP_Text;
+
+                Assert.That(buyTab.gameObject.activeSelf, Is.False,
+                    "Buy and sell navigation should only appear after choosing Trade.");
+                Assert.That(sellTab.gameObject.activeSelf, Is.False);
+                Assert.That(actionTab.gameObject.activeSelf, Is.False);
+                Assert.That(discovery.gameObject.activeSelf, Is.False,
+                    "The compact NPC header must not retain the location detail rows.");
+                Assert.That(travelTime.gameObject.activeSelf, Is.False);
+                Assert.That(resources.gameObject.activeSelf, Is.False);
+                Assert.That(
+                    description.rectTransform.anchorMin.y,
+                    Is.GreaterThanOrEqualTo(0.62f),
+                    "NPC description should remain in the compact header above the action list.");
+
+                Type interactionType =
+                    FindType("CryingSnow.StackCraft.NpcInteractionManager");
+                interactionInstance = interactionType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static);
+                previousInteraction = interactionInstance?.GetValue(null);
+                interactionInstance?.SetValue(null, null);
+                interactionHost = new GameObject(
+                    "NPC Trade Navigation State Test");
+                interaction = interactionHost.AddComponent(interactionType);
+                interactionInstance?.SetValue(null, interaction);
+                interactionType.GetField(
+                        "player",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.SetValue(interaction, card);
+                interactionType.GetField(
+                        "npc",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.SetValue(interaction, card);
+                FieldInfo stateField = interactionType.GetField(
+                    "<State>k__BackingField",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+                object choosingAction = Enum.Parse(
+                    stateField.FieldType,
+                    "ChoosingAction");
+                object tradeState = Enum.Parse(
+                    stateField.FieldType,
+                    "Trade");
+                stateField.SetValue(interaction, choosingAction);
+                traderType.GetProperty("PendingWorldSale")
+                    ?.SetValue(
+                        trader,
+                        cardType.GetProperty("Stack")?.GetValue(card));
+
+                viewType.GetMethod(
+                        "ShowNpcTrader",
+                        new[] { traderType })
+                    ?.Invoke(view, new[] { trader });
+                Assert.That(buyTab.gameObject.activeSelf, Is.False,
+                    "A pending sale must not bypass the action choice state.");
+                Assert.That(sellTab.gameObject.activeSelf, Is.False);
+                Assert.That(actionTab.gameObject.activeSelf, Is.False);
+
+                stateField.SetValue(interaction, tradeState);
+                viewType.GetMethod(
+                        "ShowNpcTrader",
+                        new[] { traderType })
+                    ?.Invoke(view, new[] { trader });
+                Assert.That(buyTab.gameObject.activeSelf, Is.True,
+                    "Trade navigation should appear after the interaction enters Trade.");
+                Assert.That(sellTab.gameObject.activeSelf, Is.True);
+                Assert.That(actionTab.gameObject.activeSelf, Is.True);
             }
             finally
             {
+                if (interaction != null)
+                {
+                    Type interactionType = interaction.GetType();
+                    interactionType.GetField(
+                            "player",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        ?.SetValue(interaction, null);
+                    interactionType.GetField(
+                            "npc",
+                            BindingFlags.Instance | BindingFlags.NonPublic)
+                        ?.SetValue(interaction, null);
+                    FieldInfo stateField = interactionType.GetField(
+                        "<State>k__BackingField",
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                    stateField?.SetValue(
+                        interaction,
+                        Enum.Parse(stateField.FieldType, "None"));
+                }
+                if (interactionHost != null)
+                    UnityEngine.Object.DestroyImmediate(interactionHost);
+                interactionInstance?.SetValue(null, previousInteraction);
                 cardManagerInstance?.SetValue(null, previousCardManager);
                 UnityEngine.Object.DestroyImmediate(npcObject);
                 UnityEngine.Object.DestroyImmediate(npcDefinition);
                 EditorSceneManager.CloseScene(scene, true);
             }
+        }
+
+        [Test]
+        public void UiRoot_NpcActionRowsUseTextFirstLayoutWithoutRepeatedPortrait()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GameObject instance = UnityEngine.Object.Instantiate(prefab);
+            try
+            {
+                Transform row = FindChild(
+                    instance.transform,
+                    "NpcTradeRowTemplate");
+                Assert.That(row, Is.Not.Null);
+
+                Component rowView = row.GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.NpcTradeListRowView");
+                MethodInfo bindAction = rowView.GetType().GetMethod(
+                    "BindAction",
+                    BindingFlags.Instance | BindingFlags.Public);
+                Assert.That(bindAction, Is.Not.Null,
+                    "Action rows need a dedicated layout instead of reusing merchandise rows.");
+
+                RawImage icon = rowView.GetType().GetField(
+                        "icon",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(rowView) as RawImage;
+                TMP_Text detailsLabel = rowView.GetType().GetField(
+                        "detailsLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(rowView) as TMP_Text;
+                Button primaryButton = rowView.GetType().GetField(
+                        "primaryButton",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(rowView) as Button;
+                TMP_Text primaryButtonLabel = rowView.GetType().GetField(
+                        "primaryButtonLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(rowView) as TMP_Text;
+                Assert.That(icon, Is.Not.Null);
+                Assert.That(detailsLabel, Is.Not.Null);
+                Assert.That(primaryButton, Is.Not.Null);
+                Assert.That(primaryButtonLabel, Is.Not.Null);
+                bool originalAutoSizing =
+                    primaryButtonLabel.enableAutoSizing;
+                float originalFontSize =
+                    primaryButtonLabel.fontSize;
+
+                bindAction.Invoke(
+                    rowView,
+                    new object[]
+                    {
+                        "开始互动\n选择一名玩家人物参与",
+                        "开始互动",
+                        new UnityEngine.Events.UnityAction(() => { })
+                    });
+
+                RectTransform details = detailsLabel.rectTransform;
+                RectTransform primary =
+                    (RectTransform)primaryButton.transform;
+                LayoutElement rowLayout = row.GetComponent<LayoutElement>();
+
+                Assert.That(icon.gameObject.activeSelf, Is.False,
+                    "The NPC portrait already appears in the header and must not repeat per action.");
+                Assert.That(details.anchorMin.x, Is.LessThanOrEqualTo(0.05f));
+                Assert.That(details.anchorMax.x, Is.GreaterThanOrEqualTo(0.67f));
+                Assert.That(
+                    primary.anchorMax.x - primary.anchorMin.x,
+                    Is.GreaterThanOrEqualTo(0.24f),
+                    "Action buttons need enough width for complete Chinese labels.");
+                Assert.That(primaryButtonLabel.enableAutoSizing, Is.True);
+                Assert.That(primaryButtonLabel.fontSizeMin, Is.EqualTo(14f));
+                Assert.That(primaryButtonLabel.fontSizeMax, Is.EqualTo(20f));
+                Assert.That(rowLayout.preferredHeight, Is.LessThanOrEqualTo(96f));
+
+                rowView.GetType().GetMethod(
+                        "Bind",
+                        BindingFlags.Instance | BindingFlags.Public)
+                    ?.Invoke(
+                        rowView,
+                        new object[]
+                        {
+                            null,
+                            "商品",
+                            "购买",
+                            new UnityEngine.Events.UnityAction(() => { }),
+                            null,
+                            null
+                        });
+                Assert.That(
+                    primaryButtonLabel.enableAutoSizing,
+                    Is.EqualTo(originalAutoSizing));
+                Assert.That(
+                    primaryButtonLabel.fontSize,
+                    Is.EqualTo(originalFontSize));
+                Assert.That(icon.gameObject.activeSelf, Is.True,
+                    "Returning to merchandise mode must restore the icon slot.");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
+        public void UiRoot_InfoPanelSitsAboveBackpackButton()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            RectTransform infoPanel = (RectTransform)FindChild(
+                prefab.transform,
+                "InfoPanel");
+            RectTransform backpackButton = (RectTransform)FindChild(
+                prefab.transform,
+                "BackpackButton");
+
+            Assert.That(infoPanel, Is.Not.Null);
+            Assert.That(backpackButton, Is.Not.Null);
+            float backpackTop =
+                backpackButton.anchoredPosition.y +
+                backpackButton.rect.height;
+            Assert.That(
+                infoPanel.anchoredPosition.y,
+                Is.GreaterThanOrEqualTo(backpackTop + 10f),
+                "Hover details must sit above the backpack button with a visible gap.");
         }
 
         [Test]
@@ -717,6 +973,49 @@ namespace CardColony.Tests
             Assert.That(
                 secondaryButton.GetComponentInChildren<TMP_Text>(true).fontSize,
                 Is.LessThanOrEqualTo(20f));
+        }
+
+        [Test]
+        public void UiRoot_NpcArtworkPreservesAspectWithoutEscapingItsSlot()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform locationArt = FindChild(
+                prefab.transform,
+                "LocationArt");
+            Transform row = FindChild(
+                prefab.transform,
+                "NpcTradeRowTemplate");
+            Transform rowIcon = FindChild(row, "Icon");
+
+            Assert.That(locationArt, Is.Not.Null);
+            Assert.That(rowIcon, Is.Not.Null);
+            AssertSquareAspectFitter(
+                locationArt,
+                "人物详情大头像",
+                AspectRatioFitter.AspectMode.HeightControlsWidth);
+            AssertSquareAspectFitter(
+                rowIcon,
+                "行动与交易列表小头像",
+                AspectRatioFitter.AspectMode.WidthControlsHeight);
+        }
+
+        private static void AssertSquareAspectFitter(
+            Transform target,
+            string label,
+            AspectRatioFitter.AspectMode expectedMode)
+        {
+            AspectRatioFitter fitter =
+                target.GetComponent<AspectRatioFitter>();
+            Assert.That(
+                fitter,
+                Is.Not.Null,
+                $"{label}必须约束图片宽高比，不能跟随父面板被横向压缩。");
+            Assert.That(
+                fitter.aspectMode,
+                Is.EqualTo(expectedMode),
+                $"{label}只能调整自身一个尺寸轴，不能使用会覆盖锚点和位置的 FitInParent。");
+            Assert.That(fitter.aspectRatio, Is.EqualTo(1f));
         }
 
         [Test]
@@ -1036,6 +1335,105 @@ namespace CardColony.Tests
                 UnityEngine.Object.DestroyImmediate(buyerObject);
                 EditorSceneManager.CloseScene(scene, true);
             }
+        }
+
+        [Test]
+        public void WorldMapLocationView_ShowBuilding_ReopensHiddenBodyWhenTabIsAlreadySelected()
+        {
+            Scene scene = EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Additive);
+            GameObject buildingObject = new("Building View Reopen Test");
+            ScriptableObject buildingDefinition = CreateDefinition(
+                "test-building-view-reopen",
+                6,
+                false,
+                0,
+                true);
+            try
+            {
+                Type viewType =
+                    FindType("CryingSnow.StackCraft.WorldMapLocationView");
+                Type cardType =
+                    FindType("CryingSnow.StackCraft.CardInstance");
+                Type stackType =
+                    FindType("CryingSnow.StackCraft.CardStack");
+                Type entranceType =
+                    FindType("CryingSnow.StackCraft.LocationEntrance");
+                Component view = scene.GetRootGameObjects()
+                    .SelectMany(root =>
+                        root.GetComponentsInChildren<Component>(true))
+                    .FirstOrDefault(component =>
+                        component != null &&
+                        component.GetType() == viewType);
+                Assert.That(view, Is.Not.Null);
+
+                Component card = buildingObject.AddComponent(cardType);
+                SetDefinition(card, buildingDefinition);
+                cardType.GetProperty("Stack")?.SetValue(
+                    card,
+                    Activator.CreateInstance(
+                        stackType,
+                        card,
+                        Vector3.zero));
+                Component entrance =
+                    buildingObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure")
+                    ?.Invoke(entrance, new object[] { "test-destination" });
+
+                Toggle locationToggle = viewType.GetField(
+                        "locationToggle",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as Toggle;
+                Assert.That(locationToggle, Is.Not.Null);
+                locationToggle.isOn = true;
+
+                CanvasGroup canvasGroup = view.GetComponent<CanvasGroup>();
+                viewType.GetMethod("ToggleView")
+                    ?.Invoke(view, new object[] { false });
+                Assert.That(canvasGroup.alpha, Is.Zero);
+
+                viewType.GetMethod(
+                        "ShowBuilding",
+                        new[] { entranceType })
+                    ?.Invoke(view, new[] { entrance });
+
+                Assert.That(canvasGroup.alpha, Is.EqualTo(1f),
+                    "Switching from an NPC to a building must restore the sidebar body even when the tab remains selected.");
+                Assert.That(canvasGroup.interactable, Is.True);
+                Assert.That(canvasGroup.blocksRaycasts, Is.True);
+                TMP_Text title = viewType.GetField(
+                        "titleLabel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.GetValue(view) as TMP_Text;
+                Assert.That(title.text, Is.EqualTo("test-building-view-reopen"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(buildingObject);
+                UnityEngine.Object.DestroyImmediate(buildingDefinition);
+                EditorSceneManager.CloseScene(scene, true);
+            }
+        }
+
+        [Test]
+        public void UiRoot_HidesRecipesModuleUntilItIsReady()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform recipesToggle = FindChild(
+                prefab.transform,
+                "RecipesToggle");
+            Transform recipesView = FindChild(
+                prefab.transform,
+                "RecipesView");
+
+            Assert.That(recipesToggle, Is.Not.Null);
+            Assert.That(recipesView, Is.Not.Null);
+            Assert.That(recipesToggle.gameObject.activeSelf, Is.False,
+                "The unfinished recipes tab should not appear in the sidebar header.");
+            Assert.That(recipesView.gameObject.activeSelf, Is.False,
+                "The unfinished recipes body should remain unavailable.");
         }
 
         [Test]
