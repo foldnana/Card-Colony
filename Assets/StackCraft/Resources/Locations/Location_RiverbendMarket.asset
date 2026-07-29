@@ -35,6 +35,7 @@ MonoBehaviour:
   randomSpawnMinSpacing: 0.8
   randomSpawnPartyClearance: 2
   randomCardSpawns: []
+  publicMarketProfile: {fileID: 11400000, guid: b9dfe8876b801ee45957f355ab909dbd, type: 2}
   marketCurrencyCardDefinition: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
   marketBuyerCardDefinition: {fileID: 0}
   marketPickupCardDefinition: {fileID: 11400000, guid: 3b997ab829e698549a4e4b96a26d6dc9, type: 2}

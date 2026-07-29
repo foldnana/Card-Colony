@@ -161,20 +161,24 @@ namespace CryingSnow.StackCraft
 
             visualRepairPending = false;
             ClearProxies();
-            foreach (IGrouping<string, BackpackEntryData> group in backpack.Entries
-                         .Where(entry => entry?.Card != null)
-                         .GroupBy(entry => string.IsNullOrWhiteSpace(entry.TableStackId)
-                             ? entry.InstanceId
-                             : entry.TableStackId))
+            IReadOnlyList<BackpackVisualGroup> visualGroups =
+                BackpackVisualGrouping.Build(
+                    backpack,
+                    id => !string.IsNullOrWhiteSpace(id) &&
+                        CardManager.Instance.GetDefinitionById(id)?.Category ==
+                            CardCategory.Currency);
+            foreach (BackpackVisualGroup group in visualGroups)
             {
-                List<BackpackEntryData> stackEntries = group
-                    .OrderBy(entry => entry.TableStackOrder)
-                    .ThenBy(entry => entry.SlotIndex)
-                    .ToList();
+                List<BackpackEntryData> stackEntries =
+                    group.Entries.ToList();
                 Vector3 position = GetTableWorldPosition(stackEntries[0]);
                 CardStack restoredStack = null;
 
-                foreach (BackpackEntryData entry in stackEntries)
+                IEnumerable<BackpackEntryData> visibleEntries =
+                    group.IsCurrencyBundle
+                        ? stackEntries.Take(1)
+                        : stackEntries;
+                foreach (BackpackEntryData entry in visibleEntries)
                 {
                     CardInstance card = CardManager.Instance.RestoreUnmanagedCardFromData(
                         entry.Card,
@@ -197,8 +201,32 @@ namespace CryingSnow.StackCraft
                     SetLayerRecursively(card.gameObject, overlayLayer);
                     BackpackCardProxy proxy =
                         card.gameObject.AddComponent<BackpackCardProxy>();
-                    proxy.Bind(owner, this, card, entry.InstanceId, entry.SlotIndex);
+                    if (group.IsCurrencyBundle)
+                    {
+                        proxy.BindBundle(
+                            owner,
+                            this,
+                            card,
+                            entry.InstanceId,
+                            entry.SlotIndex,
+                            stackEntries.Select(candidate =>
+                                candidate.InstanceId));
+                    }
+                    else
+                    {
+                        proxy.Bind(
+                            owner,
+                            this,
+                            card,
+                            entry.InstanceId,
+                            entry.SlotIndex);
+                    }
                     proxies[entry.InstanceId] = proxy;
+                    if (group.IsCurrencyBundle)
+                    {
+                        card.UpdateTitleText(
+                            $"钱袋{group.Quantity}枚");
+                    }
                 }
 
                 if (restoredStack != null)
@@ -623,6 +651,8 @@ namespace CryingSnow.StackCraft
                 return;
 
             proxies.Remove(proxy.EntryId);
+            if (proxy.IsBundledPresentation && proxy.Card?.Definition != null)
+                proxy.Card.UpdateTitleText(proxy.Card.Definition.DisplayName);
             proxy.Card?.transform.SetParent(null, true);
             if (Application.isPlaying)
                 Destroy(proxy);
@@ -1033,12 +1063,15 @@ namespace CryingSnow.StackCraft
                 if (proxy == null)
                     continue;
 
-                backpack.TrySetTablePlacement(
-                    proxy.EntryId,
-                    local.x,
-                    local.z,
-                    stackId,
-                    index);
+                foreach (string entryId in proxy.EntryIds)
+                {
+                    backpack.TrySetTablePlacement(
+                        entryId,
+                        local.x,
+                        local.z,
+                        stackId,
+                        index);
+                }
             }
         }
 

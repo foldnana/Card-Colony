@@ -590,6 +590,236 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void UiRoot_ContainsDirectPublicMarketOverview()
+        {
+            Type screenType = FindType(
+                "CryingSnow.StackCraft.PublicMarketTradeScreen");
+            Type rowType = FindType(
+                "CryingSnow.StackCraft.MarketCommodityListItem");
+            Assert.That(screenType, Is.Not.Null,
+                "地点直达的公共市场总览控制器尚未实现。");
+            Assert.That(rowType, Is.Not.Null,
+                "公共市场需要独立的列式商品行，不能复用窄版 NPC 交易行。");
+            Assert.That(
+                screenType.GetProperty("NpcTrader"),
+                Is.Null,
+                "公共市场总览不能依赖 NpcTrader。");
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+            Assert.That(
+                prefab.GetComponentInChildren(screenType, true),
+                Is.Not.Null);
+            Assert.That(
+                prefab.GetComponentInChildren(rowType, true),
+                Is.Not.Null);
+            Assert.That(
+                FindChild(prefab.transform, "LocalMarketButton"),
+                Is.Not.Null,
+                "地点界面需要固定市场按钮。");
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketModal"),
+                Is.Not.Null);
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketMarketListContent"),
+                Is.Not.Null);
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketMarketRowTemplate"),
+                Is.Not.Null);
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketConfirmButton"),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void UiRoot_PublicMarketUsesDualInventoryTradeLayout()
+        {
+            Type screenType = FindType(
+                "CryingSnow.StackCraft.PublicMarketTradeScreen");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+
+            Transform backpackList = FindChild(
+                prefab.transform,
+                "PublicMarketBackpackListContent");
+            Transform transactionPanel = FindChild(
+                prefab.transform,
+                "PublicMarketTransactionPanel");
+            Transform marketList = FindChild(
+                prefab.transform,
+                "PublicMarketMarketListContent");
+            Assert.That(backpackList, Is.Not.Null,
+                "交易界面左侧必须持续显示玩家背包，而不是只在市场表里放一个持有数字");
+            Assert.That(transactionPanel, Is.Not.Null,
+                "双库存之间需要固定交易单，统一显示数量、总价和交易后状态");
+            Assert.That(marketList, Is.Not.Null,
+                "交易界面右侧必须显示当地市场库存");
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketBuyModeButton"),
+                Is.Null,
+                "点击市场商品应直接进入购买，不再要求先切换购买页签");
+            Assert.That(
+                FindChild(prefab.transform, "PublicMarketSellModeButton"),
+                Is.Null,
+                "点击背包商品应直接进入出售，不再要求先切换出售页签");
+
+            RectTransform backpackPanel = (RectTransform)FindChild(
+                prefab.transform,
+                "PublicMarketBackpackPanel");
+            RectTransform marketPanel = (RectTransform)FindChild(
+                prefab.transform,
+                "PublicMarketMarketPanel");
+            Assert.That(backpackPanel.anchorMax.x, Is.LessThanOrEqualTo(0.35f));
+            Assert.That(transactionPanel.GetComponent<RectTransform>()
+                .anchorMin.x, Is.GreaterThanOrEqualTo(0.35f));
+            Assert.That(marketPanel.anchorMin.x, Is.GreaterThanOrEqualTo(0.65f));
+
+            Component screen = prefab.GetComponentInChildren(
+                screenType,
+                true);
+            var serializedScreen = new SerializedObject(screen);
+            Assert.That(
+                serializedScreen.FindProperty("backpackListRoot")
+                    ?.objectReferenceValue,
+                Is.Not.Null);
+            Assert.That(
+                serializedScreen.FindProperty("backpackRowTemplate")
+                    ?.objectReferenceValue,
+                Is.Not.Null);
+            Assert.That(
+                serializedScreen.FindProperty("marketListRoot")
+                    ?.objectReferenceValue,
+                Is.Not.Null);
+            Assert.That(
+                serializedScreen.FindProperty("marketRowTemplate")
+                    ?.objectReferenceValue,
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void WorldMapLocationUiInstaller_NullRootLookupIsSafe()
+        {
+            Type installerType = FindType(
+                "CryingSnow.StackCraft.EditorTools." +
+                "WorldMapLocationUiPrefabInstaller");
+            MethodInfo findDescendant = installerType?.GetMethod(
+                "FindDescendant",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(findDescendant, Is.Not.Null);
+
+            object result = null;
+            Assert.DoesNotThrow(() =>
+                result = findDescendant.Invoke(
+                    null,
+                    new object[] { null, "PublicMarketModal" }));
+            Assert.That(result, Is.Null);
+        }
+
+        [Test]
+        public void PublicMarketDualInventoryRowsShowDirectionSpecificPrices()
+        {
+            Type rowType = FindType(
+                "CryingSnow.StackCraft.MarketCommodityListItem");
+            Type quoteType = FindType(
+                "CryingSnow.StackCraft.MarketQuote");
+            Type directionType = FindType(
+                "CryingSnow.StackCraft.MarketTradeDirection");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform backpackTemplate = FindChild(
+                prefab.transform,
+                "PublicMarketBackpackRowTemplate");
+            Transform marketTemplate = FindChild(
+                prefab.transform,
+                "PublicMarketMarketRowTemplate");
+            Assert.That(backpackTemplate, Is.Not.Null);
+            Assert.That(marketTemplate, Is.Not.Null);
+
+            object quote = Activator.CreateInstance(
+                quoteType,
+                new object[]
+                {
+                    "riverbend-market",
+                    "salt",
+                    11,
+                    8,
+                    22,
+                    10,
+                    Enum.Parse(
+                        FindType("CryingSnow.StackCraft.MarketTrend"),
+                        "Normal"),
+                    0L,
+                    1
+                });
+            object playerSells = Enum.Parse(directionType, "PlayerSells");
+            object playerBuys = Enum.Parse(directionType, "PlayerBuys");
+            MethodInfo bind = rowType.GetMethod("Bind");
+
+            bind.Invoke(
+                backpackTemplate.GetComponent(rowType),
+                new[] { null, quote, 3, playerSells, true, null });
+            bind.Invoke(
+                marketTemplate.GetComponent(rowType),
+                new[] { null, quote, 3, playerBuys, true, null });
+
+            Assert.That(
+                FindChild(backpackTemplate, "Price")
+                    .GetComponent<TMPro.TMP_Text>().text,
+                Does.Contain("8"),
+                "背包商品必须直接显示当地市场愿意支付的单价");
+            Assert.That(
+                FindChild(backpackTemplate, "Quantity")
+                    .GetComponent<TMPro.TMP_Text>().text,
+                Does.Contain("3"));
+            Assert.That(
+                FindChild(marketTemplate, "Price")
+                    .GetComponent<TMPro.TMP_Text>().text,
+                Does.Contain("11"),
+                "市场商品必须直接显示玩家需要支付的单价");
+            Assert.That(
+                FindChild(marketTemplate, "Quantity")
+                    .GetComponent<TMPro.TMP_Text>().text,
+                Does.Contain("22"));
+        }
+
+        [Test]
+        public void RiverbendAndWhiteStoneLocations_ReferencePublicMarketsDirectly()
+        {
+            UnityEngine.Object riverbend =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                    MarketPath);
+            UnityEngine.Object whiteStone =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                    "Assets/StackCraft/Resources/Locations/Location_WhiteStoneCity.asset");
+            UnityEngine.Object riverbendMarket =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                    "Assets/StackCraft/Resources/Trading/Markets/Market_riverbend-market.asset");
+            UnityEngine.Object whiteStoneMarket =
+                AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                    "Assets/StackCraft/Resources/Trading/Markets/Market_whitestone-market.asset");
+            Assert.That(riverbend, Is.Not.Null);
+            Assert.That(whiteStone, Is.Not.Null);
+
+            Assert.That(
+                new SerializedObject(riverbend)
+                    .FindProperty("publicMarketProfile")
+                    ?.objectReferenceValue,
+                Is.EqualTo(riverbendMarket));
+            Assert.That(
+                new SerializedObject(whiteStone)
+                    .FindProperty("publicMarketProfile")
+                    ?.objectReferenceValue,
+                Is.EqualTo(whiteStoneMarket));
+            Assert.That(
+                new SerializedObject(whiteStoneMarket)
+                    .FindProperty("locationId")
+                    ?.stringValue,
+                Is.EqualTo("white-stone-city"));
+        }
+
+        [Test]
         public void WorldMapLocationView_ShowNpcTraderWithoutPendingSale_OpensSidebar()
         {
             Scene scene = EditorSceneManager.OpenScene(

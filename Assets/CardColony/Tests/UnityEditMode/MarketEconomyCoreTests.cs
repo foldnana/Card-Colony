@@ -490,6 +490,498 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void MarketService_PublicMarketTradeDoesNotRequireMerchantPolicy()
+        {
+            Type serviceType = FindType(
+                "CryingSnow.StackCraft.MarketService");
+            Type requestType = FindType(
+                "CryingSnow.StackCraft.MarketTradeRequest");
+            Type channelType = FindType(
+                "CryingSnow.StackCraft.MarketTradeChannel");
+            Type directionType = FindType(
+                "CryingSnow.StackCraft.MarketTradeDirection");
+            Assert.That(channelType, Is.Not.Null,
+                "公共市场交易渠道尚未实现，交易仍然依赖商人身份。");
+
+            object setup = CreateMarketSetup(
+                "public-market",
+                "food",
+                4,
+                1f,
+                10,
+                10);
+            ScriptableObject profile =
+                (ScriptableObject)GetTupleValue(setup, "Profile");
+            ScriptableObject commodity =
+                (ScriptableObject)GetTupleValue(setup, "Commodity");
+            try
+            {
+                Type catalogType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketCatalog");
+                Type repositoryType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketStateRepository");
+                Type clockType = FindType(
+                    "CryingSnow.StackCraft.MutableWorldClock");
+                Type inventoryType = FindType(
+                    "CryingSnow.StackCraft.InMemoryPlayerTradeInventory");
+                object catalog = Activator.CreateInstance(
+                    catalogType,
+                    new object[]
+                    {
+                        CreateTypedArray(
+                            commodity.GetType(),
+                            commodity),
+                        CreateTypedArray(profile.GetType(), profile)
+                    });
+                object service = Activator.CreateInstance(
+                    serviceType,
+                    catalog,
+                    Activator.CreateInstance(clockType, 0L),
+                    Activator.CreateInstance(repositoryType),
+                    99);
+                object inventory = Activator.CreateInstance(
+                    inventoryType,
+                    100,
+                    new Dictionary<string, int>(),
+                    20);
+                object quote = serviceType.GetMethod("GetQuote").Invoke(
+                    service,
+                    new object[]
+                    {
+                        "public-market",
+                        "food",
+                        Activator.CreateInstance(
+                            FindType(
+                                "CryingSnow.StackCraft.MerchantPriceModifiers"))
+                    });
+                MethodInfo createPublicRequest = requestType.GetMethod(
+                    "ForPublicMarket",
+                    BindingFlags.Public | BindingFlags.Static);
+                Assert.That(createPublicRequest, Is.Not.Null);
+                object request = createPublicRequest.Invoke(
+                    null,
+                    new object[]
+                    {
+                        "public-market",
+                        "food",
+                        Enum.Parse(directionType, "PlayerBuys"),
+                        2,
+                        GetIntProperty(quote, "PlayerBuyUnitPrice"),
+                        GetIntProperty(quote, "StateRevision")
+                    });
+
+                object result = serviceType.GetMethod("Execute").Invoke(
+                    service,
+                    new[] { request, inventory });
+
+                Assert.That(
+                    GetBoolProperty(result, "Success"),
+                    Is.True,
+                    "地点公共市场成交不应要求注册或伪造 MerchantId。");
+                Assert.That(
+                    (int)inventoryType.GetMethod("CountCommodity").Invoke(
+                        inventory,
+                        new object[] { "food" }),
+                    Is.EqualTo(2));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+                UnityEngine.Object.DestroyImmediate(commodity);
+            }
+        }
+
+        [Test]
+        public void LocationDefinition_ExplicitlyReferencesPublicMarket()
+        {
+            Type locationType = FindType(
+                "CryingSnow.StackCraft.LocationDefinition");
+            Type marketType = FindType(
+                "CryingSnow.StackCraft.MarketProfile");
+            ScriptableObject location =
+                ScriptableObject.CreateInstance(locationType);
+            ScriptableObject market =
+                ScriptableObject.CreateInstance(marketType);
+            try
+            {
+                SetField(location, "publicMarketProfile", market);
+                PropertyInfo property = locationType.GetProperty(
+                    "PublicMarketProfile",
+                    BindingFlags.Public | BindingFlags.Instance);
+
+                Assert.That(property, Is.Not.Null,
+                    "地点定义必须直接暴露公共市场，不应通过 NPC 推断。");
+                Assert.That(property.GetValue(location), Is.SameAs(market));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(market);
+                UnityEngine.Object.DestroyImmediate(location);
+            }
+        }
+
+        [Test]
+        public void LocalMarketContext_ContainsNoNpcDependency()
+        {
+            Type contextType = FindType(
+                "CryingSnow.StackCraft.LocalMarketContext");
+            Type sourceType = FindType(
+                "CryingSnow.StackCraft.LocalMarketOpenSource");
+            Type marketType = FindType(
+                "CryingSnow.StackCraft.MarketProfile");
+            Assert.That(contextType, Is.Not.Null,
+                "地点直达市场所需的 LocalMarketContext 尚未实现。");
+            Assert.That(sourceType, Is.Not.Null);
+            Assert.That(
+                contextType.GetProperty("NpcTrader"),
+                Is.Null,
+                "公共市场上下文不能依赖 NpcTrader。");
+
+            ScriptableObject market =
+                ScriptableObject.CreateInstance(marketType);
+            try
+            {
+                SetField(
+                    market,
+                    "locationId",
+                    "riverbend-market");
+                object context = Activator.CreateInstance(
+                    contextType,
+                    "riverbend-market",
+                    "河湾市场",
+                    market,
+                    Enum.Parse(sourceType, "LocationButton"));
+
+                Assert.That(
+                    contextType.GetProperty("LocationId")?.GetValue(context),
+                    Is.EqualTo("riverbend-market"));
+                Assert.That(
+                    contextType.GetProperty("MarketProfile")?.GetValue(context),
+                    Is.SameAs(market));
+
+                SetField(market, "locationId", "white-stone-city");
+                TargetInvocationException mismatch =
+                    Assert.Throws<TargetInvocationException>(() =>
+                        Activator.CreateInstance(
+                            contextType,
+                            "riverbend-market",
+                            "河湾市场",
+                            market,
+                            Enum.Parse(
+                                sourceType,
+                                "LocationButton")));
+                Assert.That(
+                    mismatch.InnerException,
+                    Is.TypeOf<ArgumentException>(),
+                    "公共市场上下文必须拒绝地点与市场资源错绑，防止跨地点远程成交。");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(market);
+            }
+        }
+
+        [Test]
+        public void LocalMarketTradeSession_ListsAndExecutesWholePublicMarket()
+        {
+            Type sessionType = FindType(
+                "CryingSnow.StackCraft.LocalMarketTradeSession");
+            Type contextType = FindType(
+                "CryingSnow.StackCraft.LocalMarketContext");
+            Type sourceType = FindType(
+                "CryingSnow.StackCraft.LocalMarketOpenSource");
+            Type serviceType = FindType(
+                "CryingSnow.StackCraft.MarketService");
+            Type directionType = FindType(
+                "CryingSnow.StackCraft.MarketTradeDirection");
+            Assert.That(sessionType, Is.Not.Null,
+                "公共市场交易会话尚未实现。");
+            Assert.That(
+                sessionType.GetProperty("NpcTrader"),
+                Is.Null,
+                "公共市场交易会话不能引用 NpcTrader。");
+
+            object setup = CreateMarketSetup(
+                "session-market",
+                "food",
+                4,
+                1f,
+                10,
+                10);
+            ScriptableObject profile =
+                (ScriptableObject)GetTupleValue(setup, "Profile");
+            ScriptableObject commodity =
+                (ScriptableObject)GetTupleValue(setup, "Commodity");
+            try
+            {
+                Type catalogType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketCatalog");
+                Type repositoryType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketStateRepository");
+                Type clockType = FindType(
+                    "CryingSnow.StackCraft.MutableWorldClock");
+                Type inventoryType = FindType(
+                    "CryingSnow.StackCraft.InMemoryPlayerTradeInventory");
+                object catalog = Activator.CreateInstance(
+                    catalogType,
+                    new object[]
+                    {
+                        CreateTypedArray(
+                            commodity.GetType(),
+                            commodity),
+                        CreateTypedArray(profile.GetType(), profile)
+                    });
+                object service = Activator.CreateInstance(
+                    serviceType,
+                    catalog,
+                    Activator.CreateInstance(clockType, 0L),
+                    Activator.CreateInstance(repositoryType),
+                    99);
+                object context = Activator.CreateInstance(
+                    contextType,
+                    "session-market",
+                    "测试市场",
+                    profile,
+                    Enum.Parse(sourceType, "LocationButton"));
+                object session = Activator.CreateInstance(
+                    sessionType,
+                    context,
+                    service);
+                var quotes = ((IEnumerable)sessionType
+                        .GetMethod("GetQuotes")
+                        .Invoke(session, null))
+                    .Cast<object>()
+                    .ToList();
+                Assert.That(quotes, Has.Count.EqualTo(1),
+                    "公共市场总览必须直接列出 MarketProfile 的全部商品。");
+
+                MethodInfo getMaximumQuantity = sessionType.GetMethod(
+                    "GetMaximumQuantity",
+                    BindingFlags.Public | BindingFlags.Instance);
+                Assert.That(getMaximumQuantity, Is.Not.Null,
+                    "最大可交易数量必须由无 UI 依赖的公共市场会话计算。");
+                object constrainedInventory = Activator.CreateInstance(
+                    inventoryType,
+                    100,
+                    new Dictionary<string, int>(),
+                    1);
+                Assert.That(
+                    (int)getMaximumQuantity.Invoke(
+                        session,
+                        new[]
+                        {
+                            quotes[0],
+                            Enum.Parse(directionType, "PlayerBuys"),
+                            constrainedInventory
+                        }),
+                    Is.EqualTo(1),
+                    "最大购买数量必须同时受玩家接收容量约束。");
+
+                object inventory = Activator.CreateInstance(
+                    inventoryType,
+                    100,
+                    new Dictionary<string, int>(),
+                    20);
+                object result = sessionType.GetMethod("Execute").Invoke(
+                    session,
+                    new[]
+                    {
+                        quotes[0],
+                        Enum.Parse(directionType, "PlayerBuys"),
+                        (object)2,
+                        inventory
+                    });
+
+                Assert.That(GetBoolProperty(result, "Success"), Is.True);
+                Assert.That(
+                    (int)inventoryType.GetMethod("CountCommodity").Invoke(
+                        inventory,
+                        new object[] { "food" }),
+                    Is.EqualTo(2));
+
+                MethodInfo isQuoteStale = sessionType.GetMethod(
+                    "IsQuoteStale",
+                    BindingFlags.Public | BindingFlags.Instance);
+                Assert.That(isQuoteStale, Is.Not.Null,
+                    "公共市场会话必须显式识别过期报价，以便 UI 给出正确提示。");
+                Assert.That(
+                    (bool)isQuoteStale.Invoke(
+                        session,
+                        new[] { quotes[0] }),
+                    Is.True,
+                    "成交后的旧报价必须被识别为过期。");
+
+                Type quoteType = quotes[0].GetType();
+                object foreignQuote = Activator.CreateInstance(
+                    quoteType,
+                    "other-market",
+                    "food",
+                    GetIntProperty(quotes[0], "PlayerBuyUnitPrice"),
+                    GetIntProperty(quotes[0], "PlayerSellUnitPrice"),
+                    GetIntProperty(quotes[0], "AvailableStock"),
+                    GetIntProperty(
+                        quotes[0],
+                        "MarketAffordableQuantity"),
+                    quoteType.GetProperty("Trend").GetValue(quotes[0]),
+                    quoteType.GetProperty("ValidAtWorldHour")
+                        .GetValue(quotes[0]),
+                    GetIntProperty(quotes[0], "StateRevision"));
+                object foreignResult = sessionType.GetMethod("Execute")
+                    .Invoke(
+                        session,
+                        new[]
+                        {
+                            foreignQuote,
+                            Enum.Parse(
+                                directionType,
+                                "PlayerBuys"),
+                            (object)1,
+                            inventory
+                        });
+                Assert.That(
+                    GetBoolProperty(foreignResult, "Success"),
+                    Is.False,
+                    "当前地点会话必须拒绝其他市场的报价。");
+                Assert.That(
+                    foreignResult.GetType().GetProperty("Failure")
+                        .GetValue(foreignResult).ToString(),
+                    Is.EqualTo("InvalidMarket"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(profile);
+                UnityEngine.Object.DestroyImmediate(commodity);
+            }
+        }
+
+        [Test]
+        public void PublicMarketScreen_RefreshReconcilesSelectedQuoteRevision()
+        {
+            Type sessionType = FindType(
+                "CryingSnow.StackCraft.LocalMarketTradeSession");
+            Type contextType = FindType(
+                "CryingSnow.StackCraft.LocalMarketContext");
+            Type sourceType = FindType(
+                "CryingSnow.StackCraft.LocalMarketOpenSource");
+            Type serviceType = FindType(
+                "CryingSnow.StackCraft.MarketService");
+            Type screenType = FindType(
+                "CryingSnow.StackCraft.PublicMarketTradeScreen");
+            object setup = CreateMarketSetup(
+                "screen-refresh-market",
+                "food",
+                4,
+                1f,
+                10,
+                10);
+            ScriptableObject profile =
+                (ScriptableObject)GetTupleValue(setup, "Profile");
+            ScriptableObject commodity =
+                (ScriptableObject)GetTupleValue(setup, "Commodity");
+            var screenObject = new GameObject("PublicMarketScreenTest");
+            try
+            {
+                Type catalogType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketCatalog");
+                Type repositoryType = FindType(
+                    "CryingSnow.StackCraft.InMemoryMarketStateRepository");
+                Type clockType = FindType(
+                    "CryingSnow.StackCraft.MutableWorldClock");
+                object catalog = Activator.CreateInstance(
+                    catalogType,
+                    new object[]
+                    {
+                        CreateTypedArray(
+                            commodity.GetType(),
+                            commodity),
+                        CreateTypedArray(profile.GetType(), profile)
+                    });
+                object service = Activator.CreateInstance(
+                    serviceType,
+                    catalog,
+                    Activator.CreateInstance(clockType, 0L),
+                    Activator.CreateInstance(repositoryType),
+                    99);
+                object context = Activator.CreateInstance(
+                    contextType,
+                    "screen-refresh-market",
+                    "测试市场",
+                    profile,
+                    Enum.Parse(sourceType, "LocationButton"));
+                object session = Activator.CreateInstance(
+                    sessionType,
+                    context,
+                    service);
+                object oldQuote = sessionType.GetMethod("GetQuote")
+                    .Invoke(session, new object[] { "food" });
+                object state = serviceType
+                    .GetMethod("GetOrCreateState")
+                    .Invoke(service, new object[] { "screen-refresh-market" });
+                int oldRevision =
+                    (int)GetPublicField(state, "StateRevision");
+                SetPublicField(
+                    state,
+                    "StateRevision",
+                    oldRevision + 1);
+
+                Component screen = screenObject.AddComponent(screenType);
+                SetField(screen, "session", session);
+                SetField(screen, "marketService", service);
+                SetField(screen, "selectedQuote", oldQuote);
+                SetField(screen, "hasSelectedQuote", true);
+
+                screenType.GetMethod(
+                        "RefreshAll",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(screen, new object[] { true });
+
+                object refreshedQuote =
+                    GetPrivateField(screen, "selectedQuote");
+                Assert.That(
+                    GetIntProperty(refreshedQuote, "StateRevision"),
+                    Is.EqualTo(oldRevision + 1),
+                    "市场刷新后，中央交易单必须同步到当前报价版本。");
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(screenObject);
+                UnityEngine.Object.DestroyImmediate(profile);
+                UnityEngine.Object.DestroyImmediate(commodity);
+            }
+        }
+
+        [Test]
+        public void MarketSubmitGate_BlocksRapidDuplicateConfirmation()
+        {
+            Type gateType = FindType(
+                "CryingSnow.StackCraft.MarketSubmitGate");
+            Assert.That(gateType, Is.Not.Null,
+                "公共市场确认按钮需要独立的快速重复提交保护。");
+            object gate = Activator.CreateInstance(
+                gateType,
+                0.25f);
+            MethodInfo tryEnter = gateType.GetMethod("TryEnter");
+            MethodInfo reset = gateType.GetMethod("Reset");
+
+            Assert.That(
+                (bool)tryEnter.Invoke(gate, new object[] { 10f }),
+                Is.True);
+            Assert.That(
+                (bool)tryEnter.Invoke(gate, new object[] { 10.1f }),
+                Is.False,
+                "冷却时间内的第二次确认必须被拒绝。");
+            Assert.That(
+                (bool)tryEnter.Invoke(gate, new object[] { 10.25f }),
+                Is.True);
+
+            reset.Invoke(gate, null);
+            Assert.That(
+                (bool)tryEnter.Invoke(gate, new object[] { 0f }),
+                Is.True,
+                "重新打开交易界面后提交保护应当重置。");
+        }
+
+        [Test]
         public void MarketService_TradesAtomicallyAndRejectsStaleQuote()
         {
             Type catalogType = FindType(
@@ -1100,7 +1592,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void NpcTradeFacade_ExposesRegionalQuoteToUiAndExecution()
+        public void NpcTradeFacade_RemainsPersonalAfterPublicMarketExtraction()
         {
             Type serviceType = FindType(
                 "CryingSnow.StackCraft.NpcTradeService");
@@ -1170,8 +1662,14 @@ namespace CardColony.Tests
             ScriptableObject market = new SerializedObject(profile)
                 .FindProperty("marketProfile")
                 .objectReferenceValue as ScriptableObject;
-            Assert.That(market, Is.Not.Null,
-                "河湾杂货商必须绑定河湾地区公共市场。");
+            Assert.That(market, Is.Null,
+                "河湾杂货商应只保留个人交易，不再代表整个地区公共市场。");
+            ScriptableObject publicMarket =
+                new SerializedObject(location)
+                    .FindProperty("publicMarketProfile")
+                    .objectReferenceValue as ScriptableObject;
+            Assert.That(publicMarket, Is.Not.Null,
+                "河湾公共市场必须由地点直接持有。");
         }
 
         [Test]

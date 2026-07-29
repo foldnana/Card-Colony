@@ -1,4 +1,6 @@
 using UnityEngine;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace CryingSnow.StackCraft
 {
@@ -13,7 +15,10 @@ namespace CryingSnow.StackCraft
 
         public CardInstance Card { get; private set; }
         public string EntryId { get; private set; }
+        public IReadOnlyList<string> EntryIds { get; private set; }
         public int SlotIndex { get; private set; }
+        public int Quantity => EntryIds?.Count ?? 1;
+        public bool IsBundledPresentation { get; private set; }
         public bool RegisterSplitStacksWithWorld => false;
 
         public void Bind(
@@ -27,7 +32,25 @@ namespace CryingSnow.StackCraft
             board = boardView;
             Card = card;
             EntryId = entryId;
+            EntryIds = new List<string> { entryId };
             SlotIndex = slotIndex;
+            IsBundledPresentation = false;
+        }
+
+        public void BindBundle(
+            BackpackView backpackView,
+            BackpackBoardView boardView,
+            CardInstance card,
+            string entryId,
+            int slotIndex,
+            IEnumerable<string> entryIds)
+        {
+            Bind(backpackView, boardView, card, entryId, slotIndex);
+            EntryIds = entryIds?
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList() ?? new List<string> { entryId };
+            IsBundledPresentation = true;
         }
 
         private void OnDisable()

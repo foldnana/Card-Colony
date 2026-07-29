@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Market_whitestone-market
   m_EditorClassIdentifier: 
   id: whitestone-market
-  locationId: whitestone
+  locationId: white-stone-city
   currency: {fileID: 11400000, guid: 1455f43f28288ef4d8645265eac4cc5f, type: 2}
   baseSpread: 0.18
   startingFunds: 300

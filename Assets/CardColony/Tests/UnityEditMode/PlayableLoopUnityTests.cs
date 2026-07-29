@@ -2522,7 +2522,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void BackpackBoard_RestoresTheExactBerryAndCoinSaleResultAsVisibleCards()
+        public void BackpackBoard_ShowsSaleCoinsAsOneQuantityCard()
         {
             EditorSceneManager.OpenScene(
                 "Assets/StackCraft/Scenes/Location.unity",
@@ -2640,7 +2640,7 @@ namespace CardColony.Tests
                         });
                 }
 
-                for (int index = 0; index < 4; index++)
+                for (int index = 0; index < 2; index++)
                 {
                     LogAssert.Expect(
                         LogType.Error,
@@ -2655,8 +2655,23 @@ namespace CardColony.Tests
                     .Where(component => component.GetType().FullName ==
                         "CryingSnow.StackCraft.BackpackCardProxy")
                     .ToArray();
-                Assert.That(proxies, Has.Length.EqualTo(4),
-                    "The saved berry and all three sale coins must each have a visual proxy.");
+                Assert.That(proxies, Has.Length.EqualTo(2),
+                    "浆果保持独立卡牌，三枚金币应合并为一张数量卡");
+                MonoBehaviour coinProxy = proxies.Single(proxy =>
+                    (int)proxy.GetType().GetProperty("Quantity")
+                        .GetValue(proxy) == 3);
+                Component coinCard = coinProxy.GetType().GetProperty("Card")
+                    .GetValue(coinProxy) as Component;
+                var coinCardSerialized = new SerializedObject(coinCard);
+                var quantityText = coinCardSerialized
+                    .FindProperty("titleText").objectReferenceValue as TMPro.TMP_Text;
+                Assert.That(quantityText, Is.Not.Null);
+                Assert.That(quantityText.text, Does.Contain("3"),
+                    "金币代表卡需要直接在卡面显示背包中的金币总数");
+                Assert.That(
+                    backpackType.GetProperty("Count").GetValue(backpack),
+                    Is.EqualTo(4),
+                    "显示合并不能修改浆果和三枚金币的真实存档数量");
                 Assert.That(proxies.All(proxy =>
                 {
                     Component card = proxy.GetType().GetProperty("Card")
@@ -2671,7 +2686,17 @@ namespace CardColony.Tests
                         renderer.bounds.center.y >
                             boardObject.transform.position.y + 0.32f;
                 }), Is.True,
-                    "Sale-result cards must be active, on the overlay layer, and above the backpack surface.");
+                    "售卖结果卡必须保持激活、位于背包覆盖层并显示在桌面上方");
+
+                boardType.GetMethod(
+                        "Detach",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(board, new object[] { coinProxy });
+                string normalCoinTitle = (string)coinDefinition.GetType()
+                    .GetProperty("DisplayName").GetValue(coinDefinition);
+                Assert.That(quantityText.text, Is.EqualTo(normalCoinTitle),
+                    "从钱袋拖出的一枚金币必须恢复普通金币标题，不能继续显示原钱袋总数");
+                Object.DestroyImmediate(coinCard.gameObject);
             }
             finally
             {
@@ -2679,6 +2704,58 @@ namespace CardColony.Tests
                 Object.DestroyImmediate(cameraObject);
                 Object.DestroyImmediate(gameDirector.gameObject);
             }
+        }
+
+        [Test]
+        public void BackpackVisualGrouping_CombinesCurrencyWithoutChangingStoredEntries()
+        {
+            System.Type groupingType =
+                FindType("CryingSnow.StackCraft.BackpackVisualGrouping");
+            Assert.That(groupingType, Is.Not.Null,
+                "背包需要独立的显示分组层，不能为合并金币而改写真实存档条目");
+            if (groupingType == null)
+                return;
+
+            System.Type backpackType =
+                FindType("CryingSnow.StackCraft.BackpackData");
+            System.Type cardDataType =
+                FindType("CryingSnow.StackCraft.CardData");
+            object backpack = System.Activator.CreateInstance(backpackType);
+            MethodInfo tryAdd = backpackType.GetMethod("TryAdd");
+            foreach (string id in new[] { "coin", "berry", "coin" })
+            {
+                object data = System.Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(data, id);
+                tryAdd.Invoke(backpack, new[] { data, null });
+            }
+
+            MethodInfo build = groupingType.GetMethod(
+                "Build",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(build, Is.Not.Null);
+            var isCurrency = new System.Func<string, bool>(
+                id => id == "coin");
+            IEnumerable groups = (IEnumerable)build.Invoke(
+                null,
+                new object[] { backpack, isCurrency });
+            object[] groupArray = groups.Cast<object>().ToArray();
+
+            Assert.That(groupArray, Has.Length.EqualTo(2),
+                "两枚金币应合并为一个钱袋式显示，浆果仍保持独立卡牌");
+            object coinGroup = groupArray.Single(group =>
+                (bool)group.GetType().GetProperty("IsCurrencyBundle")
+                    .GetValue(group));
+            Assert.That(
+                coinGroup.GetType().GetProperty("Quantity").GetValue(coinGroup),
+                Is.EqualTo(2));
+            Assert.That(
+                ((IEnumerable)coinGroup.GetType().GetProperty("Entries")
+                    .GetValue(coinGroup)).Cast<object>(),
+                Has.Count.EqualTo(2));
+            Assert.That(
+                backpackType.GetProperty("Count").GetValue(backpack),
+                Is.EqualTo(3),
+                "显示聚合不能吞掉金币条目，否则交易扣款与旧存档都会失真");
         }
 
         [Test]

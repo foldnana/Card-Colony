@@ -234,6 +234,12 @@ namespace CryingSnow.StackCraft
             }
         }
 
+        public void UpdateTitleText(string text)
+        {
+            if (titleText != null)
+                titleText.text = text;
+        }
+
         /// <summary>
         /// Controls the visual highlighting state of the card.
         /// Creates the necessary <see cref="Highlight"/> component if it does not already exist.

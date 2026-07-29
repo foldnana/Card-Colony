@@ -298,7 +298,7 @@ namespace CryingSnow.StackCraft
             MarketQuote updated = GetQuote(
                 request.MarketId,
                 request.CommodityId,
-                GetTrustedModifiers(request.MerchantId));
+                GetTrustedModifiers(request));
             return Result(
                 true,
                 MarketTradeFailure.None,
@@ -323,16 +323,26 @@ namespace CryingSnow.StackCraft
             if (profile == null)
                 return Fail(MarketTradeFailure.InvalidMarket);
 
-            if (string.IsNullOrWhiteSpace(request.MerchantId) ||
-                !merchantPolicies.TryGetValue(
-                    request.MerchantId,
-                    out MerchantPolicy policy))
+            MerchantTradeFilter trustedFilter;
+            MerchantPriceModifiers trustedModifiers;
+            if (request.Channel == MarketTradeChannel.PublicMarket)
+            {
+                trustedFilter = null;
+                trustedModifiers = MerchantPriceModifiers.Default;
+            }
+            else if (string.IsNullOrWhiteSpace(request.MerchantId) ||
+                     !merchantPolicies.TryGetValue(
+                         request.MerchantId,
+                         out MerchantPolicy policy))
             {
                 return Fail(
                     MarketTradeFailure.MerchantDoesNotTradeCommodity);
             }
-            MerchantTradeFilter trustedFilter = policy.Filter;
-            MerchantPriceModifiers trustedModifiers = policy.Modifiers;
+            else
+            {
+                trustedFilter = policy.Filter;
+                trustedModifiers = policy.Modifiers;
+            }
 
             MarketCommodityRule rule =
                 profile.GetRule(request.CommodityId);
@@ -499,11 +509,14 @@ namespace CryingSnow.StackCraft
         }
 
         private MerchantPriceModifiers GetTrustedModifiers(
-            string merchantId)
+            MarketTradeRequest request)
         {
-            return !string.IsNullOrWhiteSpace(merchantId) &&
+            if (request.Channel == MarketTradeChannel.PublicMarket)
+                return MerchantPriceModifiers.Default;
+
+            return !string.IsNullOrWhiteSpace(request.MerchantId) &&
                    merchantPolicies.TryGetValue(
-                       merchantId,
+                       request.MerchantId,
                        out MerchantPolicy policy)
                 ? policy.Modifiers
                 : MerchantPriceModifiers.Default;

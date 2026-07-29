@@ -80,6 +80,7 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0f)] private float randomSpawnPartyClearance = 2f;
         [SerializeField] private List<LocationRandomCardSpawn> randomCardSpawns = new();
         [Header("Market services")]
+        [SerializeField] private MarketProfile publicMarketProfile;
         [SerializeField] private CardDefinition marketCurrencyCardDefinition;
         [SerializeField] private CardDefinition marketBuyerCardDefinition;
         [SerializeField] private CardDefinition marketPickupCardDefinition;
@@ -105,6 +106,7 @@ namespace CryingSnow.StackCraft
         public float RandomSpawnMinSpacing => randomSpawnMinSpacing;
         public float RandomSpawnPartyClearance => randomSpawnPartyClearance;
         public IReadOnlyList<LocationRandomCardSpawn> RandomCardSpawns => randomCardSpawns;
+        public MarketProfile PublicMarketProfile => publicMarketProfile;
         public CardDefinition MarketCurrencyCardDefinition =>
             marketCurrencyCardDefinition;
         public CardDefinition MarketBuyerCardDefinition =>

@@ -9,6 +9,12 @@ namespace CryingSnow.StackCraft
         PlayerSells
     }
 
+    public enum MarketTradeChannel
+    {
+        Merchant,
+        PublicMarket
+    }
+
     public enum MarketTradeFailure
     {
         None,
@@ -64,6 +70,7 @@ namespace CryingSnow.StackCraft
         {
             MarketId = marketId;
             MerchantId = merchantId;
+            Channel = MarketTradeChannel.Merchant;
             CommodityId = commodityId;
             Direction = direction;
             Quantity = quantity;
@@ -73,8 +80,48 @@ namespace CryingSnow.StackCraft
             Filter = filter;
         }
 
+        private MarketTradeRequest(
+            string marketId,
+            MarketTradeChannel channel,
+            string commodityId,
+            MarketTradeDirection direction,
+            int quantity,
+            int expectedUnitPrice,
+            int expectedStateRevision)
+        {
+            MarketId = marketId;
+            MerchantId = string.Empty;
+            Channel = channel;
+            CommodityId = commodityId;
+            Direction = direction;
+            Quantity = quantity;
+            ExpectedUnitPrice = expectedUnitPrice;
+            ExpectedStateRevision = expectedStateRevision;
+            Modifiers = MerchantPriceModifiers.Default;
+            Filter = null;
+        }
+
+        public static MarketTradeRequest ForPublicMarket(
+            string marketId,
+            string commodityId,
+            MarketTradeDirection direction,
+            int quantity,
+            int expectedUnitPrice,
+            int expectedStateRevision)
+        {
+            return new MarketTradeRequest(
+                marketId,
+                MarketTradeChannel.PublicMarket,
+                commodityId,
+                direction,
+                quantity,
+                expectedUnitPrice,
+                expectedStateRevision);
+        }
+
         public string MarketId { get; }
         public string MerchantId { get; }
+        public MarketTradeChannel Channel { get; }
         public string CommodityId { get; }
         public MarketTradeDirection Direction { get; }
         public int Quantity { get; }

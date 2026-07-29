@@ -21,7 +21,7 @@ MonoBehaviour:
   buyPriceModifier: 1
   sellPriceModifier: 1
   refusalText: "\u8FD9\u4E2A\u4EBA\u7269\u4E0D\u6536\u8D2D\u8BE5\u7269\u54C1\u3002"
-  marketProfile: {fileID: 11400000, guid: b9dfe8876b801ee45957f355ab909dbd, type: 2}
+  marketProfile: {fileID: 0}
   sellCommodityTags:
   - food
   - wood
@@ -40,5 +40,5 @@ MonoBehaviour:
   - ore
   - medicine
   - rope
-  usesMarketFunds: 1
+  usesMarketFunds: 0
   personalFundLimit: 0

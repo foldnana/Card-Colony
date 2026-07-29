@@ -186,7 +186,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 });
             result["whitestone-market"] = CreateMarket(
                 "whitestone-market",
-                "whitestone",
+                "white-stone-city",
                 currency,
                 commodities,
                 new[]
@@ -382,7 +382,7 @@ namespace CryingSnow.StackCraft.EditorTools
             categories.GetArrayElementAtIndex(3).enumValueIndex =
                 (int)CardCategory.Equipment;
             serialized.FindProperty("marketProfile").objectReferenceValue =
-                riverbendMarket;
+                null;
             SetStringArray(
                 serialized.FindProperty("sellCommodityTags"),
                 new[]
@@ -397,11 +397,13 @@ namespace CryingSnow.StackCraft.EditorTools
                     "food", "wood", "salt", "cloth",
                     "tools", "ore", "medicine", "rope"
                 });
-            serialized.FindProperty("usesMarketFunds").boolValue = true;
+            serialized.FindProperty("usesMarketFunds").boolValue = false;
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(profile);
 
             var locationSerialized = new SerializedObject(location);
+            locationSerialized.FindProperty("publicMarketProfile")
+                .objectReferenceValue = riverbendMarket;
             SerializedProperty profiles =
                 locationSerialized.FindProperty("npcTradeProfiles");
             profiles.arraySize = 1;
