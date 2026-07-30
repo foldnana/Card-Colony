@@ -14,6 +14,21 @@ namespace CryingSnow.StackCraft
         [SerializeField] private TMP_Text detailsLabel;
         [SerializeField] private TMP_Text trendLabel;
         [SerializeField] private Button selectionButton;
+        [SerializeField] private Sprite buyButtonSprite;
+        [SerializeField] private Sprite sellButtonSprite;
+
+        private static readonly Color WarmIvory =
+            new(0.98f, 0.89f, 0.72f, 1f);
+        private static readonly Color PriceGold =
+            new(0.99f, 0.76f, 0.28f, 1f);
+        private static readonly Color StockBlue =
+            new(0.46f, 0.84f, 1f, 1f);
+        private static readonly Color DetailsSilver =
+            new(0.76f, 0.80f, 0.84f, 1f);
+        private static readonly Color TrendGreen =
+            new(0.58f, 0.88f, 0.68f, 1f);
+        private static readonly Color SellPromptGold =
+            new(0.96f, 0.71f, 0.34f, 1f);
 
         public void Bind(
             CommodityDefinition commodity,
@@ -34,6 +49,7 @@ namespace CryingSnow.StackCraft
                 nameLabel.text = commodity?.DisplayName ??
                     quote.CommodityId ??
                     string.Empty;
+                nameLabel.color = WarmIvory;
             }
             bool playerBuys =
                 direction == MarketTradeDirection.PlayerBuys;
@@ -42,12 +58,14 @@ namespace CryingSnow.StackCraft
                 priceLabel.text = playerBuys
                     ? $"买入价 {quote.PlayerBuyUnitPrice} 金币/枚"
                     : $"本地收购 {quote.PlayerSellUnitPrice} 金币/枚";
+                priceLabel.color = PriceGold;
             }
             if (quantityLabel != null)
             {
                 quantityLabel.text = playerBuys
                     ? $"市场库存 {quote.AvailableStock}"
                     : $"背包持有 {Mathf.Max(0, owned)}";
+                quantityLabel.color = StockBlue;
             }
             if (detailsLabel != null)
             {
@@ -55,12 +73,16 @@ namespace CryingSnow.StackCraft
                     ? $"你有 {Mathf.Max(0, owned)} 件"
                     : $"全部出售可得 " +
                         $"{(long)quote.PlayerSellUnitPrice * Mathf.Max(0, owned)} 金币";
+                detailsLabel.color = DetailsSilver;
             }
             if (trendLabel != null)
             {
                 trendLabel.text = playerBuys
                     ? GetTrendLabel(quote.Trend)
                     : "点击出售";
+                trendLabel.color = playerBuys
+                    ? TrendGreen
+                    : SellPromptGold;
             }
 
             if (selectionButton == null)
@@ -71,10 +93,27 @@ namespace CryingSnow.StackCraft
                 directionOpen && action != null;
             if (selectionButton.targetGraphic is Image background)
             {
-                background.color = playerBuys
-                    ? new Color(0.075f, 0.145f, 0.135f, 0.98f)
-                    : new Color(0.12f, 0.13f, 0.16f, 0.98f);
+                Sprite buttonSprite = playerBuys
+                    ? buyButtonSprite
+                    : sellButtonSprite;
+                if (buttonSprite != null)
+                {
+                    background.sprite = buttonSprite;
+                    background.type = Image.Type.Sliced;
+                    background.color = Color.white;
+                }
             }
+            ColorBlock colors = ColorBlock.defaultColorBlock;
+            colors.normalColor = Color.white;
+            colors.highlightedColor =
+                new Color(0.96f, 0.96f, 0.96f, 1f);
+            colors.pressedColor =
+                new Color(0.78f, 0.78f, 0.78f, 1f);
+            colors.selectedColor = colors.highlightedColor;
+            colors.disabledColor =
+                new Color(0.50f, 0.50f, 0.50f, 0.68f);
+            colors.fadeDuration = 0.08f;
+            selectionButton.colors = colors;
             if (directionOpen && action != null)
                 selectionButton.onClick.AddListener(action);
         }

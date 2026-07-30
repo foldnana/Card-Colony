@@ -97,6 +97,16 @@ namespace CryingSnow.StackCraft
                 i.consumptionMode == IngredientConsumption.Destroy);
         }
 
+        public bool WouldConsume(CardDefinition definition)
+        {
+            if (definition == null || requiredIngredients == null)
+                return false;
+
+            return requiredIngredients.Any(ingredient =>
+                ingredient.card == definition &&
+                ingredient.consumptionMode != IngredientConsumption.Keep);
+        }
+
         #region Subclass Helpers
         protected Dictionary<CardDefinition, Ingredient> GetIngredientRules()
         {
@@ -130,6 +140,12 @@ namespace CryingSnow.StackCraft
 
         protected void ApplyConsumptionRule(CardInstance card, IngredientConsumption mode, CardStack stack)
         {
+            if (mode != IngredientConsumption.Keep &&
+                !ProtagonistRules.CanBeConsumed(card))
+            {
+                return;
+            }
+
             switch (mode)
             {
                 case IngredientConsumption.Keep:

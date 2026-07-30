@@ -255,6 +255,11 @@ namespace CryingSnow.StackCraft
                 activeQuests.Remove(quest);
                 completedQuestIDs.Add(quest.QuestData.Id);
                 completedQuests.Add(quest);
+                if (quest.QuestData.ExperienceReward > 0)
+                {
+                    GameDirector.Instance?.GrantProtagonistExperience(
+                        quest.QuestData.ExperienceReward);
+                }
 
                 // Unlock next quests
                 foreach (var nextQuest in quest.QuestData.QuestsToUnlock)

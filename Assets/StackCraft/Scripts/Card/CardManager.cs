@@ -324,7 +324,10 @@ namespace CryingSnow.StackCraft
             {
                 var cardData = stackData.Cards[i];
 
-                CardDefinition def = GetDefinitionById(cardData.Id);
+                string spawnId = !string.IsNullOrEmpty(cardData.OriginalId)
+                    ? cardData.OriginalId
+                    : cardData.Id;
+                CardDefinition def = GetDefinitionById(spawnId);
 
                 if (def == null) continue;
 
@@ -347,6 +350,7 @@ namespace CryingSnow.StackCraft
                 {
                     RestoreEquipmentForCard(newCard, cardData);
                 }
+                newCard.ClampCurrentHealthToMaximum();
 
                 if (i == 0)
                 {
@@ -482,6 +486,7 @@ namespace CryingSnow.StackCraft
                 data,
                 notifyStats,
                 registerWithManager);
+            card.ClampCurrentHealthToMaximum();
 
             return card;
         }
@@ -528,6 +533,7 @@ namespace CryingSnow.StackCraft
             {
                 RestoreEquipmentForCard(newCard, cardData);
             }
+            newCard.ClampCurrentHealthToMaximum();
         }
 
         private void RestoreDiscoveredCards()
@@ -1078,6 +1084,7 @@ namespace CryingSnow.StackCraft
             return cards?.Where(card =>
                     card?.Definition != null &&
                     card is not PackInstance &&
+                    !ProtagonistRules.IsProtagonist(card) &&
                     card.Definition.Category != CardCategory.Currency &&
                     !card.Definition.IsLocationStatic) ??
                 Enumerable.Empty<CardInstance>();

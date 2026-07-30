@@ -25,6 +25,7 @@ namespace CryingSnow.StackCraft
 
         #region Private Fields
         private readonly List<CardInstance> _combatants = new();
+        private readonly HashSet<CardInstance> _participants = new();
 
         private const float ATTACK_INTERVAL = 1f;
         private float _turnTimer = ATTACK_INTERVAL;
@@ -49,6 +50,8 @@ namespace CryingSnow.StackCraft
 
             _combatants.AddRange(attackers);
             _combatants.AddRange(defenders);
+            foreach (CardInstance participant in _combatants)
+                _participants.Add(participant);
             foreach (var card in _combatants)
             {
                 card.Combatant.InitializeCombatActionProgress();
@@ -191,6 +194,7 @@ namespace CryingSnow.StackCraft
             // --- CLEANUP & RESOLUTION ---
             if (defender.CurrentHealth <= 0)
             {
+                AwardDefeatExperience(defender);
                 Attackers.Remove(defender);
                 Defenders.Remove(defender);
                 _combatants.Remove(defender);
@@ -208,6 +212,24 @@ namespace CryingSnow.StackCraft
             else
             {
                 _currentState = CombatState.Idle;
+            }
+        }
+
+        private void AwardDefeatExperience(CardInstance defeatedCard)
+        {
+            if (defeatedCard?.Definition == null ||
+                defeatedCard.Definition.Faction != CardFaction.Mob ||
+                defeatedCard.Definition.ExperienceReward <= 0)
+            {
+                return;
+            }
+
+            CardInstance protagonist = _participants.FirstOrDefault(
+                ProtagonistRules.IsProtagonist);
+            if (protagonist != null)
+            {
+                GameDirector.Instance?.GrantProtagonistExperience(
+                    defeatedCard.Definition.ExperienceReward);
             }
         }
         #endregion
@@ -322,6 +344,7 @@ namespace CryingSnow.StackCraft
                 {
                     targetList.Add(newCombatant);
                     _combatants.Add(newCombatant);
+                    _participants.Add(newCombatant);
 
                     newCombatant.Combatant.EnterCombat(this);
                     newCombatant.Combatant.InitializeCombatActionProgress();

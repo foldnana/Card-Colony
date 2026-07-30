@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -20,6 +21,9 @@ namespace CryingSnow.StackCraft
 
         [SerializeField, Tooltip("The reusable scene used for local location boards.")]
         private string locationScene = "Location";
+
+        private const string DefaultProtagonistResourcePath =
+            "Cards/Characters/Card_Villager";
 
         public Dictionary<string, GameData> SavedGames { get; private set; }
         public GameData GameData { get; private set; }
@@ -97,6 +101,8 @@ namespace CryingSnow.StackCraft
             }
 
             GameData = new GameData(candidateSlot, prefs);
+            GameData.EnsureEconomyState();
+            EnsureProtagonistState(GameData);
             StartCoroutine(TravelSequence(defaultScene, null));
         }
 
@@ -110,6 +116,7 @@ namespace CryingSnow.StackCraft
         public void SaveGame()
         {
             if (GameData == null) return;
+            CaptureActiveLocationParty();
             OnBeforeSave?.Invoke(GameData);
             GameData.LastSaved = System.DateTime.Now;
             string fileName = $"SaveSlot{GameData.SlotNumber:D3}";
@@ -127,6 +134,8 @@ namespace CryingSnow.StackCraft
                 return;
 
             gameData.EnsureBackpack();
+            gameData.EnsureEconomyState();
+            EnsureProtagonistState(gameData);
             this.GameData = gameData;
             StartCoroutine(TravelSequence(gameData.CurrentScene, null));
         }
@@ -145,9 +154,8 @@ namespace CryingSnow.StackCraft
                 GameData.LocationHistory?.Clear();
 
             GameData.ActiveLocationId = locationId;
-            GameData.PartyMembers = partyMembers != null
-                ? new List<CardData>(partyMembers)
-                : new List<CardData>();
+            if (!enteringFromLocation)
+                GameData.UpdatePartyMembers(partyMembers);
             GameData.MarkLocationTransitionPending(
                 enteringFromLocation
                     ? LocationTransitionReason.ChildLocationEntry
@@ -162,7 +170,7 @@ namespace CryingSnow.StackCraft
                 return false;
 
             if (partyMembers != null)
-                GameData.PartyMembers = new List<CardData>(partyMembers);
+                GameData.UpdatePartyMembers(partyMembers);
 
             SaveGame();
             if (GameData.TryPopLocation(out string parentLocationId))
@@ -185,7 +193,7 @@ namespace CryingSnow.StackCraft
                 return false;
 
             if (partyMembers != null)
-                GameData.PartyMembers = new List<CardData>(partyMembers);
+                GameData.UpdatePartyMembers(partyMembers);
 
             SaveGame();
             GameData.LocationHistory?.Clear();
@@ -226,6 +234,78 @@ namespace CryingSnow.StackCraft
         {
             DeleteGame(this.GameData);
             StartCoroutine(TravelSequence(titleScene, null));
+        }
+
+        public bool IsProtagonist(CardInstance card)
+        {
+            return ProtagonistRules.IsProtagonist(GameData, card);
+        }
+
+        public bool IsProtagonist(CardData cardData)
+        {
+            return ProtagonistRules.IsProtagonist(GameData, cardData);
+        }
+
+        public CardData GetProtagonistData()
+        {
+            return GameData?.GetProtagonistData();
+        }
+
+        public CardInstance FindActiveProtagonistCard()
+        {
+            return CardManager.Instance?.AllCards.FirstOrDefault(
+                card => IsProtagonist(card));
+        }
+
+        public CharacterProgressionResult GrantProtagonistExperience(int amount)
+        {
+            CardData protagonistData = GetProtagonistData();
+            if (protagonistData == null || amount <= 0)
+                return new CharacterProgressionResult(0);
+
+            CardInstance activeCard = FindActiveProtagonistCard();
+            if (activeCard == null ||
+                SceneManager.GetActiveScene().name != locationScene)
+            {
+                CharacterProgressionResult dataResult =
+                    CharacterProgressionService.GrantExperience(
+                        protagonistData,
+                        amount);
+                activeCard?.RestoreSavedStats(protagonistData);
+                return dataResult;
+            }
+
+            CharacterProgressionResult result =
+                activeCard.GainExperience(amount);
+            protagonistData.Level = activeCard.Level;
+            protagonistData.Experience = activeCard.Experience;
+            protagonistData.CurrentHealth = activeCard.CurrentHealth;
+            protagonistData.MaximumHealth =
+                activeCard.Stats?.MaxHealth.Value ??
+                activeCard.CurrentHealth;
+            protagonistData.CurrentEnergy = activeCard.CurrentEnergy;
+            protagonistData.MaxEnergy = activeCard.MaxEnergy;
+            protagonistData.IsDowned = activeCard.IsDowned;
+            return result;
+        }
+
+        public void SyncProtagonistState(CardInstance activeCard)
+        {
+            if (!IsProtagonist(activeCard))
+                return;
+
+            CardData data = GetProtagonistData();
+            if (data == null)
+                return;
+
+            data.CurrentHealth = activeCard.CurrentHealth;
+            data.MaximumHealth = activeCard.Stats?.MaxHealth.Value ??
+                activeCard.CurrentHealth;
+            data.Level = activeCard.Level;
+            data.Experience = activeCard.Experience;
+            data.CurrentEnergy = activeCard.CurrentEnergy;
+            data.MaxEnergy = activeCard.MaxEnergy;
+            data.IsDowned = activeCard.IsDowned;
         }
         #endregion
 
@@ -300,6 +380,47 @@ namespace CryingSnow.StackCraft
             }
 
             incomingTravelers.Clear();
+        }
+
+        private void CaptureActiveLocationParty()
+        {
+            if (GameData == null ||
+                SceneManager.GetActiveScene().name != locationScene ||
+                CardManager.Instance == null)
+            {
+                return;
+            }
+
+            List<CardData> activeParty = CardManager.Instance.AllCards
+                .Where(card =>
+                    card != null &&
+                    card.Definition != null &&
+                    card.Definition.Category == CardCategory.Character &&
+                    card.Definition.Faction == CardFaction.Player)
+                .Select(card => new CardData(card))
+                .ToList();
+            if (activeParty.Count > 0)
+                GameData.UpdatePartyMembers(activeParty);
+        }
+
+        private static CardData EnsureProtagonistState(GameData gameData)
+        {
+            if (gameData == null)
+                return null;
+
+            CardDefinition fallback = Resources.Load<CardDefinition>(
+                DefaultProtagonistResourcePath);
+            if (fallback == null)
+            {
+                Debug.LogError(
+                    $"Missing protagonist definition at Resources/{DefaultProtagonistResourcePath}.");
+                return null;
+            }
+
+            return gameData.EnsureProtagonist(
+                fallback.Id,
+                fallback.CreateCombatStats().MaxHealth.Value,
+                fallbackEnergy: 4);
         }
         #endregion
     }

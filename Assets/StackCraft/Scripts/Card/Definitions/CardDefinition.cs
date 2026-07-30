@@ -127,6 +127,9 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Damage multiplier for critical hits, in percent (%).")]
         private int criticalMultiplier = 150;
 
+        [SerializeField, Min(0), Tooltip("Experience granted when this hostile card is defeated.")]
+        private int experienceReward;
+
         // Equipment
         [SerializeField, Tooltip("Only applies if Card Category is Equipment.")]
         private EquipmentSlot equipmentSlot;
@@ -171,6 +174,7 @@ namespace CryingSnow.StackCraft
         public int Uses => hasDurability ? uses : 1;
 
         public int Nutrition => nutrition;
+        public int ExperienceReward => experienceReward;
 
         public EquipmentSlot EquipmentSlot => equipmentSlot;
         public List<StatModifier> StatModifiers => statModifiers;

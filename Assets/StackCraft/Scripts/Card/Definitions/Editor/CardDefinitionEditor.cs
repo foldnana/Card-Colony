@@ -45,6 +45,7 @@ namespace CryingSnow.StackCraft
         private SerializedProperty dodgeProp;
         private SerializedProperty criticalChanceProp;
         private SerializedProperty criticalMultiplierProp;
+        private SerializedProperty experienceRewardProp;
 
         private SerializedProperty equipmentSlotProp;
         private SerializedProperty statModifiersProp;
@@ -92,6 +93,7 @@ namespace CryingSnow.StackCraft
             dodgeProp = serializedObject.FindProperty("dodge");
             criticalChanceProp = serializedObject.FindProperty("criticalChance");
             criticalMultiplierProp = serializedObject.FindProperty("criticalMultiplier");
+            experienceRewardProp = serializedObject.FindProperty("experienceReward");
 
             equipmentSlotProp = serializedObject.FindProperty("equipmentSlot");
             statModifiersProp = serializedObject.FindProperty("statModifiers");
@@ -440,6 +442,8 @@ namespace CryingSnow.StackCraft
                     EditorGUILayout.IntSlider(dodgeProp, 0, 100);
                     EditorGUILayout.IntSlider(criticalChanceProp, 0, 100);
                     EditorGUILayout.IntSlider(criticalMultiplierProp, 100, 300);
+                    if (category == CardCategory.Mob)
+                        EditorGUILayout.PropertyField(experienceRewardProp);
                 }
             }
 

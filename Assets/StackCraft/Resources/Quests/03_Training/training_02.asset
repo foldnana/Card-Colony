@@ -20,6 +20,7 @@ MonoBehaviour:
   targetRecipe: {fileID: 0}
   targetAmount: 1
   targetPace: 1
+  experienceReward: 10
   prerequisiteQuests:
   - {fileID: 11400000, guid: fd389a5ba424cca4ca1e0660a286ced5, type: 2}
   questsToUnlock:

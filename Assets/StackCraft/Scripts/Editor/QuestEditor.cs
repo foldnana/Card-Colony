@@ -15,6 +15,7 @@ namespace CryingSnow.StackCraft
         SerializedProperty targetRecipeProp;
         SerializedProperty targetAmountProp;
         SerializedProperty targetPaceProp;
+        SerializedProperty experienceRewardProp;
 
         SerializedProperty prereqProp;
         SerializedProperty unlockProp;
@@ -30,6 +31,8 @@ namespace CryingSnow.StackCraft
             targetRecipeProp = serializedObject.FindProperty("targetRecipe");
             targetAmountProp = serializedObject.FindProperty("targetAmount");
             targetPaceProp = serializedObject.FindProperty("targetPace");
+            experienceRewardProp =
+                serializedObject.FindProperty("experienceReward");
 
             prereqProp = serializedObject.FindProperty("prerequisiteQuests");
             unlockProp = serializedObject.FindProperty("questsToUnlock");
@@ -110,6 +113,10 @@ namespace CryingSnow.StackCraft
             }
 
             EditorGUI.indentLevel--;
+
+            EditorGUILayout.Space();
+            EditorGUILayout.LabelField("Rewards", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(experienceRewardProp);
 
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Flow", EditorStyles.boldLabel);

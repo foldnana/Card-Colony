@@ -75,6 +75,7 @@ namespace CryingSnow.StackCraft
             InfoPanel.Instance?.SetWorldMapSuppressed(true);
             WorldMapPartyStatusView.Instance?.Hide();
             ApplyWorldMapBackground();
+            EnsureProtagonistState();
             ConfigureExistingCards();
             RemoveLegacyJobCards();
             ApplyReturnedPartyState(GameDirector.Instance?.GameData?.PartyMembers);
@@ -105,6 +106,7 @@ namespace CryingSnow.StackCraft
                 return;
 
             hasSpawned = true;
+            EnsureProtagonistState();
 
             foreach (WorldMapCardSpawn spawn in locationSpawns)
             {
@@ -201,23 +203,15 @@ namespace CryingSnow.StackCraft
                 return false;
 
             WorldMapLocationDetails details = GetLocationDetails(locationIndex);
-            if (details == null || string.IsNullOrWhiteSpace(details.locationId) ||
-                legacyTravelerDefinition == null)
+            if (details == null || string.IsNullOrWhiteSpace(details.locationId))
             {
                 return false;
             }
 
-            CardInstance partyCard = partyController.PartyCard;
-            var expandedMember = new CardData
-            {
-                Id = legacyTravelerDefinition.Id,
-                UsesLeft = partyCard.UsesLeft,
-                CurrentHealth = partyCard.CurrentHealth,
-                CurrentNutrition = partyCard.CurrentNutrition
-            };
+            EnsureProtagonistState();
             return GameDirector.Instance.EnterLocation(
                 details.locationId,
-                new[] { expandedMember });
+                GameDirector.Instance.GameData.PartyMembers);
         }
 
         public bool CanEnterPartyLocation(int locationIndex)
@@ -443,7 +437,9 @@ namespace CryingSnow.StackCraft
                 .ToList();
 
             foreach (CardInstance card in legacyCards)
-                card.Stack?.DestroyCard(card);
+                card.Stack?.DestroyCard(
+                    card,
+                    allowProtagonistRepresentationRemoval: true);
 
             if (legacyCards.Count > 0)
                 cardManager.NotifyStatsChanged();
@@ -451,7 +447,9 @@ namespace CryingSnow.StackCraft
 
         private void ApplyReturnedPartyState(IEnumerable<CardData> partyMembers)
         {
-            CardData returnedMember = partyMembers?.FirstOrDefault(member => member != null);
+            CardData returnedMember =
+                GameDirector.Instance?.GameData?.GetProtagonistData() ??
+                partyMembers?.FirstOrDefault(member => member != null);
             if (returnedMember == null || partyController?.PartyCard == null)
                 return;
 
@@ -479,7 +477,26 @@ namespace CryingSnow.StackCraft
                 partyCard,
                 locationName,
                 status,
-                memberCount: 1);
+                memberCount: Mathf.Max(
+                    1,
+                    GameDirector.Instance?.GameData?.PartyMembers?.Count ?? 0),
+                protagonistData:
+                    GameDirector.Instance?.GameData?.GetProtagonistData());
+        }
+
+        private CardData EnsureProtagonistState()
+        {
+            GameData gameData = GameDirector.Instance?.GameData;
+            CardDefinition fallback =
+                legacyTravelerDefinition ?? partyDefinition;
+            if (gameData == null || fallback == null)
+                return null;
+
+            CombatStats stats = fallback.CreateCombatStats();
+            return gameData.EnsureProtagonist(
+                fallback.Id,
+                stats.MaxHealth.Value,
+                fallbackEnergy: 4);
         }
 
         private void ApplyWorldMapBackground()

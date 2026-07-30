@@ -156,6 +156,7 @@ namespace CryingSnow.StackCraft
             CardStack sourceStack = card.Stack;
             List<CardInstance> cards = sourceStack.Cards.ToList();
             if (cards.Count == 0 || cards.Any(candidate => candidate == null ||
+                    !ProtagonistRules.CanBeStored(candidate) ||
                     !CanStoreDefinition(candidate.Definition) ||
                     (candidate.Combatant != null && candidate.Combatant.IsInCombat)))
                 return false;

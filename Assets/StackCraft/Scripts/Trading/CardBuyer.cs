@@ -30,6 +30,9 @@ namespace CryingSnow.StackCraft
         {
             return droppedStack.Cards.All(card =>
             {
+                if (!ProtagonistRules.CanBeSold(card))
+                    return false;
+
                 // Basic sellable check
                 if (!card.Definition.IsSellable)
                 {

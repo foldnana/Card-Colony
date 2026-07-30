@@ -40,6 +40,7 @@ namespace CryingSnow.StackCraft
 
             return droppedStack.Cards.All(card =>
                 card != null &&
+                ProtagonistRules.CanBeSold(card) &&
                 MarketTradeRules.CanSell(card.Definition) &&
                 (card.Combatant == null || !card.Combatant.IsInCombat) &&
                 (!card.TryGetComponent<ChestLogic>(out ChestLogic chest) ||

@@ -55,6 +55,12 @@ namespace CryingSnow.StackCraft.EditorTools
                         "PublicMarketTransactionPanel") != null;
                 if (locationSidebarInstalled && dualInventoryInstalled)
                 {
+                    PublicMarketFantasySkinInstaller
+                        .ApplyToPrefabContents(root);
+                    CommonFantasyHudSkinInstaller
+                        .ApplyToPrefabContents(root);
+                    PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
+                    AssetDatabase.SaveAssets();
                     Debug.Log(
                         "World-map location sidebar and public market UI " +
                         "are already installed.");
@@ -916,6 +922,10 @@ namespace CryingSnow.StackCraft.EditorTools
             SetReference(serialized, "confirmButton", confirm);
             serialized.ApplyModifiedPropertiesWithoutUndo();
             modal.SetActive(false);
+            PublicMarketFantasySkinInstaller
+                .ApplyToPrefabContents(root);
+            CommonFantasyHudSkinInstaller
+                .ApplyToPrefabContents(root);
         }
 
         private static MarketInventoryPanelParts CreateMarketInventoryPanel(

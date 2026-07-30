@@ -204,6 +204,13 @@ namespace CryingSnow.StackCraft
 
         private bool DoesStackMatchRecipe(CardStack stack, RecipeDefinition recipe)
         {
+            if (stack.Cards.Any(card =>
+                    ProtagonistRules.IsProtagonist(card) &&
+                    recipe.WouldConsume(card.BaseDefinition)))
+            {
+                return false;
+            }
+
             // Group the cards in the stack by their base definition and count them.
             var stackComposition = stack.Cards
                 .GroupBy(c => c.BaseDefinition)

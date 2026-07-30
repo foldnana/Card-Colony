@@ -65,7 +65,8 @@ namespace CryingSnow.StackCraft
             equipmentCard.EquipmentComponent.OnEquipped(this._card);
 
             // --- HANDLE CLASS CHANGE ---
-            if (equipmentCard.Definition.ClassChangeResult != null)
+            if (equipmentCard.Definition.ClassChangeResult != null &&
+                !ProtagonistRules.IsProtagonist(_card))
             {
                 if (OriginalDefinition == null)
                 {

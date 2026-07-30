@@ -158,8 +158,16 @@ namespace CryingSnow.StackCraft
         /// If the stack was crafting, the task is stopped. If the stack becomes empty, it is unregistered.
         /// </remarks>
         /// <param name="card">The card instance to be destroyed.</param>
-        public void DestroyCard(CardInstance card)
+        public void DestroyCard(
+            CardInstance card,
+            bool allowProtagonistRepresentationRemoval = false)
         {
+            if (!allowProtagonistRepresentationRemoval &&
+                ProtagonistRules.IsProtagonist(card))
+            {
+                return;
+            }
+
             if (Cards.Remove(card))
             {
                 if (IsCrafting) CraftingManager.Instance.StopCraftingTask(this);
@@ -188,6 +196,9 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void DestroyCardForCommittedTrade(CardInstance card)
         {
+            if (ProtagonistRules.IsProtagonist(card))
+                return;
+
             if (card == null || !Cards.Remove(card))
                 return;
 
@@ -248,6 +259,9 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void DestroyAllCards()
         {
+            if (Cards.Exists(ProtagonistRules.IsProtagonist))
+                return;
+
             if (IsCrafting) CraftingManager.Instance.StopCraftingTask(this);
 
             foreach (var card in Cards)

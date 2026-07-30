@@ -57,6 +57,9 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("The time pace (e.g., Normal, Fast) to monitor for 'Time' quests.")]
         private TimePace targetPace = TimePace.Normal;
 
+        [SerializeField, Min(0), Tooltip("Experience granted to the protagonist when the quest is completed.")]
+        private int experienceReward;
+
         // Flow
         [SerializeField, Tooltip("Quests that must be completed before this quest becomes available.")]
         private List<Quest> prerequisiteQuests;
@@ -75,6 +78,7 @@ namespace CryingSnow.StackCraft
         public RecipeDefinition TargetRecipe => targetRecipe;
         public int TargetAmount => targetAmount;
         public TimePace TargetPace => targetPace;
+        public int ExperienceReward => experienceReward;
 
         // Flow
         public List<Quest> PrerequisiteQuests => prerequisiteQuests;

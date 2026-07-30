@@ -312,6 +312,8 @@ namespace CryingSnow.StackCraft.EditorTools
             TMP_Text label = button.GetComponentInChildren<TMP_Text>(true);
             if (label != null)
                 label.text = "返回世界地图";
+            CommonFantasyHudSkinInstaller
+                .StyleLocationReturnButton(button);
             return button;
         }
 

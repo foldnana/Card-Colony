@@ -32,6 +32,7 @@ namespace CryingSnow.StackCraft
 
         private Material backgroundMaterial;
         private LocationDefinition activeDefinition;
+        private SceneData activeSceneData;
         private bool isReturning;
 
         public LocationDefinition ActiveDefinition => activeDefinition;
@@ -85,8 +86,9 @@ namespace CryingSnow.StackCraft
                 Destroy(backgroundMaterial);
         }
 
-        private void HandleSceneDataReady(SceneData _, bool wasLoaded)
+        private void HandleSceneDataReady(SceneData sceneData, bool wasLoaded)
         {
+            activeSceneData = sceneData;
             string locationId = GameDirector.Instance?.GameData?.ActiveLocationId;
             IReadOnlyList<LocationDefinition> availableDefinitions =
                 GetAvailableDefinitions();
@@ -123,10 +125,21 @@ namespace CryingSnow.StackCraft
                 .ConsumeLocationTransitionReason();
             bool hasIncomingParty =
                 transitionReason != LocationTransitionReason.None;
-            bool shouldRandomize = ShouldRandomizeLocationCards(
+            int worldDay = GameDirector.Instance.GameData.GetWorldDay();
+            bool shouldRandomize = LocationRandomRefreshPolicy.ShouldRefresh(
                 activeDefinition.RandomizeCardsOnEntry,
                 wasLoaded,
-                transitionReason);
+                transitionReason,
+                worldDay,
+                sceneData?.LastRandomRefreshDay ?? 0);
+            if (shouldRandomize && sceneData != null)
+            {
+                sceneData.LastRandomRefreshDay = worldDay;
+                sceneData.RandomSeed = CreateLocationRandomSeed(
+                    activeDefinition.Id,
+                    worldDay,
+                    GameDirector.Instance.GameData.EconomySeed);
+            }
 
             if (!wasLoaded)
             {
@@ -292,7 +305,8 @@ namespace CryingSnow.StackCraft
                 .Select(card => card.Stack.TargetPosition);
             IReadOnlyList<LocationRandomSpawnPlanItem> plan = CreateRandomSpawnPlan(
                 activeDefinition,
-                System.Guid.NewGuid().GetHashCode(),
+                activeSceneData?.RandomSeed ??
+                    System.Guid.NewGuid().GetHashCode(),
                 occupiedPositions,
                 partyPositions);
             var spawnedCards = new List<CardInstance>(plan.Count);
@@ -323,6 +337,22 @@ namespace CryingSnow.StackCraft
             CardManager.Instance.ResolveOverlaps();
             CardManager.Instance.NotifyStatsChanged();
             return spawnedCards;
+        }
+
+        public static int CreateLocationRandomSeed(
+            string locationId,
+            int worldDay,
+            int worldSeed)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                hash = (hash ^ (uint)worldSeed) * 16777619u;
+                hash = (hash ^ (uint)Mathf.Max(1, worldDay)) * 16777619u;
+                foreach (char character in locationId ?? string.Empty)
+                    hash = (hash ^ character) * 16777619u;
+                return hash == 0u ? 1 : (int)hash;
+            }
         }
 
         public IReadOnlyList<CardInstance> SpawnInitialLocationCards()
@@ -537,6 +567,7 @@ namespace CryingSnow.StackCraft
 
             List<CardInstance> generatedCards = CardManager.Instance.AllCards
                 .Where(card => card != null &&
+                    !ProtagonistRules.IsProtagonist(card) &&
                     card.GetComponent<LocationRandomSpawnMarker>() != null)
                 .ToList();
             foreach (CardInstance card in generatedCards)
@@ -551,16 +582,17 @@ namespace CryingSnow.StackCraft
                 return System.Array.Empty<CardInstance>();
 
             List<CardData> members = memberData?.Where(data => data != null).ToList() ?? new();
-            if (members.Count == 0 && activeDefinition.ExpandedPartyMemberDefinition != null)
+            if (activeDefinition.ExpandedPartyMemberDefinition != null)
             {
                 CardDefinition fallback = activeDefinition.ExpandedPartyMemberDefinition;
-                members.Add(new CardData
-                {
-                    Id = fallback.Id,
-                    UsesLeft = fallback.Uses,
-                    CurrentHealth = fallback.CreateCombatStats().MaxHealth.Value,
-                    CurrentNutrition = fallback.Nutrition
-                });
+                CardData protagonist = GameDirector.Instance?.GameData
+                    ?.EnsureProtagonist(
+                        fallback.Id,
+                        fallback.CreateCombatStats().MaxHealth.Value,
+                        fallbackEnergy: 4);
+                if (members.Count == 0 && protagonist != null)
+                    members = new List<CardData>(
+                        GameDirector.Instance.GameData.PartyMembers);
             }
 
             var spawnedMembers = new List<CardInstance>();
@@ -593,7 +625,9 @@ namespace CryingSnow.StackCraft
                     card.Definition.Faction == CardFaction.Player)
                 .ToList();
             foreach (CardInstance card in existingParty)
-                card.Stack?.DestroyCard(card);
+                card.Stack?.DestroyCard(
+                    card,
+                    allowProtagonistRepresentationRemoval: true);
 
             return SpawnExpandedPartyMembers(memberData);
         }

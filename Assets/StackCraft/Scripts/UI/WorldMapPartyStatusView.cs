@@ -20,6 +20,7 @@ namespace CryingSnow.StackCraft
 
         private CanvasGroup canvasGroup;
         private CardInstance displayedParty;
+        private CardData displayedProtagonistData;
         private int displayedCurrentHealth = -1;
         private int displayedMaxHealth = -1;
 
@@ -51,7 +52,8 @@ namespace CryingSnow.StackCraft
             CardInstance partyCard,
             string locationName,
             string state,
-            int memberCount)
+            int memberCount,
+            CardData protagonistData = null)
         {
             if (partyCard == null)
             {
@@ -60,6 +62,7 @@ namespace CryingSnow.StackCraft
             }
 
             displayedParty = partyCard;
+            displayedProtagonistData = protagonistData;
             displayedCurrentHealth = -1;
             displayedMaxHealth = -1;
             CardDefinition definition = partyCard.Definition;
@@ -74,6 +77,25 @@ namespace CryingSnow.StackCraft
             membersLabel.text = $"成员：{Mathf.Max(0, memberCount)}";
             stateLabel.text = $"状态：{state}";
 
+            int level = protagonistData?.Level ?? partyCard.Level;
+            int experience = protagonistData?.Experience ??
+                partyCard.Experience;
+            int currentEnergy = protagonistData?.CurrentEnergy ??
+                partyCard.CurrentEnergy;
+            int maxEnergy = protagonistData?.MaxEnergy ??
+                partyCard.MaxEnergy;
+            bool isDowned = protagonistData?.IsDowned ??
+                partyCard.IsDowned;
+            int requiredExperience = CharacterProgressionService
+                .GetExperienceRequiredForNextLevel(level);
+            partyNameLabel.text =
+                $"主角小队  Lv.{level}";
+            membersLabel.text =
+                $"成员：{Mathf.Max(0, memberCount)}  经验：{experience}/{requiredExperience}";
+            stateLabel.text = isDowned
+                ? "状态：倒地，等待救援"
+                : $"状态：{state}  体力：{currentEnergy}/{maxEnergy}";
+
             RefreshHealth();
             SetVisible(true);
         }
@@ -81,6 +103,7 @@ namespace CryingSnow.StackCraft
         public void Hide()
         {
             displayedParty = null;
+            displayedProtagonistData = null;
             SetVisible(false);
         }
 
@@ -89,10 +112,15 @@ namespace CryingSnow.StackCraft
             if (displayedParty == null)
                 return;
 
-            int currentHealth = Mathf.Max(0, displayedParty.CurrentHealth);
-            int maxHealth = displayedParty.Stats != null
-                ? Mathf.Max(1, displayedParty.Stats.MaxHealth.Value)
-                : Mathf.Max(1, currentHealth);
+            int currentHealth = Mathf.Max(
+                0,
+                displayedProtagonistData?.CurrentHealth ??
+                    displayedParty.CurrentHealth);
+            int maxHealth = displayedProtagonistData?.MaximumHealth > 0
+                ? displayedProtagonistData.MaximumHealth
+                : displayedParty.Stats != null
+                    ? Mathf.Max(1, displayedParty.Stats.MaxHealth.Value)
+                    : Mathf.Max(1, currentHealth);
             if (currentHealth == displayedCurrentHealth && maxHealth == displayedMaxHealth)
                 return;
 

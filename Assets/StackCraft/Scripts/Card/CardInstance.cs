@@ -36,6 +36,11 @@ namespace CryingSnow.StackCraft
         public int UsesLeft { get; private set; }
         public int CurrentHealth { get; private set; }
         public int CurrentNutrition { get; private set; }
+        public int Level { get; private set; } = 1;
+        public int Experience { get; private set; }
+        public int CurrentEnergy { get; private set; } = 4;
+        public int MaxEnergy { get; private set; } = 4;
+        public bool IsDowned { get; private set; }
 
         public CardDefinition BaseDefinition => EquipperComponent?.OriginalDefinition ?? Definition;
         public CardStack OriginalCraftingStack { get; set; }
@@ -94,6 +99,7 @@ namespace CryingSnow.StackCraft
             Size = new Vector2(_col.size.x, _col.size.z) + settings.Margin;
 
             Stats = definition.CreateCombatStats();
+            ApplyProgressionModifiers();
 
             UsesLeft = (definition is PackDefinition packDefinition)
                 ? packDefinition.Slots.Count
@@ -102,7 +108,7 @@ namespace CryingSnow.StackCraft
             CurrentHealth = Stats.MaxHealth.Value;
             CurrentNutrition = definition.Nutrition;
 
-            titleText.text = Definition.DisplayName;
+            UpdateProgressionTitle();
 
             UpdateStatDisplays();
 
@@ -200,6 +206,18 @@ namespace CryingSnow.StackCraft
                 if (Stack.TopCard.Definition.Category is CardCategory.Character)
                 {
                     info.body += $"\n生命（{CurrentHealth}/{Stack.TopCard.Stats.MaxHealth.Value}）";
+
+                    if (ProtagonistRules.IsProtagonist(Stack.TopCard))
+                    {
+                        int required = CharacterProgressionService
+                            .GetExperienceRequiredForNextLevel(Stack.TopCard.Level);
+                        info.body +=
+                            $"\n等级：{Stack.TopCard.Level}" +
+                            $"\n经验：{Stack.TopCard.Experience}/{required}" +
+                            $"\n体力：{Stack.TopCard.CurrentEnergy}/{Stack.TopCard.MaxEnergy}";
+                        if (Stack.TopCard.IsDowned)
+                            info.body += "\n状态：倒地";
+                    }
 
                     if (Stack.TopCard.Definition.CombatType != CombatType.None)
                     {
@@ -398,6 +416,18 @@ namespace CryingSnow.StackCraft
                 }
 
                 // 3. Physical Stacking Check (Can a Wood card physically sit on a Sawmill?)
+                bool protagonistInvolved =
+                    ProtagonistRules.IsProtagonist(this) ||
+                    candidateStack.Cards.Any(
+                        ProtagonistRules.IsProtagonist);
+                if (protagonistInvolved &&
+                    Definition.Category == CardCategory.Character &&
+                    candidateStack.BottomCard.Definition.Category ==
+                        CardCategory.Character)
+                {
+                    continue;
+                }
+
                 if (!CanStack(Definition, candidateStack.BottomCard.Definition))
                     continue;
 
@@ -528,6 +558,12 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void Kill()
         {
+            if (ProtagonistRules.ShouldEnterDownedState(this))
+            {
+                EnterDownedState();
+                return;
+            }
+
             CardManager.Instance?.NotifyCardKilled(this);
 
             KillTweens();
@@ -551,6 +587,62 @@ namespace CryingSnow.StackCraft
 
             if (Stack != null) Stack.DestroyCard(this);
             else GameObject.Destroy(gameObject);
+        }
+
+        public void EnterDownedState()
+        {
+            if (IsDowned)
+                return;
+
+            IsDowned = true;
+            CurrentHealth = 0;
+            IsBeingDragged = false;
+            KillTweens();
+
+            if (Combatant != null)
+            {
+                CombatTask task = Combatant.CurrentCombatTask;
+                if (Combatant.IsInCombat && task != null)
+                    task.RemoveCombatant(this);
+                Combatant.LeaveCombat();
+            }
+
+            if (Stack == null)
+                CardManager.Instance?.ReturnCardToBoard(this);
+
+            UpdateProgressionTitle();
+            UpdateStatDisplays();
+            GameDirector.Instance?.SyncProtagonistState(this);
+            CardManager.Instance?.NotifyStatsChanged();
+        }
+
+        public bool Revive(int restoredHealth, int restoredEnergy = 1)
+        {
+            if (!IsDowned)
+                return false;
+
+            IsDowned = false;
+            CurrentHealth = Mathf.Clamp(
+                Mathf.Max(1, restoredHealth),
+                1,
+                Stats.MaxHealth.Value);
+            CurrentEnergy = Mathf.Clamp(
+                Mathf.Max(0, restoredEnergy),
+                0,
+                MaxEnergy);
+            UpdateProgressionTitle();
+            UpdateStatDisplays();
+            GameDirector.Instance?.SyncProtagonistState(this);
+            CardManager.Instance?.NotifyStatsChanged();
+            return true;
+        }
+
+        public void ConfirmProtagonistDeath()
+        {
+            if (!IsDowned || !ProtagonistRules.IsProtagonist(this))
+                return;
+
+            GameDirector.Instance?.GameOver();
         }
 
         /// <summary>
@@ -577,7 +669,8 @@ namespace CryingSnow.StackCraft
         {
             Definition = newDefinition;
             Stats = Definition.CreateCombatStats();
-            if (titleText != null) titleText.text = Definition.DisplayName;
+            ApplyProgressionModifiers();
+            UpdateProgressionTitle();
             if (_renderer != null)
                 ApplyVisualTextures(_renderer.material, Definition);
         }
@@ -601,17 +694,125 @@ namespace CryingSnow.StackCraft
         /// <param name="cardData">The data object containing the saved stat values.</param>
         public void RestoreSavedStats(CardData cardData)
         {
+            if (cardData == null)
+                return;
+
             if (!string.IsNullOrWhiteSpace(cardData.PersistentId))
                 PersistentId = cardData.PersistentId;
             UsesLeft = cardData.UsesLeft;
-            CurrentHealth = cardData.CurrentHealth;
+            Level = Mathf.Max(1, cardData.Level);
+            Experience = Mathf.Max(0, cardData.Experience);
+            MaxEnergy = cardData.MaxEnergy > 0 ? cardData.MaxEnergy : 4;
+            CurrentEnergy = Mathf.Clamp(cardData.CurrentEnergy, 0, MaxEnergy);
+            IsDowned = cardData.IsDowned;
+            Stats = Definition.CreateCombatStats();
+            ApplyProgressionModifiers();
+            CurrentHealth = Mathf.Max(0, cardData.CurrentHealth);
             CurrentNutrition = cardData.CurrentNutrition;
 
+            UpdateProgressionTitle();
             UpdateStatDisplays();
 
             if (gameObject.TryGetComponent<ChestLogic>(out var chest))
             {
                 chest.RestoreCoins(cardData.StoredCoins);
+            }
+        }
+
+        public void ClampCurrentHealthToMaximum()
+        {
+            CurrentHealth = Mathf.Clamp(
+                CurrentHealth,
+                0,
+                Stats?.MaxHealth.Value ?? Mathf.Max(1, CurrentHealth));
+            UpdateStatDisplays();
+        }
+
+        public CharacterProgressionResult GainExperience(int amount)
+        {
+            var state = new CardData
+            {
+                Level = Level,
+                Experience = Experience,
+                CurrentEnergy = CurrentEnergy,
+                MaxEnergy = MaxEnergy
+            };
+            int previousLevel = Level;
+            int previousMaxHealth = Stats.MaxHealth.Value;
+            CharacterProgressionResult result =
+                CharacterProgressionService.GrantExperience(state, amount);
+            Level = state.Level;
+            Experience = state.Experience;
+            if (result.LevelsGained > 0)
+            {
+                Stats.MaxHealth.AddModifier(new ProgressionModifier(
+                    CharacterProgressionService.GetMaxHealthBonus(Level) -
+                    CharacterProgressionService.GetMaxHealthBonus(previousLevel)));
+                Stats.Attack.AddModifier(new ProgressionModifier(
+                    CharacterProgressionService.GetAttackBonus(Level) -
+                    CharacterProgressionService.GetAttackBonus(previousLevel)));
+                Stats.Defense.AddModifier(new ProgressionModifier(
+                    CharacterProgressionService.GetDefenseBonus(Level) -
+                    CharacterProgressionService.GetDefenseBonus(previousLevel)));
+                CurrentHealth = Mathf.Min(
+                    Stats.MaxHealth.Value,
+                    CurrentHealth + Stats.MaxHealth.Value - previousMaxHealth);
+            }
+
+            UpdateProgressionTitle();
+            UpdateStatDisplays();
+            CardManager.Instance?.NotifyStatsChanged();
+            return result;
+        }
+
+        public void RestoreEnergy(int amount)
+        {
+            CurrentEnergy = Mathf.Clamp(CurrentEnergy + amount, 0, MaxEnergy);
+        }
+
+        public bool TrySpendEnergy(int amount)
+        {
+            amount = Mathf.Max(0, amount);
+            if (IsDowned || CurrentEnergy < amount)
+                return false;
+
+            CurrentEnergy -= amount;
+            return true;
+        }
+
+        private void ApplyProgressionModifiers()
+        {
+            if (Stats == null || Definition == null ||
+                Definition.Category != CardCategory.Character)
+            {
+                return;
+            }
+
+            Stats.MaxHealth.AddModifier(new ProgressionModifier(
+                CharacterProgressionService.GetMaxHealthBonus(Level)));
+            Stats.Attack.AddModifier(new ProgressionModifier(
+                CharacterProgressionService.GetAttackBonus(Level)));
+            Stats.Defense.AddModifier(new ProgressionModifier(
+                CharacterProgressionService.GetDefenseBonus(Level)));
+        }
+
+        private void UpdateProgressionTitle()
+        {
+            if (titleText == null || Definition == null)
+                return;
+
+            titleText.text = ProtagonistRules.IsProtagonist(this)
+                ? $"{Definition.DisplayName} Lv.{Level}"
+                : Definition.DisplayName;
+        }
+
+        private readonly struct ProgressionModifier : IStatModifier
+        {
+            public float Value { get; }
+
+            public ProgressionModifier(float value)
+            {
+                Value = value;
             }
         }
         #endregion

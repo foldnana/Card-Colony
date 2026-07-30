@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace CryingSnow.StackCraft
@@ -15,6 +16,8 @@ namespace CryingSnow.StackCraft
     public class GameData
     {
         public const int CurrentEconomyStateVersion = 1;
+        public const int CurrentProtagonistStateVersion = 1;
+        public const int MaximumPartySize = 4;
 
         public int SlotNumber;
         public string CurrentScene;
@@ -23,6 +26,8 @@ namespace CryingSnow.StackCraft
         public int EconomyStateVersion;
         public int EconomySeed;
         public long WorldElapsedHours;
+        public int ProtagonistStateVersion;
+        public string ProtagonistPersistentId;
         public List<MarketStateData> Markets = new();
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
@@ -162,6 +167,126 @@ namespace CryingSnow.StackCraft
             Backpack.Normalize();
             return Backpack;
         }
+
+        public CardData GetProtagonistData()
+        {
+            if (PartyMembers == null ||
+                string.IsNullOrWhiteSpace(ProtagonistPersistentId))
+            {
+                return null;
+            }
+
+            return PartyMembers.FirstOrDefault(member =>
+                member != null &&
+                member.PersistentId == ProtagonistPersistentId);
+        }
+
+        public CardData EnsureProtagonist(
+            string fallbackDefinitionId,
+            int fallbackMaxHealth,
+            int fallbackEnergy)
+        {
+            PartyMembers ??= new List<CardData>();
+            CardData protagonist = GetProtagonistData();
+            if (protagonist == null)
+            {
+                protagonist = PartyMembers.FirstOrDefault(member =>
+                    member != null &&
+                    member.Id == fallbackDefinitionId);
+                protagonist ??= PartyMembers.FirstOrDefault(member => member != null);
+            }
+
+            if (protagonist == null)
+            {
+                protagonist = new CardData
+                {
+                    Id = fallbackDefinitionId,
+                    UsesLeft = 1,
+                    CurrentHealth = Mathf.Max(1, fallbackMaxHealth),
+                    MaximumHealth = Mathf.Max(1, fallbackMaxHealth)
+                };
+                PartyMembers.Add(protagonist);
+            }
+
+            if (string.IsNullOrWhiteSpace(protagonist.PersistentId))
+                protagonist.PersistentId = System.Guid.NewGuid().ToString("N");
+
+            ProtagonistPersistentId = protagonist.PersistentId;
+            if (ProtagonistStateVersion < CurrentProtagonistStateVersion)
+            {
+                protagonist.Level = Mathf.Max(1, protagonist.Level);
+                protagonist.Experience = Mathf.Max(0, protagonist.Experience);
+                protagonist.MaxEnergy = protagonist.MaxEnergy > 0
+                    ? protagonist.MaxEnergy
+                    : Mathf.Max(1, fallbackEnergy);
+                protagonist.CurrentEnergy = protagonist.CurrentEnergy > 0
+                    ? Mathf.Min(protagonist.CurrentEnergy, protagonist.MaxEnergy)
+                    : protagonist.MaxEnergy;
+                protagonist.IsDowned = protagonist.CurrentHealth <= 0;
+                if (protagonist.MaximumHealth <= 0)
+                {
+                    protagonist.MaximumHealth =
+                        Mathf.Max(1, fallbackMaxHealth) +
+                        CharacterProgressionService.GetMaxHealthBonus(
+                            protagonist.Level);
+                }
+                ProtagonistStateVersion = CurrentProtagonistStateVersion;
+            }
+            else
+            {
+                protagonist.NormalizeProgression(fallbackEnergy);
+                if (protagonist.MaximumHealth <= 0)
+                {
+                    protagonist.MaximumHealth =
+                        Mathf.Max(1, fallbackMaxHealth) +
+                        CharacterProgressionService.GetMaxHealthBonus(
+                            protagonist.Level);
+                }
+            }
+
+            return protagonist;
+        }
+
+        public void UpdatePartyMembers(IEnumerable<CardData> partyMembers)
+        {
+            CardData existingProtagonist = GetProtagonistData();
+            List<CardData> incoming = partyMembers?
+                .Where(member => member != null)
+                .ToList() ?? new List<CardData>();
+
+            CardData protagonist = string.IsNullOrWhiteSpace(
+                    ProtagonistPersistentId)
+                ? null
+                : incoming.FirstOrDefault(member =>
+                    member.PersistentId == ProtagonistPersistentId);
+            if (protagonist == null && existingProtagonist != null)
+            {
+                protagonist = existingProtagonist;
+                incoming.Insert(0, protagonist);
+            }
+            PartyMembers = protagonist == null
+                ? incoming.Take(MaximumPartySize).ToList()
+                : new[] { protagonist }
+                    .Concat(incoming.Where(member => member != protagonist))
+                    .Take(MaximumPartySize)
+                    .ToList();
+
+            if (!string.IsNullOrWhiteSpace(ProtagonistPersistentId))
+                return;
+
+            CardData first = PartyMembers.FirstOrDefault();
+            if (first == null)
+                return;
+
+            if (string.IsNullOrWhiteSpace(first.PersistentId))
+                first.PersistentId = System.Guid.NewGuid().ToString("N");
+            ProtagonistPersistentId = first.PersistentId;
+        }
+
+        public bool IsProtagonist(CardData cardData)
+        {
+            return ProtagonistRules.IsProtagonist(this, cardData);
+        }
     }
 
     [System.Serializable]
@@ -169,6 +294,8 @@ namespace CryingSnow.StackCraft
     {
         public string SceneName;
         public int ContentMigrationVersion;
+        public int LastRandomRefreshDay;
+        public int RandomSeed;
         public List<StackData> SavedStacks = new();
         public List<CombatData> SavedCombats = new();
         public List<string> CompletedQuests = new();
@@ -281,9 +408,15 @@ namespace CryingSnow.StackCraft
         public string PersistentId;
         public int UsesLeft;
         public int CurrentHealth;
+        public int MaximumHealth;
         public int CurrentNutrition;
         public int StoredCoins;
         public bool IsLocationRandomSpawn;
+        public int Level = 1;
+        public int Experience;
+        public int CurrentEnergy = 4;
+        public int MaxEnergy = 4;
+        public bool IsDowned;
 
         public string OriginalId; // Stores "Villager" if current Id is "Warrior"
         public List<CardData> EquippedItems = new();
@@ -296,7 +429,14 @@ namespace CryingSnow.StackCraft
             PersistentId = card.PersistentId;
             UsesLeft = card.UsesLeft;
             CurrentHealth = card.CurrentHealth;
+            MaximumHealth = card.Stats?.MaxHealth.Value ??
+                card.CurrentHealth;
             CurrentNutrition = card.CurrentNutrition;
+            Level = card.Level;
+            Experience = card.Experience;
+            CurrentEnergy = card.CurrentEnergy;
+            MaxEnergy = card.MaxEnergy;
+            IsDowned = card.IsDowned;
             IsLocationRandomSpawn =
                 card.GetComponent<LocationRandomSpawnMarker>() != null;
 
@@ -319,6 +459,16 @@ namespace CryingSnow.StackCraft
                     EquippedItems.Add(new CardData(item));
                 }
             }
+        }
+
+        public void NormalizeProgression(int fallbackEnergy = 4)
+        {
+            Level = Mathf.Max(1, Level);
+            Experience = Mathf.Max(0, Experience);
+            MaxEnergy = MaxEnergy > 0
+                ? MaxEnergy
+                : Mathf.Max(1, fallbackEnergy);
+            CurrentEnergy = Mathf.Clamp(CurrentEnergy, 0, MaxEnergy);
         }
     }
 

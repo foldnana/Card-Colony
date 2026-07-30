@@ -46,6 +46,7 @@ namespace CryingSnow.StackCraft
         private CardInstance equipperCard => _equipmentComponent?.Equipper;
 
         public bool CanBeDragged => _card != null &&
+            !_card.IsDowned &&
             GetComponent<NpcTrader>() == null &&
             (_card.Definition == null || _card.Definition.PlayerDraggable) &&
             _card.Stack != null &&

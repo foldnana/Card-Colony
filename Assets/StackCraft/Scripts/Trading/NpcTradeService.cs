@@ -496,6 +496,7 @@ namespace CryingSnow.StackCraft
 
             List<CardInstance> cards = stack.Cards.ToList();
             if (cards.Any(card => card == null ||
+                    !ProtagonistRules.CanBeSold(card) ||
                     !trader.CanBuy(card.Definition) ||
                     (card.Combatant != null && card.Combatant.IsInCombat)))
             {
