@@ -1,0 +1,54 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b27af4ed6f4149418ccbb5600e4508e1, type: 3}
+  m_Name: WorldQuest_RiverbendWhisperingForest
+  m_EditorClassIdentifier:
+  id: story_riverbend_whispering_forest_01
+  title: "\u6797\u95F4\u5F02\u54CD"
+  description: "\u4F4E\u8BED\u68EE\u6797\u4E2D\u4F20\u6765\u4E86\u5F02\u5E38\u52A8\u9759\uFF0C\u6751\u957F\u8BF7\u4F60\u505A\u597D\u51C6\u5907\u540E\u524D\u5F80\u8C03\u67E5\u3002"
+  giverNpcId: riverbend-village-chief
+  acceptLocationId: riverbend
+  objectives:
+  - type: 0
+    targetId: food
+    contextId: riverbend-market
+    requiredAmount: 1
+    text: "\u5728\u6CB3\u6E7E\u5E02\u573A\u8D2D\u4E701\u4EFD\u7CAE\u98DF"
+  - type: 1
+    targetId: whispering-forest
+    contextId:
+    requiredAmount: 1
+    text: "\u524D\u5F80\u4F4E\u8BED\u68EE\u6797"
+  - type: 2
+    targetId: 366be2e0e40c4b4d93229a94ae7133ae
+    contextId: whispering-forest
+    requiredAmount: 1
+    text: "\u51FB\u8D251\u53EA\u53F2\u83B1\u59C6"
+  - type: 3
+    targetId: riverbend-village-chief
+    contextId: riverbend
+    requiredAmount: 1
+    text: "\u8FD4\u56DE\u6CB3\u6E7E\u6751\u5411\u6751\u957F\u6C47\u62A5"
+  acceptanceRewards:
+  - cardDefinitionId: 4bda315463bf4b73b63f1d232fb522e4
+    cardAmount: 8
+    protagonistExperience: 0
+  - cardDefinitionId: medicine
+    cardAmount: 1
+    protagonistExperience: 0
+  completionRewards:
+  - cardDefinitionId: 4bda315463bf4b73b63f1d232fb522e4
+    cardAmount: 10
+    protagonistExperience: 0
+  - cardDefinitionId:
+    cardAmount: 0
+    protagonistExperience: 10

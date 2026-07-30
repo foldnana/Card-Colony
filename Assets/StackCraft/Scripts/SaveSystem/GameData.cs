@@ -17,6 +17,7 @@ namespace CryingSnow.StackCraft
     {
         public const int CurrentEconomyStateVersion = 1;
         public const int CurrentProtagonistStateVersion = 1;
+        public const int CurrentWorldQuestStateVersion = 1;
         public const int MaximumPartySize = 4;
 
         public int SlotNumber;
@@ -28,7 +29,9 @@ namespace CryingSnow.StackCraft
         public long WorldElapsedHours;
         public int ProtagonistStateVersion;
         public string ProtagonistPersistentId;
+        public int WorldQuestStateVersion;
         public List<MarketStateData> Markets = new();
+        public List<WorldQuestStateData> WorldQuests = new();
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
         public BackpackData Backpack = new();

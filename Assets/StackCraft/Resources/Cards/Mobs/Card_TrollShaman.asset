@@ -46,6 +46,7 @@ MonoBehaviour:
   dodge: 8
   criticalChance: 16
   criticalMultiplier: 140
+  experienceReward: 20
   equipmentSlot: 0
   statModifiers: []
   classChangeResult: {fileID: 0}

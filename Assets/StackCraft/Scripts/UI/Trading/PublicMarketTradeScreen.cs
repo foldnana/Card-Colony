@@ -237,6 +237,13 @@ namespace CryingSnow.StackCraft
 
             if (result.Success)
             {
+                if (direction == MarketTradeDirection.PlayerBuys)
+                {
+                    WorldQuestRuntime.Instance?.ReportMarketPurchase(
+                        session.MarketProfile.Id,
+                        commodity.Id,
+                        quantity);
+                }
                 SetHint(direction ==
                     MarketTradeDirection.PlayerBuys
                         ? $"购买成功：{commodity.DisplayName} ×{quantity}。"

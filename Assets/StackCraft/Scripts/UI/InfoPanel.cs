@@ -13,6 +13,18 @@ namespace CryingSnow.StackCraft
         Modal       // For critical, game-pausing events like end-of-day
     }
 
+    public readonly struct InfoPanelAction
+    {
+        public string Label { get; }
+        public System.Action Callback { get; }
+
+        public InfoPanelAction(string label, System.Action callback)
+        {
+            Label = label;
+            Callback = callback;
+        }
+    }
+
     public class InfoPanel : MonoBehaviour
     {
         public static InfoPanel Instance { get; private set; }
@@ -35,8 +47,8 @@ namespace CryingSnow.StackCraft
 
         private RectTransform panelRect;
         private RectTransform textRect;
-        private RectTransform actionButtonRect;
         private CanvasGroup visibilityGroup;
+        private readonly List<TextButton> actionButtons = new();
 
         public bool IsWorldMapSuppressed { get; private set; }
 
@@ -47,8 +59,7 @@ namespace CryingSnow.StackCraft
             public int RequestID;
             public InfoPriority Priority;
             public (string header, string body) Info;
-            public string ButtonLabel;
-            public System.Action ButtonAction;
+            public List<InfoPanelAction> Actions = new();
         }
 
         private readonly object hoverRequester = "HoverRequester";
@@ -100,13 +111,40 @@ namespace CryingSnow.StackCraft
         {
             if (requester == null) return;
 
+            var request = new InfoRequest
+            {
+                RequestID = s_requestCounter++,
+                Priority = priority,
+                Info = info
+            };
+            if (!string.IsNullOrEmpty(buttonLabel) && buttonAction != null)
+                request.Actions.Add(
+                    new InfoPanelAction(buttonLabel, buttonAction));
+            activeRequests[requester] = request;
+
+            RefreshInfo();
+        }
+
+        public void RequestInfoDisplayWithActions(
+            object requester,
+            InfoPriority priority,
+            (string header, string body) info,
+            params InfoPanelAction[] actions)
+        {
+            if (requester == null)
+                return;
+
             activeRequests[requester] = new InfoRequest
             {
                 RequestID = s_requestCounter++,
                 Priority = priority,
                 Info = info,
-                ButtonLabel = buttonLabel,
-                ButtonAction = buttonAction
+                Actions = actions?
+                    .Where(action =>
+                        !string.IsNullOrWhiteSpace(action.Label) &&
+                        action.Callback != null)
+                    .ToList() ??
+                    new List<InfoPanelAction>()
             };
 
             RefreshInfo();
@@ -141,19 +179,12 @@ namespace CryingSnow.StackCraft
 
                 UpdateInfo(highestPriorityRequest.Info);
 
-                if (!string.IsNullOrEmpty(highestPriorityRequest.ButtonLabel) && highestPriorityRequest.ButtonAction != null)
-                {
-                    SetActionButton(highestPriorityRequest.ButtonLabel, highestPriorityRequest.ButtonAction);
-                }
-                else
-                {
-                    actionButton.Deactivate();
-                }
+                SetActionButtons(highestPriorityRequest.Actions);
             }
             else
             {
                 ClearInfo();
-                actionButton.Deactivate();
+                SetActionButtons(null);
             }
 
             RebuildLayout();
@@ -182,7 +213,9 @@ namespace CryingSnow.StackCraft
         {
             panelRect = (RectTransform)transform;
             textRect = infoText.rectTransform;
-            actionButtonRect = (RectTransform)actionButton.transform;
+            actionButtons.Clear();
+            if (actionButton != null)
+                actionButtons.Add(actionButton);
 
             // These two components both try to drive the same RectTransforms. Their
             // result depends on initialization order and can collapse Chinese text
@@ -203,10 +236,6 @@ namespace CryingSnow.StackCraft
             textRect.anchoredPosition = Vector2.zero;
             textRect.sizeDelta = Vector2.zero;
 
-            actionButtonRect.anchorMin = new Vector2(0f, 1f);
-            actionButtonRect.anchorMax = new Vector2(1f, 1f);
-            actionButtonRect.pivot = new Vector2(0.5f, 1f);
-
             infoText.margin = new Vector4(24f, 18f, 24f, 20f);
             infoText.lineSpacing = 6f;
             infoText.paragraphSpacing = 12f;
@@ -218,7 +247,7 @@ namespace CryingSnow.StackCraft
 
         private void RebuildLayout()
         {
-            if (panelRect == null || textRect == null || actionButtonRect == null)
+            if (panelRect == null || textRect == null)
                 return;
 
             float textHeight = 0f;
@@ -231,9 +260,29 @@ namespace CryingSnow.StackCraft
 
             textRect.sizeDelta = new Vector2(0f, textHeight);
 
-            float buttonHeight = actionButton.gameObject.activeSelf ? ActionButtonHeight : 0f;
-            actionButtonRect.anchoredPosition = new Vector2(0f, -textHeight);
-            actionButtonRect.sizeDelta = new Vector2(0f, buttonHeight);
+            List<TextButton> visibleButtons = actionButtons
+                .Where(button =>
+                    button != null && button.gameObject.activeSelf)
+                .ToList();
+            float buttonHeight =
+                visibleButtons.Count > 0 ? ActionButtonHeight : 0f;
+            float buttonWidth = visibleButtons.Count > 0
+                ? PanelWidth / visibleButtons.Count
+                : PanelWidth;
+            for (int index = 0; index < visibleButtons.Count; index++)
+            {
+                RectTransform buttonRect =
+                    (RectTransform)visibleButtons[index].transform;
+                buttonRect.anchorMin = new Vector2(0f, 1f);
+                buttonRect.anchorMax = new Vector2(0f, 1f);
+                buttonRect.pivot = new Vector2(0f, 1f);
+                buttonRect.anchoredPosition = new Vector2(
+                    buttonWidth * index,
+                    -textHeight);
+                buttonRect.sizeDelta = new Vector2(
+                    buttonWidth,
+                    buttonHeight);
+            }
 
             panelRect.sizeDelta = new Vector2(PanelWidth, textHeight + buttonHeight);
             infoText.ForceMeshUpdate();
@@ -252,13 +301,35 @@ namespace CryingSnow.StackCraft
             lastDisplayedInfo = ("", "");
         }
 
-        private void SetActionButton(string label, System.Action action)
+        private void SetActionButtons(
+            IReadOnlyList<InfoPanelAction> actions)
         {
-            actionButton.Setup(
-                label,
-                bodySize,
-                onClick: () => action?.Invoke()
-            );
+            int required = actions?.Count ?? 0;
+            while (actionButtons.Count < required)
+            {
+                TextButton clone = Instantiate(
+                    actionButton,
+                    actionButton.transform.parent);
+                clone.name = $"ActionButton{actionButtons.Count + 1}";
+                clone.Deactivate();
+                actionButtons.Add(clone);
+            }
+
+            for (int index = 0; index < actionButtons.Count; index++)
+            {
+                TextButton button = actionButtons[index];
+                if (index >= required)
+                {
+                    button.Deactivate();
+                    continue;
+                }
+
+                InfoPanelAction action = actions[index];
+                button.Setup(
+                    action.Label,
+                    bodySize,
+                    onClick: () => action.Callback?.Invoke());
+            }
         }
 
         private void ApplyVisibility()

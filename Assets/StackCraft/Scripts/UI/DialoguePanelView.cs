@@ -16,12 +16,25 @@ namespace CryingSnow.StackCraft
         [SerializeField] private TMP_Text replyButtonLabel;
         [SerializeField] private Button goodbyeButton;
 
+        private TMP_Text goodbyeButtonLabel;
+        private string defaultGoodbyeLabel;
+
         public TMP_Text SpeakerNameLabel => speakerNameLabel;
         public TMP_Text DialogueTextLabel => dialogueTextLabel;
         public Button ReplyButton => replyButton;
         public Button GoodbyeButton => goodbyeButton;
         public RawImage PortraitBackground => portraitBackground;
         public RawImage Portrait => portrait;
+
+        private void Awake()
+        {
+            if (goodbyeButton != null)
+            {
+                goodbyeButtonLabel =
+                    goodbyeButton.GetComponentInChildren<TMP_Text>(true);
+                defaultGoodbyeLabel = goodbyeButtonLabel?.text;
+            }
+        }
 
         public void Show(CardDefinition speaker, Action onReply, Action onGoodbye)
         {
@@ -44,12 +57,48 @@ namespace CryingSnow.StackCraft
 
             ConfigureButton(replyButton, onReply);
             ConfigureButton(goodbyeButton, onGoodbye);
+            if (goodbyeButtonLabel != null &&
+                !string.IsNullOrWhiteSpace(defaultGoodbyeLabel))
+            {
+                goodbyeButtonLabel.text = defaultGoodbyeLabel;
+            }
 
             bool hasReply = !string.IsNullOrWhiteSpace(speaker.DialogueReplyText);
             if (replyButton != null)
                 replyButton.gameObject.SetActive(hasReply);
             if (replyButtonLabel != null)
                 replyButtonLabel.text = speaker.DialogueReplyText;
+        }
+
+        public void ShowQuest(
+            CardDefinition speaker,
+            string dialogue,
+            string primaryLabel,
+            Action onPrimary,
+            string secondaryLabel,
+            Action onSecondary)
+        {
+            if (speaker == null)
+                return;
+
+            Show(speaker, onPrimary, onSecondary);
+            if (dialogueTextLabel != null)
+                dialogueTextLabel.text = dialogue;
+            bool hasPrimary = !string.IsNullOrWhiteSpace(primaryLabel) &&
+                              onPrimary != null;
+            if (replyButton != null)
+                replyButton.gameObject.SetActive(hasPrimary);
+            if (replyButtonLabel != null)
+                replyButtonLabel.text = primaryLabel;
+            if (goodbyeButton != null)
+            {
+                goodbyeButton.gameObject.SetActive(onSecondary != null);
+                if (goodbyeButtonLabel != null &&
+                    !string.IsNullOrWhiteSpace(secondaryLabel))
+                {
+                    goodbyeButtonLabel.text = secondaryLabel;
+                }
+            }
         }
 
         public void ShowResponse(string response)

@@ -58,8 +58,11 @@ namespace CryingSnow.StackCraft
         private Tween _moveTween;
         private Tween _combatTween;
         private Tween _hurtTween;
+        private Tween _levelUpTween;
 
         private Highlight _highlight;
+        private Color _defaultCardColor = Color.white;
+        private TextMeshPro _worldQuestMarker;
 
         private bool _isHovered;
 
@@ -86,6 +89,8 @@ namespace CryingSnow.StackCraft
             _mainCam = Camera.main;
             _renderer = GetComponent<MeshRenderer>();
             _col = GetComponent<BoxCollider>();
+            if (_renderer.material.HasProperty("_Color"))
+                _defaultCardColor = _renderer.material.GetColor("_Color");
 
             Combatant = GetComponent<CardCombatant>();
             EquipperComponent = GetComponent<CardEquipper>();
@@ -113,6 +118,12 @@ namespace CryingSnow.StackCraft
             UpdateStatDisplays();
 
             ApplyVisualTextures(_renderer.material, Definition);
+            RefreshWorldQuestMarker();
+            if (WorldQuestRuntime.Instance != null)
+            {
+                WorldQuestRuntime.Instance.OnQuestChanged +=
+                    HandleWorldQuestChanged;
+            }
 
             Stack = new CardStack(this, transform.position);
             if (registerWithManager)
@@ -143,6 +154,15 @@ namespace CryingSnow.StackCraft
             InfoPanel.Instance?.UnregisterHover();
         }
 
+        private void OnDestroy()
+        {
+            if (WorldQuestRuntime.Instance != null)
+            {
+                WorldQuestRuntime.Instance.OnQuestChanged -=
+                    HandleWorldQuestChanged;
+            }
+        }
+
         private void Update()
         {
             if (_isHovered && Stack != null && Stack.IsCrafting)
@@ -169,6 +189,53 @@ namespace CryingSnow.StackCraft
         #endregion
 
         #region Information & Visuals
+        private void HandleWorldQuestChanged(WorldQuestViewModel quest)
+        {
+            if (quest.QuestId == RiverbendForestQuestRules.QuestId)
+                RefreshWorldQuestMarker();
+        }
+
+        private void RefreshWorldQuestMarker()
+        {
+            bool isQuestNpc = Definition?.Id ==
+                RiverbendForestQuestRules.GiverNpcId;
+            bool visible = isQuestNpc &&
+                WorldQuestRuntime.Instance != null &&
+                WorldQuestRuntime.Instance.GetViewModel(
+                    RiverbendForestQuestRules.QuestId).ShowsNpcMarker;
+            if (!visible)
+            {
+                if (_worldQuestMarker != null)
+                    _worldQuestMarker.gameObject.SetActive(false);
+                return;
+            }
+
+            if (_worldQuestMarker == null && titleText != null)
+            {
+                _worldQuestMarker = Instantiate(
+                    titleText,
+                    titleText.transform.parent);
+                _worldQuestMarker.name = "WorldQuestMarker";
+                _worldQuestMarker.text = "!";
+                _worldQuestMarker.fontSize =
+                    Mathf.Max(titleText.fontSize * 1.4f, 5f);
+                _worldQuestMarker.fontStyle = FontStyles.Bold;
+                _worldQuestMarker.color = new Color32(
+                    255,
+                    204,
+                    64,
+                    255);
+                _worldQuestMarker.alignment =
+                    TextAlignmentOptions.Center;
+                _worldQuestMarker.transform.localPosition =
+                    titleText.transform.localPosition +
+                    new Vector3(Size.x * 0.35f, 0.004f, 0f);
+            }
+
+            if (_worldQuestMarker != null)
+                _worldQuestMarker.gameObject.SetActive(true);
+        }
+
         private (string, string) GetInfo()
         {
             (string header, string body) info = ("", "");
@@ -614,6 +681,7 @@ namespace CryingSnow.StackCraft
             UpdateStatDisplays();
             GameDirector.Instance?.SyncProtagonistState(this);
             CardManager.Instance?.NotifyStatsChanged();
+            ApplyDownedVisual();
         }
 
         public bool Revive(int restoredHealth, int restoredEnergy = 1)
@@ -634,6 +702,7 @@ namespace CryingSnow.StackCraft
             UpdateStatDisplays();
             GameDirector.Instance?.SyncProtagonistState(this);
             CardManager.Instance?.NotifyStatsChanged();
+            ApplyDownedVisual();
             return true;
         }
 
@@ -642,7 +711,7 @@ namespace CryingSnow.StackCraft
             if (!IsDowned || !ProtagonistRules.IsProtagonist(this))
                 return;
 
-            GameDirector.Instance?.GameOver();
+            GameDirector.Instance?.ConfirmProtagonistDeath("战斗重伤");
         }
 
         /// <summary>
@@ -672,7 +741,10 @@ namespace CryingSnow.StackCraft
             ApplyProgressionModifiers();
             UpdateProgressionTitle();
             if (_renderer != null)
+            {
                 ApplyVisualTextures(_renderer.material, Definition);
+                ApplyDownedVisual();
+            }
         }
 
         public static void ApplyVisualTextures(Material material, CardDefinition definition)
@@ -712,6 +784,7 @@ namespace CryingSnow.StackCraft
 
             UpdateProgressionTitle();
             UpdateStatDisplays();
+            ApplyDownedVisual();
 
             if (gameObject.TryGetComponent<ChestLogic>(out var chest))
             {
@@ -765,6 +838,60 @@ namespace CryingSnow.StackCraft
             return result;
         }
 
+        public void PlayLevelUpFeedback()
+        {
+            if (_renderer == null)
+                return;
+
+            _levelUpTween?.Kill();
+            var sequence = DOTween.Sequence()
+                .Append(_renderer.material.DOFloat(
+                    1f,
+                    "_FlashAmount",
+                    0.15f))
+                .Append(_renderer.material.DOFloat(
+                    0f,
+                    "_FlashAmount",
+                    0.35f))
+                .SetLoops(2)
+                .SetUpdate(true);
+
+            if (titleText != null)
+            {
+                TextMeshPro popup = Instantiate(
+                    titleText,
+                    titleText.transform.parent);
+                popup.name = "LevelUpPopup";
+                popup.text = "升级！";
+                popup.color = new Color(1f, 0.82f, 0.24f);
+                popup.fontSize *= 1.15f;
+                popup.transform.localPosition +=
+                    new Vector3(0f, 0.02f, 0.5f);
+                sequence.Join(
+                    popup.transform.DOLocalMoveZ(
+                        popup.transform.localPosition.z + 0.25f,
+                        1.25f));
+                sequence.Join(popup.DOFade(0f, 1.25f));
+                sequence.OnKill(() =>
+                {
+                    if (popup != null)
+                        Destroy(popup.gameObject);
+                    if (_levelUpTween == sequence)
+                        _levelUpTween = null;
+                });
+            }
+            else
+            {
+                sequence.OnKill(() =>
+                {
+                    if (_levelUpTween == sequence)
+                        _levelUpTween = null;
+                });
+            }
+
+            _levelUpTween = sequence;
+        }
+
         public void RestoreEnergy(int amount)
         {
             CurrentEnergy = Mathf.Clamp(CurrentEnergy + amount, 0, MaxEnergy);
@@ -801,9 +928,34 @@ namespace CryingSnow.StackCraft
             if (titleText == null || Definition == null)
                 return;
 
-            titleText.text = ProtagonistRules.IsProtagonist(this)
-                ? $"{Definition.DisplayName} Lv.{Level}"
-                : Definition.DisplayName;
+            if (!ProtagonistRules.IsProtagonist(this))
+            {
+                titleText.text = Definition.DisplayName;
+                return;
+            }
+
+            titleText.text = IsDowned
+                ? $"{Definition.DisplayName} Lv.{Level}【倒地】"
+                : $"{Definition.DisplayName} Lv.{Level}";
+        }
+
+        private void ApplyDownedVisual()
+        {
+            if (_renderer == null || !Application.isPlaying)
+                return;
+
+            Material material = _renderer.material;
+            if (!material.HasProperty("_Color"))
+                return;
+
+            material.SetColor(
+                "_Color",
+                IsDowned
+                    ? Color.Lerp(
+                        _defaultCardColor,
+                        new Color(0.32f, 0.34f, 0.38f, 1f),
+                        0.8f)
+                    : _defaultCardColor);
         }
 
         private readonly struct ProgressionModifier : IStatModifier
@@ -922,6 +1074,7 @@ namespace CryingSnow.StackCraft
         {
             _moveTween?.Kill();
             _combatTween?.Kill();
+            _levelUpTween?.Kill();
         }
         #endregion
     }

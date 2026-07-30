@@ -72,6 +72,7 @@ namespace CryingSnow.StackCraft
         private void Awake()
         {
             returnButton?.onClick.AddListener(ReturnToWorldMap);
+            ProtagonistStatePresenter.Ensure(gameObject);
             if (GameDirector.Instance != null)
                 GameDirector.Instance.OnSceneDataReady += HandleSceneDataReady;
         }
@@ -653,6 +654,14 @@ namespace CryingSnow.StackCraft
         {
             if (isReturning || GameDirector.Instance == null)
                 return;
+
+            if (!ProtagonistRules.CanLeaveLocationNormally(
+                    GameDirector.Instance.GameData))
+            {
+                ProtagonistStatePresenter.Ensure(gameObject)
+                    ?.RefreshDownedState(force: true);
+                return;
+            }
 
             isReturning = true;
             if (returnButton != null)

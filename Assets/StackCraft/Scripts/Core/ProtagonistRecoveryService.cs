@@ -5,6 +5,8 @@ namespace CryingSnow.StackCraft
 {
     public static class ProtagonistRecoveryService
     {
+        public const string RescueMedicineDefinitionId = "medicine";
+
         public static bool CanBeRescued(GameData gameData)
         {
             CardData protagonist = gameData?.GetProtagonistData();
@@ -61,6 +63,9 @@ namespace CryingSnow.StackCraft
 
             BackpackData backpack = gameData.EnsureBackpack();
             BackpackEntryData entry = backpack.Find(backpackEntryId);
+            if (entry?.Card?.Id != RescueMedicineDefinitionId)
+                return false;
+
             CardDefinition item = entry?.Card == null
                 ? null
                 : CardManager.Instance.GetDefinitionById(entry.Card.Id);
@@ -82,6 +87,22 @@ namespace CryingSnow.StackCraft
             active?.Revive(restoredHealth, restoredEnergy: 1);
             BackpackService.NotifyContentsChanged();
             return true;
+        }
+
+        public static BackpackEntryData FindRescueMedicineEntry(
+            GameData gameData)
+        {
+            return gameData?.EnsureBackpack()?.Entries?.FirstOrDefault(
+                entry =>
+                    entry?.Card != null &&
+                    entry.Card.Id == RescueMedicineDefinitionId);
+        }
+
+        public static bool TryRescueWithFirstMedicine(GameData gameData)
+        {
+            BackpackEntryData entry = FindRescueMedicineEntry(gameData);
+            return entry != null &&
+                TryRescueWithBackpackItem(gameData, entry.InstanceId);
         }
     }
 }

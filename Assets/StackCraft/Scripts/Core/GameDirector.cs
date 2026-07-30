@@ -12,6 +12,8 @@ namespace CryingSnow.StackCraft
 
         public event System.Action<SceneData, bool> OnSceneDataReady;
         public event System.Action<GameData> OnBeforeSave;
+        public event System.Action<CharacterProgressionNotification>
+            OnProtagonistProgressed;
 
         [SerializeField, Tooltip("The name of the scene that serves as the game's main menu or entry point.")]
         private string titleScene = "Title";
@@ -44,6 +46,7 @@ namespace CryingSnow.StackCraft
             DontDestroyOnLoad(gameObject);
             SceneManager.sceneLoaded += HandleSceneLoaded;
             SavedGames = SaveSystem.LoadAllValidData<GameData>();
+            WorldQuestRuntime.Ensure(gameObject);
         }
 
         private void OnDestroy()
@@ -74,6 +77,8 @@ namespace CryingSnow.StackCraft
                 GameData.CurrentScene = scene.name;
                 bool wasLoaded = GameData.TryGetScene(out SceneData sceneData);
                 OnSceneDataReady?.Invoke(sceneData, wasLoaded);
+                WorldQuestRuntime.Instance?.Initialize(GameData);
+                WorldQuestRuntime.Instance?.HandleSceneLoaded();
             }
         }
 
@@ -103,6 +108,7 @@ namespace CryingSnow.StackCraft
             GameData = new GameData(candidateSlot, prefs);
             GameData.EnsureEconomyState();
             EnsureProtagonistState(GameData);
+            WorldQuestRuntime.Instance?.Initialize(GameData);
             StartCoroutine(TravelSequence(defaultScene, null));
         }
 
@@ -137,6 +143,7 @@ namespace CryingSnow.StackCraft
             gameData.EnsureEconomyState();
             EnsureProtagonistState(gameData);
             this.GameData = gameData;
+            WorldQuestRuntime.Instance?.Initialize(gameData);
             StartCoroutine(TravelSequence(gameData.CurrentScene, null));
         }
 
@@ -160,6 +167,7 @@ namespace CryingSnow.StackCraft
                 enteringFromLocation
                     ? LocationTransitionReason.ChildLocationEntry
                     : LocationTransitionReason.WorldMapEntry);
+            WorldQuestRuntime.Instance?.ReportLocationEntered(locationId);
             StartCoroutine(TravelSequence(locationScene, null));
             return true;
         }
@@ -263,30 +271,96 @@ namespace CryingSnow.StackCraft
             if (protagonistData == null || amount <= 0)
                 return new CharacterProgressionResult(0);
 
+            int previousLevel = protagonistData.Level;
             CardInstance activeCard = FindActiveProtagonistCard();
+            CharacterProgressionResult result;
             if (activeCard == null ||
                 SceneManager.GetActiveScene().name != locationScene)
             {
-                CharacterProgressionResult dataResult =
+                result =
                     CharacterProgressionService.GrantExperience(
                         protagonistData,
                         amount);
                 activeCard?.RestoreSavedStats(protagonistData);
-                return dataResult;
+            }
+            else
+            {
+                result = activeCard.GainExperience(amount);
+                protagonistData.Level = activeCard.Level;
+                protagonistData.Experience = activeCard.Experience;
+                protagonistData.CurrentHealth = activeCard.CurrentHealth;
+                protagonistData.MaximumHealth =
+                    activeCard.Stats?.MaxHealth.Value ??
+                    activeCard.CurrentHealth;
+                protagonistData.CurrentEnergy = activeCard.CurrentEnergy;
+                protagonistData.MaxEnergy = activeCard.MaxEnergy;
+                protagonistData.IsDowned = activeCard.IsDowned;
             }
 
-            CharacterProgressionResult result =
-                activeCard.GainExperience(amount);
-            protagonistData.Level = activeCard.Level;
-            protagonistData.Experience = activeCard.Experience;
-            protagonistData.CurrentHealth = activeCard.CurrentHealth;
-            protagonistData.MaximumHealth =
-                activeCard.Stats?.MaxHealth.Value ??
-                activeCard.CurrentHealth;
-            protagonistData.CurrentEnergy = activeCard.CurrentEnergy;
-            protagonistData.MaxEnergy = activeCard.MaxEnergy;
-            protagonistData.IsDowned = activeCard.IsDowned;
+            string displayName =
+                activeCard?.Definition?.DisplayName ?? "旅行者";
+            string message = protagonistData.Level > previousLevel
+                ? CharacterProgressionFeedback.BuildLevelUpMessage(
+                    displayName,
+                    previousLevel,
+                    protagonistData.Level)
+                : $"{displayName}获得了战斗经验。";
+            OnProtagonistProgressed?.Invoke(
+                new CharacterProgressionNotification(
+                    amount,
+                    previousLevel,
+                    protagonistData.Level,
+                    protagonistData.Experience,
+                    message));
             return result;
+        }
+
+        public bool TryRescueDownedProtagonist()
+        {
+            bool rescued =
+                ProtagonistRecoveryService.TryRescueWithFirstMedicine(
+                    GameData);
+            if (rescued)
+                SaveGame();
+            return rescued;
+        }
+
+        public bool RetreatDownedProtagonist()
+        {
+            ProtagonistRetreatResult result =
+                ProtagonistRetreatService.Apply(
+                    GameData,
+                    ProtagonistRetreatService.DefaultCoinDefinitionId,
+                    ProtagonistRetreatService.DefaultHoursLost,
+                    ProtagonistRetreatService.DefaultMaximumCoinsLost);
+            if (!result.Succeeded)
+                return false;
+
+            FindActiveProtagonistCard()?.Revive(
+                restoredHealth: 1,
+                restoredEnergy: 0);
+            BackpackService.NotifyContentsChanged();
+            return ReturnToWorldMap(null);
+        }
+
+        public bool ConfirmProtagonistDeath(string deathCause)
+        {
+            CardData protagonist = GetProtagonistData();
+            if (protagonist?.IsDowned != true)
+                return false;
+
+            ProtagonistRunChronicle chronicle =
+                ProtagonistChronicleService.Create(GameData, deathCause);
+            string archiveName =
+                ProtagonistChronicleService.GetArchiveFileName(chronicle);
+            if (chronicle != null &&
+                !string.IsNullOrWhiteSpace(archiveName))
+            {
+                SaveSystem.SaveData(chronicle, archiveName);
+            }
+
+            GameOver();
+            return true;
         }
 
         public void SyncProtagonistState(CardInstance activeCard)

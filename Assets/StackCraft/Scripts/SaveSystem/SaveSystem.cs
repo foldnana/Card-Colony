@@ -13,6 +13,9 @@ namespace CryingSnow.StackCraft
         public static void SaveData<T>(T data, string fileName)
         {
             string filePath = Path.Combine(Application.persistentDataPath, fileName + ".json");
+            string directoryPath = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrWhiteSpace(directoryPath))
+                Directory.CreateDirectory(directoryPath);
 
             // Convert the data object to a JSON string
             // Formatting.Indented makes the file readable (good for debugging). 

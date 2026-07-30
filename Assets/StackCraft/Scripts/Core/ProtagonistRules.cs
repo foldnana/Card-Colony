@@ -42,5 +42,11 @@ namespace CryingSnow.StackCraft
         {
             return IsProtagonist(card);
         }
+
+        public static bool CanLeaveLocationNormally(GameData gameData)
+        {
+            CardData protagonist = gameData?.GetProtagonistData();
+            return protagonist == null || !protagonist.IsDowned;
+        }
     }
 }

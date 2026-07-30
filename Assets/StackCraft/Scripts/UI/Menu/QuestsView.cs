@@ -18,6 +18,9 @@ namespace CryingSnow.StackCraft
 
         // Tracks the expanded/collapsed state of each group
         private readonly Dictionary<QuestGroup, bool> groupToggleState = new();
+        private TextButton worldQuestHeaderButton;
+        private TextButton worldQuestButton;
+        private bool worldQuestExpanded = true;
         #endregion
 
         #region Unity & Event Methods
@@ -27,6 +30,11 @@ namespace CryingSnow.StackCraft
             {
                 QuestManager.Instance.OnQuestActivated += HandleQuestActivated;
                 QuestManager.Instance.OnQuestCompleted += HandleQuestCompleted;
+            }
+            if (WorldQuestRuntime.Instance != null)
+            {
+                WorldQuestRuntime.Instance.OnQuestChanged +=
+                    HandleWorldQuestChanged;
             }
 
             BuildGroupMap();
@@ -39,6 +47,11 @@ namespace CryingSnow.StackCraft
             {
                 QuestManager.Instance.OnQuestActivated -= HandleQuestActivated;
                 QuestManager.Instance.OnQuestCompleted -= HandleQuestCompleted;
+            }
+            if (WorldQuestRuntime.Instance != null)
+            {
+                WorldQuestRuntime.Instance.OnQuestChanged -=
+                    HandleWorldQuestChanged;
             }
 
             ClearView();
@@ -95,6 +108,8 @@ namespace CryingSnow.StackCraft
                 CreateQuestButton(quest);
             }
 
+            CreateWorldQuestButtons();
+
             ScheduleItemLayout();
         }
 
@@ -114,6 +129,12 @@ namespace CryingSnow.StackCraft
 
             groupHeaderButtons.Clear();
             allQuestButtons.Clear();
+            if (worldQuestHeaderButton != null)
+                Destroy(worldQuestHeaderButton.gameObject);
+            if (worldQuestButton != null)
+                Destroy(worldQuestButton.gameObject);
+            worldQuestHeaderButton = null;
+            worldQuestButton = null;
         }
         #endregion
 
@@ -151,6 +172,11 @@ namespace CryingSnow.StackCraft
                 questBtn.SetText(currentText);
             }
         }
+
+        private void HandleWorldQuestChanged(WorldQuestViewModel quest)
+        {
+            CreateWorldQuestButtons();
+        }
         #endregion
 
         #region Button & Group Logic
@@ -184,6 +210,53 @@ namespace CryingSnow.StackCraft
             }
 
             return questBtn;
+        }
+
+        private void CreateWorldQuestButtons()
+        {
+            if (worldQuestHeaderButton != null)
+                Destroy(worldQuestHeaderButton.gameObject);
+            if (worldQuestButton != null)
+                Destroy(worldQuestButton.gameObject);
+            worldQuestHeaderButton = null;
+            worldQuestButton = null;
+
+            WorldQuestRuntime runtime = WorldQuestRuntime.Instance;
+            if (runtime == null)
+                return;
+
+            WorldQuestViewModel quest = runtime.GetViewModel(
+                RiverbendForestQuestRules.QuestId);
+            if (string.IsNullOrWhiteSpace(quest.QuestId))
+                return;
+
+            worldQuestHeaderButton = CreateItemButton(
+                $"主线任务 {(worldQuestExpanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}",
+                "MainStoryGroup",
+                35f);
+            worldQuestHeaderButton.SetColor(headerColor);
+            worldQuestHeaderButton.SetOnClick(() =>
+            {
+                worldQuestExpanded = !worldQuestExpanded;
+                if (worldQuestButton != null)
+                    worldQuestButton.gameObject.SetActive(
+                        worldQuestExpanded);
+                worldQuestHeaderButton.SetText(
+                    $"主线任务 {(worldQuestExpanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}");
+                ScheduleItemLayout();
+            });
+
+            string completed = quest.Status == WorldQuestStatus.Completed
+                ? $" {SYMBOL_COMPLETED}"
+                : string.Empty;
+            worldQuestButton = CreateItemButton(
+                $"{SYMBOL_BULLET} {quest.Title}{completed}",
+                quest,
+                30f);
+            worldQuestButton.gameObject.SetActive(worldQuestExpanded);
+            worldQuestButton.transform.SetSiblingIndex(
+                worldQuestHeaderButton.transform.GetSiblingIndex() + 1);
+            ScheduleItemLayout();
         }
 
         private void ToggleGroup(QuestGroup group)
@@ -224,6 +297,19 @@ namespace CryingSnow.StackCraft
                 }
                 return (header, body);
             }
+            if (item is WorldQuestViewModel worldQuest)
+            {
+                string body = worldQuest.Description;
+                body += $"\n\n当前目标：{worldQuest.ObjectiveText}";
+                if (worldQuest.Status is WorldQuestStatus.Active or
+                    WorldQuestStatus.ReadyToTurnIn)
+                {
+                    body +=
+                        $"\n进度：{worldQuest.CurrentAmount} / " +
+                        $"{worldQuest.RequiredAmount}";
+                }
+                return (worldQuest.Title, body);
+            }
 
             return ("", "");
         }
@@ -232,6 +318,8 @@ namespace CryingSnow.StackCraft
         {
             if (item is QuestInstance questInstance)
                 return questInstance.QuestData.Id;
+            if (item is WorldQuestViewModel worldQuest)
+                return worldQuest.QuestId;
 
             return null;
         }

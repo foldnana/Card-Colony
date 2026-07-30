@@ -257,6 +257,246 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void ProtagonistRules_DownedHeroCannotUseNormalLocationReturn()
+        {
+            Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type rulesType = FindType("CryingSnow.StackCraft.ProtagonistRules");
+            object gameData = Activator.CreateInstance(gameDataType);
+            object protagonist = CreateCardData(
+                cardDataType,
+                "traveler",
+                "hero-id");
+            gameDataType.GetField("ProtagonistPersistentId")
+                .SetValue(gameData, "hero-id");
+            GetPartyMembers(gameDataType, gameData).Add(protagonist);
+            MethodInfo canLeave = RequireMethod(
+                rulesType,
+                "CanLeaveLocationNormally",
+                gameDataType);
+
+            cardDataType.GetField("IsDowned").SetValue(protagonist, true);
+            Assert.That(
+                canLeave.Invoke(null, new[] { gameData }),
+                Is.False);
+
+            cardDataType.GetField("IsDowned").SetValue(protagonist, false);
+            Assert.That(
+                canLeave.Invoke(null, new[] { gameData }),
+                Is.True);
+        }
+
+        [Test]
+        public void ProtagonistRecovery_SelectsMedicineInsteadOfOrdinaryFood()
+        {
+            Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type backpackDataType = FindType(
+                "CryingSnow.StackCraft.BackpackData");
+            Type backpackEntryType = FindType(
+                "CryingSnow.StackCraft.BackpackEntryData");
+            Type recoveryType = FindType(
+                "CryingSnow.StackCraft.ProtagonistRecoveryService");
+            object gameData = Activator.CreateInstance(gameDataType);
+            object backpack = gameDataType.GetField("Backpack").GetValue(gameData);
+            IList entries = (IList)backpackDataType.GetField("Entries")
+                .GetValue(backpack);
+            object foodEntry = CreateBackpackEntry(
+                backpackEntryType,
+                cardDataType,
+                "food-entry",
+                "berry");
+            object medicineEntry = CreateBackpackEntry(
+                backpackEntryType,
+                cardDataType,
+                "medicine-entry",
+                "medicine");
+            entries.Add(foodEntry);
+            entries.Add(medicineEntry);
+
+            object result = RequireMethod(
+                    recoveryType,
+                    "FindRescueMedicineEntry",
+                    gameDataType)
+                .Invoke(null, new[] { gameData });
+
+            Assert.That(result, Is.SameAs(medicineEntry));
+        }
+
+        [Test]
+        public void ProtagonistRetreat_AppliesTimeAndCoinCostAndRevivesHero()
+        {
+            Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type backpackDataType = FindType(
+                "CryingSnow.StackCraft.BackpackData");
+            Type backpackEntryType = FindType(
+                "CryingSnow.StackCraft.BackpackEntryData");
+            Type retreatType = FindType(
+                "CryingSnow.StackCraft.ProtagonistRetreatService");
+            object gameData = Activator.CreateInstance(gameDataType);
+            object protagonist = CreateCardData(
+                cardDataType,
+                "traveler",
+                "hero-id");
+            cardDataType.GetField("IsDowned").SetValue(protagonist, true);
+            cardDataType.GetField("CurrentHealth").SetValue(protagonist, 0);
+            cardDataType.GetField("MaximumHealth").SetValue(protagonist, 15);
+            gameDataType.GetField("ProtagonistPersistentId")
+                .SetValue(gameData, "hero-id");
+            gameDataType.GetField("WorldElapsedHours")
+                .SetValue(gameData, 47L);
+            GetPartyMembers(gameDataType, gameData).Add(protagonist);
+
+            object backpack = gameDataType.GetField("Backpack").GetValue(gameData);
+            IList entries = (IList)backpackDataType.GetField("Entries")
+                .GetValue(backpack);
+            for (int index = 0; index < 5; index++)
+            {
+                entries.Add(CreateBackpackEntry(
+                    backpackEntryType,
+                    cardDataType,
+                    $"coin-{index}",
+                    "coin-definition"));
+            }
+            entries.Add(CreateBackpackEntry(
+                backpackEntryType,
+                cardDataType,
+                "berry-entry",
+                "berry"));
+
+            object result = RequireMethod(
+                    retreatType,
+                    "Apply",
+                    gameDataType,
+                    typeof(string),
+                    typeof(int),
+                    typeof(int))
+                .Invoke(
+                    null,
+                    new object[]
+                    {
+                        gameData,
+                        "coin-definition",
+                        6,
+                        3
+                    });
+
+            Assert.That(
+                result.GetType().GetProperty("Succeeded").GetValue(result),
+                Is.True);
+            Assert.That(
+                result.GetType().GetProperty("HoursLost").GetValue(result),
+                Is.EqualTo(6));
+            Assert.That(
+                result.GetType().GetProperty("CoinsLost").GetValue(result),
+                Is.EqualTo(3));
+            Assert.That(
+                gameDataType.GetField("WorldElapsedHours").GetValue(gameData),
+                Is.EqualTo(53L));
+            Assert.That(
+                gameDataType.GetField("WorldDay").GetValue(gameData),
+                Is.EqualTo(3));
+            Assert.That(
+                cardDataType.GetField("IsDowned").GetValue(protagonist),
+                Is.False);
+            Assert.That(
+                cardDataType.GetField("CurrentHealth").GetValue(protagonist),
+                Is.EqualTo(1));
+            Assert.That(entries.Count, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void ProtagonistChronicle_CapturesFinalRunSummary()
+        {
+            Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type chronicleServiceType = FindType(
+                "CryingSnow.StackCraft.ProtagonistChronicleService");
+            object gameData = Activator.CreateInstance(gameDataType);
+            object protagonist = CreateCardData(
+                cardDataType,
+                "traveler",
+                "hero-id");
+            cardDataType.GetField("Level").SetValue(protagonist, 4);
+            cardDataType.GetField("CurrentHealth").SetValue(protagonist, 0);
+            cardDataType.GetField("IsDowned").SetValue(protagonist, true);
+            gameDataType.GetField("SlotNumber").SetValue(gameData, 2);
+            gameDataType.GetField("ActiveLocationId")
+                .SetValue(gameData, "whispering-forest");
+            gameDataType.GetField("WorldDay").SetValue(gameData, 7);
+            gameDataType.GetField("ProtagonistPersistentId")
+                .SetValue(gameData, "hero-id");
+            GetPartyMembers(gameDataType, gameData).Add(protagonist);
+            GetPartyMembers(gameDataType, gameData).Add(
+                CreateCardData(cardDataType, "guard", "guard-id"));
+
+            object chronicle = RequireMethod(
+                    chronicleServiceType,
+                    "Create",
+                    gameDataType,
+                    typeof(string))
+                .Invoke(null, new[] { gameData, "战斗重伤" });
+            Type chronicleType = chronicle.GetType();
+
+            Assert.That(
+                chronicleType.GetField("SlotNumber").GetValue(chronicle),
+                Is.EqualTo(2));
+            Assert.That(
+                chronicleType.GetField("ProtagonistLevel").GetValue(chronicle),
+                Is.EqualTo(4));
+            Assert.That(
+                chronicleType.GetField("WorldDay").GetValue(chronicle),
+                Is.EqualTo(7));
+            Assert.That(
+                chronicleType.GetField("LocationId").GetValue(chronicle),
+                Is.EqualTo("whispering-forest"));
+            Assert.That(
+                chronicleType.GetField("PartySize").GetValue(chronicle),
+                Is.EqualTo(2));
+            Assert.That(
+                chronicleType.GetField("DeathCause").GetValue(chronicle),
+                Is.EqualTo("战斗重伤"));
+        }
+
+        [Test]
+        public void ProgressionFeedback_DescribesEveryLevelUpStatChange()
+        {
+            Type feedbackType = FindType(
+                "CryingSnow.StackCraft.CharacterProgressionFeedback");
+            string message = (string)RequireMethod(
+                    feedbackType,
+                    "BuildLevelUpMessage",
+                    typeof(string),
+                    typeof(int),
+                    typeof(int))
+                .Invoke(null, new object[] { "旅行者", 1, 3 });
+
+            Assert.That(message, Does.Contain("旅行者升到 3 级"));
+            Assert.That(message, Does.Contain("最大生命 +4"));
+            Assert.That(message, Does.Contain("攻击 +1"));
+            Assert.That(message, Does.Contain("防御 +1"));
+        }
+
+        [Test]
+        public void ProgressionFeedback_BuildsReadableExperienceBar()
+        {
+            Type feedbackType = FindType(
+                "CryingSnow.StackCraft.CharacterProgressionFeedback");
+            string bar = (string)RequireMethod(
+                    feedbackType,
+                    "BuildExperienceBar",
+                    typeof(int),
+                    typeof(int),
+                    typeof(int))
+                .Invoke(null, new object[] { 1, 5, 10 });
+
+            Assert.That(bar, Does.Contain("5/15"));
+            Assert.That(bar.Count(character => character == '■'), Is.EqualTo(3));
+            Assert.That(bar.Count(character => character == '□'), Is.EqualTo(7));
+        }
+
+        [Test]
         public void GameData_UpdatePartyMembers_PreservesHeroWhenActiveCaptureMissesIt()
         {
             Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
@@ -334,6 +574,25 @@ namespace CardColony.Tests
             cardDataType.GetField("Id").SetValue(data, definitionId);
             cardDataType.GetField("PersistentId").SetValue(data, persistentId);
             return data;
+        }
+
+        private static object CreateBackpackEntry(
+            Type backpackEntryType,
+            Type cardDataType,
+            string instanceId,
+            string definitionId)
+        {
+            object entry = Activator.CreateInstance(backpackEntryType);
+            backpackEntryType.GetField("InstanceId").SetValue(
+                entry,
+                instanceId);
+            backpackEntryType.GetField("Card").SetValue(
+                entry,
+                CreateCardData(
+                    cardDataType,
+                    definitionId,
+                    $"{instanceId}-card"));
+            return entry;
         }
 
         private static IList GetPartyMembers(Type gameDataType, object gameData)

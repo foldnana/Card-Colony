@@ -2910,7 +2910,9 @@ namespace CardColony.Tests
 
                 MethodInfo showParty = statusView.GetType().GetMethod("ShowParty");
                 Assert.That(showParty, Is.Not.Null);
-                showParty.Invoke(statusView, new object[] { card, "河湾村", "驻扎中", 1 });
+                showParty.Invoke(
+                    statusView,
+                    new object[] { card, "河湾村", "驻扎中", 1, null });
 
                 Assert.That(
                     FindDescendant(uiInstance, "InfoPanel").GetComponent<CanvasGroup>().alpha,
@@ -2918,7 +2920,7 @@ namespace CardColony.Tests
                 Assert.That(panel.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
                 Assert.That(
                     FindDescendant(panel.gameObject, "PartyName").GetComponent<TMPro.TMP_Text>().text,
-                    Is.EqualTo("旅行小队"));
+                    Is.EqualTo("主角小队  Lv.1"));
                 Assert.That(
                     FindDescendant(panel.gameObject, "PartyHealthText").GetComponent<TMPro.TMP_Text>().text,
                     Does.Contain("12/15"));
@@ -3522,6 +3524,23 @@ namespace CardColony.Tests
                 "Awake",
                 BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(bootstrap, null);
 
+            System.Type gameDirectorType =
+                FindType("CryingSnow.StackCraft.GameDirector");
+            PropertyInfo directorInstanceProperty =
+                gameDirectorType.GetProperty(
+                    "Instance",
+                    BindingFlags.Public | BindingFlags.Static);
+            object existingDirector =
+                directorInstanceProperty?.GetValue(null);
+            PropertyInfo gameDataProperty =
+                gameDirectorType.GetProperty("GameData");
+            object previousGameData =
+                existingDirector == null
+                    ? null
+                    : gameDataProperty.GetValue(existingDirector);
+            if (existingDirector != null)
+                gameDataProperty.SetValue(existingDirector, null);
+
             Component party = null;
             try
             {
@@ -3573,6 +3592,10 @@ namespace CardColony.Tests
             }
             finally
             {
+                if (existingDirector != null)
+                    gameDataProperty.SetValue(
+                        existingDirector,
+                        previousGameData);
                 DestroyTestCard(party);
                 bootstrap.GetType().GetMethod(
                     "OnDestroy",
@@ -6786,7 +6809,9 @@ namespace CardColony.Tests
                     LogType.Error,
                     new System.Text.RegularExpressions.Regex("Destroy may not be called from edit mode!"));
                 locationStack.GetType().GetMethod("DestroyCard")
-                    .Invoke(locationStack, new object[] { locationCard });
+                    .Invoke(
+                        locationStack,
+                        new object[] { locationCard, false });
 
                 Assert.That(partyCard == null, Is.False,
                     "地点卡销毁前必须先释放小队，不能把独立小队栈作为子对象一起删除");

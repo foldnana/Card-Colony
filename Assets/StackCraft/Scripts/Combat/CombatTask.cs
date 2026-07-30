@@ -194,7 +194,11 @@ namespace CryingSnow.StackCraft
             // --- CLEANUP & RESOLUTION ---
             if (defender.CurrentHealth <= 0)
             {
-                AwardDefeatExperience(defender);
+                bool creditedToPlayerParty =
+                    AwardDefeatExperience(defender);
+                WorldQuestRuntime.Instance?.ReportEnemyDefeated(
+                    defender.Definition?.Id,
+                    creditedToPlayerParty);
                 Attackers.Remove(defender);
                 Defenders.Remove(defender);
                 _combatants.Remove(defender);
@@ -215,13 +219,13 @@ namespace CryingSnow.StackCraft
             }
         }
 
-        private void AwardDefeatExperience(CardInstance defeatedCard)
+        private bool AwardDefeatExperience(CardInstance defeatedCard)
         {
             if (defeatedCard?.Definition == null ||
                 defeatedCard.Definition.Faction != CardFaction.Mob ||
                 defeatedCard.Definition.ExperienceReward <= 0)
             {
-                return;
+                return false;
             }
 
             CardInstance protagonist = _participants.FirstOrDefault(
@@ -230,7 +234,10 @@ namespace CryingSnow.StackCraft
             {
                 GameDirector.Instance?.GrantProtagonistExperience(
                     defeatedCard.Definition.ExperienceReward);
+                return true;
             }
+
+            return false;
         }
         #endregion
 
