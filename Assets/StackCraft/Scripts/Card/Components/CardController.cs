@@ -26,7 +26,11 @@ namespace CryingSnow.StackCraft
     }
 
     [RequireComponent(typeof(CardInstance))]
-    public class CardController : MonoBehaviour, IPointerDownHandler, IPointerUpHandler
+    public class CardController : MonoBehaviour,
+        IPointerDownHandler,
+        IPointerUpHandler,
+        IBeginDragHandler,
+        IDragHandler
     {
         // Component References
         private CardInstance _card;
@@ -39,6 +43,7 @@ namespace CryingSnow.StackCraft
         private Vector3 _dragStartPosition;
         private Vector2 _dragScreenOffset;
         private bool _backpackBridgeActive;
+        private bool _interactionWithdrawalPending;
 
         // Helper Properties
         private bool isEquipped => _equipmentComponent != null && _equipmentComponent.IsEquipped;
@@ -72,9 +77,28 @@ namespace CryingSnow.StackCraft
         public void OnPointerDown(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
-            if (!InputManager.Instance.IsInputEnabled) return;
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            bool canWithdrawFromInteraction =
+                interaction?.CanWithdrawPlayerCard(_card) == true;
+            bool inputAllowsPointerDown =
+                InputManager.Instance.IsInputEnabled ||
+                (canWithdrawFromInteraction &&
+                 InputManager.Instance.IsInputEnabledExcept(interaction));
+            if (!inputAllowsPointerDown)
+            {
+                return;
+            }
 
             _backpackBridgeActive = false;
+            _interactionWithdrawalPending = false;
+
+            if (canWithdrawFromInteraction)
+            {
+                _interactionWithdrawalPending = true;
+                return;
+            }
+
             WorldMapLocation.NotifyCardClicked(_card);
             LocationEntrance.NotifyCardClicked(_card);
             MarketProductVendor.NotifyCardClicked(_card);
@@ -120,6 +144,45 @@ namespace CryingSnow.StackCraft
             }
 
             // 3. Handle Standard Drag (Stack Splitting)
+            BeginStandardDrag();
+        }
+
+        public void OnBeginDrag(PointerEventData eventData)
+        {
+            if (eventData.button != PointerEventData.InputButton.Left ||
+                !_interactionWithdrawalPending)
+            {
+                return;
+            }
+
+            _interactionWithdrawalPending = false;
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            if (interaction == null ||
+                !InputManager.Instance.IsInputEnabledExcept(interaction) ||
+                !interaction.TryWithdrawPlayerCard(_card) ||
+                !CanBeDragged)
+            {
+                return;
+            }
+
+            foreach (ICardDragStartHandler handler in
+                     GetComponents<ICardDragStartHandler>())
+            {
+                handler.HandleDragStarted(_card);
+            }
+
+            BeginStandardDrag();
+        }
+
+        public void OnDrag(PointerEventData eventData)
+        {
+            // Drag motion remains frame-driven in Update. Implementing this
+            // interface makes Unity dispatch OnBeginDrag for withdrawal.
+        }
+
+        private void BeginStandardDrag()
+        {
             _card.IsBeingDragged = true;
             _dragStartPosition = transform.position;
 
@@ -209,6 +272,7 @@ namespace CryingSnow.StackCraft
         public void OnPointerUp(PointerEventData eventData)
         {
             if (eventData.button != PointerEventData.InputButton.Left) return;
+            _interactionWithdrawalPending = false;
             if (!_card.IsBeingDragged) return;
 
             _card.IsBeingDragged = false;

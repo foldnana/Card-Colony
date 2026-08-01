@@ -24,6 +24,16 @@ namespace CryingSnow.StackCraft
             }
         }
 
+        public bool IsInputEnabledExcept(object allowedRequester)
+        {
+            foreach (object requester in inputLocks)
+            {
+                if (!ReferenceEquals(requester, allowedRequester))
+                    return false;
+            }
+            return true;
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this)

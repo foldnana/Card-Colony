@@ -485,6 +485,38 @@ namespace CryingSnow.StackCraft
                 (card == initiator || card == target);
         }
 
+        public bool CanWithdrawPlayerCard(CardInstance card)
+        {
+            return IsActive &&
+                IsPlayerInvolved &&
+                !autonomous &&
+                card != null &&
+                card == player &&
+                card == initiator &&
+                !card.IsDowned &&
+                (card.Definition == null ||
+                 card.Definition.PlayerDraggable);
+        }
+
+        public bool TryWithdrawPlayerCard(CardInstance card)
+        {
+            if (!CanWithdrawPlayerCard(card))
+                return false;
+
+            Vector3 withdrawalPosition =
+                card.transform.position.Flatten();
+            initiatorReturnPosition = withdrawalPosition;
+            EndInteraction();
+
+            if (card.Stack == null)
+                return false;
+
+            card.Stack.SetTargetPosition(
+                withdrawalPosition,
+                instant: true);
+            return true;
+        }
+
         private void SetState(NpcInteractionState state)
         {
             if (State == state)

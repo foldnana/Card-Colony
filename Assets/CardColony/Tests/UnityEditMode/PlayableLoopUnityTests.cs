@@ -5037,6 +5037,226 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void CardController_DraggingPlayerOutOfNpcInteractionUsesWithdrawalPath()
+        {
+            System.Type cardType =
+                FindType("CryingSnow.StackCraft.CardInstance");
+            System.Type controllerType =
+                FindType("CryingSnow.StackCraft.CardController");
+            System.Type interactionType =
+                FindType("CryingSnow.StackCraft.NpcInteractionManager");
+
+            Assert.That(
+                typeof(IBeginDragHandler).IsAssignableFrom(controllerType),
+                Is.True,
+                "The controller must wait for an actual drag gesture before ending NPC interaction.");
+            Assert.That(
+                typeof(IDragHandler).IsAssignableFrom(controllerType),
+                Is.True,
+                "Unity only assigns pointerDrag to an IDragHandler, so OnBeginDrag alone is not reachable.");
+            Assert.That(
+                controllerType.GetMethod(
+                    "OnBeginDrag",
+                    new[] { typeof(PointerEventData) }),
+                Is.Not.Null);
+            Assert.That(
+                controllerType.GetMethod(
+                    "OnDrag",
+                    new[] { typeof(PointerEventData) }),
+                Is.Not.Null);
+            Assert.That(
+                interactionType.GetMethod(
+                    "CanWithdrawPlayerCard",
+                    new[] { cardType }),
+                Is.Not.Null);
+            Assert.That(
+                interactionType.GetMethod(
+                    "TryWithdrawPlayerCard",
+                    new[] { cardType }),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void NpcInteractionManager_WithdrawsOnlyThePlayerFromCurrentPosition()
+        {
+            EditorSceneManager.OpenScene(
+                "Assets/StackCraft/Scenes/Location.unity",
+                OpenSceneMode.Single);
+            string[] singletonTypes =
+            {
+                "CryingSnow.StackCraft.Board",
+                "CryingSnow.StackCraft.InputManager",
+                "CryingSnow.StackCraft.CardManager",
+                "CryingSnow.StackCraft.CombatManager",
+                "CryingSnow.StackCraft.DialogueManager"
+            };
+            foreach (string typeName in singletonTypes)
+            {
+                MonoBehaviour component = Object
+                    .FindObjectsOfType<MonoBehaviour>(true)
+                    .First(item => item.GetType().FullName == typeName);
+                component.GetType()
+                    .GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(component, null);
+            }
+
+            Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
+            Object chiefDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_VillageChief.asset");
+            Component player = CreateUninitializedCard(
+                playerDefinition,
+                "Interaction Withdrawal Player");
+            Component chief = CreateUninitializedCard(
+                chiefDefinition,
+                "Interaction Withdrawal Chief");
+            try
+            {
+                System.Type traderType =
+                    FindType("CryingSnow.StackCraft.NpcTrader");
+                Component trader = chief.gameObject.AddComponent(traderType);
+                traderType.GetMethod(
+                        "Configure",
+                        new[] { chief.GetType() })
+                    .Invoke(trader, new object[] { chief });
+                player.GetType().GetProperty("Size")
+                    .SetValue(player, Vector2.one);
+                chief.GetType().GetProperty("Size")
+                    .SetValue(chief, Vector2.one);
+                SetTestCardStackPosition(
+                    player,
+                    new Vector3(-0.2f, 0f, 0f));
+                SetTestCardStackPosition(
+                    chief,
+                    new Vector3(0.2f, 0f, 0f));
+
+                System.Type cardManagerType =
+                    FindType("CryingSnow.StackCraft.CardManager");
+                object cardManager = cardManagerType
+                    .GetProperty("Instance").GetValue(null);
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        player.GetType().GetProperty("Stack")
+                            .GetValue(player)
+                    });
+                cardManagerType.GetMethod("RegisterStack").Invoke(
+                    cardManager,
+                    new[]
+                    {
+                        chief.GetType().GetProperty("Stack")
+                            .GetValue(chief)
+                    });
+
+                System.Type interactionType =
+                    FindType("CryingSnow.StackCraft.NpcInteractionManager");
+                object interaction = interactionType
+                    .GetProperty("Instance").GetValue(null);
+                Assert.That(
+                    interactionType.GetMethod("StartInteraction")
+                        .Invoke(
+                            interaction,
+                            new object[] { player, chief }),
+                    Is.True);
+
+                object interactionRect = interactionType
+                    .GetProperty("InteractionRect")
+                    .GetValue(interaction);
+                Vector3 interactionPosition = (Vector3)interactionRect
+                    .GetType().GetMethod("GetLayoutPosition")
+                    .Invoke(interactionRect, new object[] { player });
+                player.GetType().GetMethod("SetTargetInstant")
+                    .Invoke(
+                        player,
+                        new object[] { interactionPosition, true });
+                interactionType.GetMethod("Tick")
+                    .Invoke(interaction, new object[] { 0.1f });
+
+                Assert.That(
+                    traderType.GetProperty("IsSelected")
+                        .GetValue(trader),
+                    Is.True);
+                System.Type controllerType =
+                    FindType("CryingSnow.StackCraft.CardController");
+                Component controller =
+                    player.gameObject.AddComponent(controllerType);
+                controllerType.GetMethod(
+                        "Awake",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .Invoke(controller, null);
+                controllerType.GetMethod(
+                        "OnPointerDown",
+                        new[] { typeof(PointerEventData) })
+                    .Invoke(
+                        controller,
+                        new object[]
+                        {
+                            new PointerEventData(EventSystem.current)
+                            {
+                                button = PointerEventData.InputButton.Left
+                            }
+                        });
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.True,
+                    "A click without a drag must keep the interaction active.");
+                Assert.That(
+                    traderType.GetProperty("IsSelected")
+                        .GetValue(trader),
+                    Is.True,
+                    "A click without a drag must not clear the active NPC panel.");
+
+                Assert.That(
+                    interactionType.GetMethod("CanWithdrawPlayerCard")
+                        .Invoke(interaction, new object[] { player }),
+                    Is.True);
+                Assert.That(
+                    interactionType.GetMethod("CanWithdrawPlayerCard")
+                        .Invoke(interaction, new object[] { chief }),
+                    Is.False,
+                    "The fixed NPC card must never become draggable through the withdrawal path.");
+                Assert.That(
+                    interactionType.GetMethod("TryWithdrawPlayerCard")
+                        .Invoke(interaction, new object[] { player }),
+                    Is.True);
+                Assert.That(
+                    interactionType.GetProperty("IsActive")
+                        .GetValue(interaction),
+                    Is.False);
+
+                object restoredPlayerStack = player.GetType()
+                    .GetProperty("Stack").GetValue(player);
+                Assert.That(restoredPlayerStack, Is.Not.Null);
+                Vector3 restoredPosition = (Vector3)restoredPlayerStack
+                    .GetType().GetProperty("TargetPosition")
+                    .GetValue(restoredPlayerStack);
+                Assert.That(
+                    Vector2.Distance(
+                        new Vector2(
+                            restoredPosition.x,
+                            restoredPosition.z),
+                        new Vector2(
+                            interactionPosition.x,
+                            interactionPosition.z)),
+                    Is.LessThan(0.01f),
+                    "Withdrawal must continue the drag from the displayed interaction slot instead of snapping home first.");
+                Assert.That(
+                    chief.GetType().GetProperty("Stack")
+                        .GetValue(chief),
+                    Is.Not.Null);
+            }
+            finally
+            {
+                DestroyTestCard(player);
+                DestroyTestCard(chief);
+            }
+        }
+
+        [Test]
         public void DialogueManager_StartAndEndMovesCardsThroughInteractionRectWithoutCombat()
         {
             EditorSceneManager.OpenScene("Assets/StackCraft/Scenes/Location.unity", OpenSceneMode.Single);
@@ -5260,17 +5480,35 @@ namespace CardColony.Tests
                 MethodInfo addScopedLock = inputType.GetMethod(
                     "AddLock",
                     new[] { typeof(object), typeof(bool) });
+                MethodInfo isInputEnabledExcept = inputType.GetMethod(
+                    "IsInputEnabledExcept",
+                    new[] { typeof(object) });
                 Assert.That(addScopedLock, Is.Not.Null,
                     "输入锁需要区分允许镜头的对话锁与完全禁止输入的硬锁");
+                Assert.That(
+                    isInputEnabledExcept,
+                    Is.Not.Null,
+                    "Interaction withdrawal must not bypass unrelated modal locks.");
 
                 addScopedLock.Invoke(input, new[] { dialogueLock, (object)true });
                 Assert.That(inputType.GetProperty("IsInputEnabled").GetValue(input), Is.False);
                 Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.True,
                     "对话期间卡牌输入仍应锁定，但地图拖动与缩放应可用");
+                Assert.That(
+                    isInputEnabledExcept.Invoke(
+                        input,
+                        new[] { dialogueLock }),
+                    Is.True);
 
                 addScopedLock.Invoke(input, new[] { hardLock, (object)false });
                 Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.False,
                     "转场等硬锁存在时不能被对话的镜头权限绕过");
+                Assert.That(
+                    isInputEnabledExcept.Invoke(
+                        input,
+                        new[] { dialogueLock }),
+                    Is.False,
+                    "The NPC interaction lock cannot bypass a concurrent hard lock.");
 
                 inputType.GetMethod("RemoveLock").Invoke(input, new[] { hardLock });
                 Assert.That(inputType.GetProperty("IsCameraInputEnabled").GetValue(input), Is.True);
