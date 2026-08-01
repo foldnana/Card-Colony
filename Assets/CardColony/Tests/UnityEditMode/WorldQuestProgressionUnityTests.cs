@@ -28,11 +28,17 @@ namespace CardColony.Tests
             Type serviceType = FindType(
                 "CryingSnow.StackCraft.WorldQuestProgressionService");
             object gameData = Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("ActiveLocationId")
+                .SetValue(gameData, "riverbend");
             IList states = GetQuestStates(gameDataType, gameData);
             object duplicate = Activator.CreateInstance(stateType);
             stateType.GetField("QuestId").SetValue(duplicate, QuestId);
             states.Add(duplicate);
-            states.Add(Activator.CreateInstance(stateType));
+            object secondDuplicate = Activator.CreateInstance(stateType);
+            stateType.GetField("QuestId").SetValue(
+                secondDuplicate,
+                QuestId);
+            states.Add(secondDuplicate);
 
             object state = RequireMethod(
                     serviceType,
@@ -56,7 +62,7 @@ namespace CardColony.Tests
             Assert.That(
                 gameDataType.GetField("WorldQuestStateVersion")
                     .GetValue(gameData),
-                Is.EqualTo(1));
+                Is.EqualTo(2));
         }
 
         [Test]
@@ -112,6 +118,9 @@ namespace CardColony.Tests
                 Is.False,
                 "NPC-only kills must not progress the main quest.");
             Assert.That(fixture.ReportDefeat(SlimeId, true), Is.True);
+            Assert.That(fixture.Status, Is.EqualTo("Active"));
+            Assert.That(fixture.ObjectiveIndex, Is.EqualTo(3));
+            Assert.That(fixture.ReportTalk(VillageChiefId), Is.True);
             Assert.That(fixture.Status, Is.EqualTo("ReadyToTurnIn"));
             Assert.That(fixture.ObjectiveIndex, Is.EqualTo(3));
             Assert.That(
@@ -146,6 +155,7 @@ namespace CardColony.Tests
             fixture.ReportPurchase(MarketId, CommodityId, true, 1);
             fixture.ReportLocation(ForestId);
             fixture.ReportDefeat(SlimeId, true);
+            fixture.ReportTalk(VillageChiefId);
 
             Assert.That(fixture.CanTurnIn("other-npc"), Is.False);
             Assert.That(fixture.TryComplete("other-npc"), Is.False);
@@ -163,6 +173,8 @@ namespace CardColony.Tests
             Type rewardServiceType = FindType(
                 "CryingSnow.StackCraft.WorldQuestRewardService");
             object gameData = Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("ActiveLocationId")
+                .SetValue(gameData, "riverbend");
 
             Assert.That(
                 InvokeStaticBool(
@@ -224,6 +236,7 @@ namespace CardColony.Tests
             fixture.ReportPurchase(MarketId, CommodityId, true, 1);
             fixture.ReportLocation(ForestId);
             fixture.ReportDefeat(SlimeId, true);
+            fixture.ReportTalk(VillageChiefId);
 
             Assert.That(
                 InvokeStaticBool(
@@ -235,7 +248,7 @@ namespace CardColony.Tests
                     typeof(string)),
                 Is.True);
             Assert.That(CountBackpackCards(gameDataType, gameData,
-                "4bda315463bf4b73b63f1d232fb522e4"), Is.EqualTo(10));
+                "4bda315463bf4b73b63f1d232fb522e4"), Is.EqualTo(18));
             Assert.That(
                 cardDataType.GetField("Experience").GetValue(protagonist),
                 Is.EqualTo(0));
@@ -257,7 +270,7 @@ namespace CardColony.Tests
                     typeof(string)),
                 Is.False);
             Assert.That(CountBackpackCards(gameDataType, gameData,
-                "4bda315463bf4b73b63f1d232fb522e4"), Is.EqualTo(10));
+                "4bda315463bf4b73b63f1d232fb522e4"), Is.EqualTo(18));
             Assert.That(
                 cardDataType.GetField("Experience").GetValue(protagonist),
                 Is.EqualTo(0));
@@ -317,6 +330,8 @@ namespace CardColony.Tests
             Type serviceType = FindType(
                 "CryingSnow.StackCraft.WorldQuestProgressionService");
             object gameData = Activator.CreateInstance(gameDataType);
+            gameDataType.GetField("ActiveLocationId")
+                .SetValue(gameData, "riverbend");
             InvokeStaticBool(
                 serviceType,
                 "TryAccept",
@@ -333,7 +348,7 @@ namespace CardColony.Tests
             Assert.That(
                 gameDataType.GetField("WorldQuestStateVersion")
                     .GetValue(restored),
-                Is.EqualTo(1));
+                Is.EqualTo(2));
             Assert.That(
                 GetQuestStates(gameDataType, restored).Count,
                 Is.EqualTo(1));
@@ -550,12 +565,44 @@ namespace CardColony.Tests
                 stateType = FindType(
                     "CryingSnow.StackCraft.WorldQuestStateData");
                 this.gameData = gameData;
+                gameDataType.GetField("ActiveLocationId")
+                    .SetValue(gameData, "riverbend");
+                EnsureTestProtagonist(gameDataType, gameData);
                 RequireMethod(
                         serviceType,
                         "EnsureQuestState",
                         gameDataType,
                         typeof(string))
                     .Invoke(null, new[] { gameData, (object)QuestId });
+            }
+
+            private static void EnsureTestProtagonist(
+                Type gameDataType,
+                object gameData)
+            {
+                IList party = (IList)gameDataType.GetField("PartyMembers")
+                    .GetValue(gameData);
+                if (party.Count > 0)
+                    return;
+                Type cardDataType = FindType(
+                    "CryingSnow.StackCraft.CardData");
+                object protagonist = Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id").SetValue(
+                    protagonist,
+                    "traveler");
+                cardDataType.GetField("PersistentId").SetValue(
+                    protagonist,
+                    "test-protagonist");
+                cardDataType.GetField("Level").SetValue(protagonist, 1);
+                cardDataType.GetField("CurrentHealth").SetValue(
+                    protagonist,
+                    15);
+                cardDataType.GetField("MaximumHealth").SetValue(
+                    protagonist,
+                    15);
+                gameDataType.GetField("ProtagonistPersistentId")
+                    .SetValue(gameData, "test-protagonist");
+                party.Add(protagonist);
             }
 
             public int ObjectiveIndex =>
@@ -631,6 +678,16 @@ namespace CardColony.Tests
                     typeof(string),
                     typeof(string),
                     typeof(bool));
+            }
+
+            public bool ReportTalk(string npcId)
+            {
+                return InvokeBool(
+                    "ReportNpcTalked",
+                    new[] { gameData, (object)QuestId, npcId },
+                    gameDataType,
+                    typeof(string),
+                    typeof(string));
             }
 
             public bool CanTurnIn(string npcId)

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2333d6b4a2b6224cb5f997181f50f88, type: 3}
+  m_Name: WorldQuestReasons
+  m_EditorClassIdentifier: 
+  reasons:
+  - reasonId: story_conflict
+    displayText: '剧情选择与该任务产生了冲突。'
+  - reasonId: world_changed
+    displayText: '世界状态已改变，该任务暂时无法继续。'
+  - reasonId: failed_requirement
+    displayText: '任务的必要条件已经无法完成。'
+  - reasonId: cancelled_by_outcome
+    displayText: '其他任务的结局使该任务不再成立。'

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace CryingSnow.StackCraft
@@ -12,6 +13,8 @@ namespace CryingSnow.StackCraft
 
         private CardInstance player;
         private CardInstance npc;
+        private string activeWorldQuestId;
+        private string activeWorldQuestOutcomeId;
 
         public bool IsActive { get; private set; }
         public CardInstance Player => player;
@@ -142,42 +145,97 @@ namespace CryingSnow.StackCraft
 
         private bool TryShowWorldQuestDialogue()
         {
-            if (npc?.Definition?.Id !=
-                    RiverbendForestQuestRules.GiverNpcId ||
-                WorldQuestRuntime.Instance == null)
+            WorldQuestRuntime runtime = WorldQuestRuntime.Instance;
+            string npcId = npc?.Definition?.Id;
+            if (runtime == null || string.IsNullOrWhiteSpace(npcId))
             {
                 return false;
             }
 
-            const string questId = RiverbendForestQuestRules.QuestId;
-            WorldQuestViewModel quest =
-                WorldQuestRuntime.Instance.GetViewModel(questId);
+            runtime.ResolveNpcInteraction(
+                npcId,
+                GameDirector.Instance?.GameData?.ActiveLocationId ??
+                string.Empty);
+            IReadOnlyList<WorldQuestViewModel> interactions =
+                runtime.GetNpcInteractions(npcId);
+            if (interactions.Count == 0)
+                return false;
+            if (interactions.Count > 1)
+            {
+                ShowWorldQuestSelection(interactions, 0);
+                return true;
+            }
+
+            return ShowWorldQuestInteraction(interactions[0]);
+        }
+
+        private void ShowWorldQuestSelection(
+            IReadOnlyList<WorldQuestViewModel> interactions,
+            int index)
+        {
+            int safeIndex = Mathf.Clamp(index, 0, interactions.Count - 1);
+            string titles = "这里有多项事务与你有关：\n\n" +
+                string.Join("\n", interactions.Select((item, itemIndex) =>
+                    $"{(itemIndex == safeIndex ? "▶" : "•")} " +
+                    item.Title));
+            WorldQuestViewModel selected = interactions[safeIndex];
+            bool hasNext = safeIndex + 1 < interactions.Count;
+            dialoguePanel.ShowQuest(
+                npc.Definition,
+                titles,
+                $"查看：{selected.Title}",
+                () => ShowWorldQuestInteraction(selected),
+                hasNext ? "下一个" : "告辞",
+                hasNext
+                    ? () => ShowWorldQuestSelection(
+                        interactions,
+                        safeIndex + 1)
+                    : EndDialogue);
+        }
+
+        private bool ShowWorldQuestInteraction(WorldQuestViewModel quest)
+        {
+            WorldQuestRuntime runtime = WorldQuestRuntime.Instance;
+            WorldQuestDefinition definition = runtime.GetDefinition(
+                quest.QuestId);
+            if (definition == null)
+                return false;
+            activeWorldQuestId = quest.QuestId;
             switch (quest.Status)
             {
                 case WorldQuestStatus.Available:
                     dialoguePanel.ShowQuest(
                         npc.Definition,
-                        "最近低语森林里总有奇怪的动静。\n" +
-                        "去市场准备一点吃的，再替村里看看发生了什么。",
-                        "接受委托",
+                        definition.Dialogue.OfferText,
+                        definition.Dialogue.AcceptLabel,
                         AcceptWorldQuest,
-                        "暂不接受",
+                        definition.Dialogue.DeclineLabel,
                         EndDialogue);
                     return true;
                 case WorldQuestStatus.ReadyToTurnIn:
-                    dialoguePanel.ShowQuest(
-                        npc.Definition,
-                        "你平安回来就好。森林里的魔物越来越不安分了。\n" +
-                        "这份报酬收下吧，之后也许还有事情要拜托你。",
-                        "汇报调查结果",
-                        TurnInWorldQuest,
-                        "稍后再说",
-                        EndDialogue);
+                    IReadOnlyList<WorldQuestOutcomeDefinition> outcomes =
+                        runtime.GetEligibleOutcomes(quest.QuestId);
+                    if (outcomes.Count > 1)
+                        ShowWorldQuestOutcomeSelection(quest, outcomes, 0);
+                    else
+                        ShowWorldQuestOutcomeConfirmation(
+                            quest,
+                            outcomes.FirstOrDefault());
                     return true;
                 case WorldQuestStatus.Active:
                     dialoguePanel.ShowQuest(
                         npc.Definition,
-                        GetActiveQuestReminder(quest.ObjectiveIndex),
+                        definition.FindStage(quest.StageId)
+                            ?.ActiveReminderText ?? quest.ObjectiveText,
+                        null,
+                        null,
+                        "告辞",
+                        EndDialogue);
+                    return true;
+                case WorldQuestStatus.Suspended:
+                    dialoguePanel.ShowQuest(
+                        npc.Definition,
+                        definition.Dialogue.SuspendedText,
                         null,
                         null,
                         "告辞",
@@ -186,7 +244,25 @@ namespace CryingSnow.StackCraft
                 case WorldQuestStatus.Completed:
                     dialoguePanel.ShowQuest(
                         npc.Definition,
-                        "多亏了你的调查，村里能提前做好防备。路上多加小心。",
+                        definition.Dialogue.CompletedText,
+                        null,
+                        null,
+                        "告辞",
+                        EndDialogue);
+                    return true;
+                case WorldQuestStatus.Failed:
+                    dialoguePanel.ShowQuest(
+                        npc.Definition,
+                        definition.Dialogue.FailedText,
+                        null,
+                        null,
+                        "告辞",
+                        EndDialogue);
+                    return true;
+                case WorldQuestStatus.Cancelled:
+                    dialoguePanel.ShowQuest(
+                        npc.Definition,
+                        definition.Dialogue.CancelledText,
                         null,
                         null,
                         "告辞",
@@ -197,16 +273,65 @@ namespace CryingSnow.StackCraft
             }
         }
 
+        private void ShowWorldQuestOutcomeSelection(
+            WorldQuestViewModel quest,
+            IReadOnlyList<WorldQuestOutcomeDefinition> outcomes,
+            int index)
+        {
+            int safeIndex = Mathf.Clamp(index, 0, outcomes.Count - 1);
+            string choices = "请选择这次任务的处理方式：\n\n" +
+                string.Join("\n", outcomes.Select((outcome, itemIndex) =>
+                    $"{(itemIndex == safeIndex ? "▶" : "•")} " +
+                    outcome.ChoiceLabel));
+            WorldQuestOutcomeDefinition selected = outcomes[safeIndex];
+            bool hasNext = safeIndex + 1 < outcomes.Count;
+            dialoguePanel.ShowQuest(
+                npc.Definition,
+                choices,
+                selected.ChoiceLabel,
+                () => ShowWorldQuestOutcomeConfirmation(quest, selected),
+                hasNext ? "下一个" : "暂不决定",
+                hasNext
+                    ? () => ShowWorldQuestOutcomeSelection(
+                        quest,
+                        outcomes,
+                        safeIndex + 1)
+                    : EndDialogue);
+        }
+
+        private void ShowWorldQuestOutcomeConfirmation(
+            WorldQuestViewModel quest,
+            WorldQuestOutcomeDefinition outcome)
+        {
+            WorldQuestDefinition definition = WorldQuestRuntime.Instance
+                ?.GetDefinition(quest.QuestId);
+            activeWorldQuestId = quest.QuestId;
+            activeWorldQuestOutcomeId = outcome?.OutcomeId;
+            dialoguePanel.ShowQuest(
+                npc.Definition,
+                outcome?.ResolutionText ?? quest.ObjectiveText,
+                outcome?.ChoiceLabel ?? definition?.Dialogue.TurnInLabel,
+                outcome == null ? null : TurnInWorldQuest,
+                definition?.Dialogue.PostponeLabel ?? "暂不决定",
+                EndDialogue);
+        }
+
         private void AcceptWorldQuest()
         {
             if (!IsActive)
                 return;
 
-            bool accepted = WorldQuestRuntime.Instance?.TryAccept(
-                RiverbendForestQuestRules.QuestId) == true;
+            WorldQuestOperationResult result =
+                WorldQuestRuntime.Instance?.TryAccept(activeWorldQuestId) ??
+                WorldQuestOperationResult.Fail(
+                    WorldQuestResultCode.NotInitialized,
+                    activeWorldQuestId,
+                    string.Empty);
             dialoguePanel?.ShowResponse(
-                accepted
-                    ? "带上这些金币和药品。先去河湾市场买一份粮食，再去低语森林调查。"
+                result.Success
+                    ? WorldQuestRuntime.Instance
+                        ?.GetDefinition(activeWorldQuestId)
+                        ?.Dialogue.AcceptedText
                     : "委托暂时无法登记，请稍后再试。");
         }
 
@@ -215,27 +340,18 @@ namespace CryingSnow.StackCraft
             if (!IsActive)
                 return;
 
-            bool completed = WorldQuestRuntime.Instance?.TryTurnIn(
-                RiverbendForestQuestRules.QuestId,
-                RiverbendForestQuestRules.GiverNpcId) == true;
+            WorldQuestRuntime runtime = WorldQuestRuntime.Instance;
+            WorldQuestOperationResult result = runtime?.TryTurnIn(
+                activeWorldQuestId,
+                activeWorldQuestOutcomeId) ??
+                WorldQuestOperationResult.Fail(
+                    WorldQuestResultCode.NotInitialized,
+                    activeWorldQuestId,
+                    string.Empty);
             dialoguePanel?.ShowResponse(
-                completed
+                result.Success
                     ? "辛苦了。这份报酬是你应得的。"
                     : "调查记录还不完整，准备好后再来找我。");
-        }
-
-        private static string GetActiveQuestReminder(int objectiveIndex)
-        {
-            return objectiveIndex switch
-            {
-                RiverbendForestQuestRules.PurchaseObjectiveIndex =>
-                    "先去河湾市场准备一份粮食，再出发去森林。",
-                RiverbendForestQuestRules.EnterForestObjectiveIndex =>
-                    "补给准备好了就去低语森林，注意路上的动静。",
-                RiverbendForestQuestRules.DefeatSlimeObjectiveIndex =>
-                    "低语森林就在村外。查清制造异响的魔物。",
-                _ => "调查清楚后回来告诉我结果。"
-            };
         }
 
         public bool IsCardInDialogue(CardInstance card)
@@ -277,6 +393,8 @@ namespace CryingSnow.StackCraft
             dialoguePanel?.Hide();
             player = null;
             npc = null;
+            activeWorldQuestId = null;
+            activeWorldQuestOutcomeId = null;
         }
 
         private static bool IsPlayerCharacter(CardInstance card)

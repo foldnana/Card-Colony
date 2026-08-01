@@ -12,6 +12,7 @@ namespace CryingSnow.StackCraft
 
         public event System.Action<SceneData, bool> OnSceneDataReady;
         public event System.Action<GameData> OnBeforeSave;
+        public event System.Action<GameData> OnAfterSave;
         public event System.Action<CharacterProgressionNotification>
             OnProtagonistProgressed;
 
@@ -78,6 +79,11 @@ namespace CryingSnow.StackCraft
                 bool wasLoaded = GameData.TryGetScene(out SceneData sceneData);
                 OnSceneDataReady?.Invoke(sceneData, wasLoaded);
                 WorldQuestRuntime.Instance?.Initialize(GameData);
+                if (!string.IsNullOrWhiteSpace(GameData.ActiveLocationId))
+                {
+                    WorldQuestRuntime.Instance?.ReportLocationEntered(
+                        GameData.ActiveLocationId);
+                }
                 WorldQuestRuntime.Instance?.HandleSceneLoaded();
             }
         }
@@ -128,6 +134,7 @@ namespace CryingSnow.StackCraft
             string fileName = $"SaveSlot{GameData.SlotNumber:D3}";
             SaveSystem.SaveData<GameData>(GameData, fileName);
             SavedGames.TryAdd(fileName, GameData);
+            OnAfterSave?.Invoke(GameData);
         }
 
         /// <summary>
@@ -167,7 +174,6 @@ namespace CryingSnow.StackCraft
                 enteringFromLocation
                     ? LocationTransitionReason.ChildLocationEntry
                     : LocationTransitionReason.WorldMapEntry);
-            WorldQuestRuntime.Instance?.ReportLocationEntered(locationId);
             StartCoroutine(TravelSequence(locationScene, null));
             return true;
         }
@@ -312,6 +318,11 @@ namespace CryingSnow.StackCraft
                     protagonistData.Level,
                     protagonistData.Experience,
                     message));
+            if (protagonistData.Level != previousLevel)
+            {
+                WorldQuestRuntime.Instance?.ReportProtagonistLevelChanged(
+                    protagonistData.Level);
+            }
             return result;
         }
 

@@ -12,43 +12,208 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b27af4ed6f4149418ccbb5600e4508e1, type: 3}
   m_Name: WorldQuest_RiverbendWhisperingForest
   m_EditorClassIdentifier:
+  schemaVersion: 2
   id: story_riverbend_whispering_forest_01
+  category: 0
+  priority: 100
   title: "\u6797\u95F4\u5F02\u54CD"
   description: "\u4F4E\u8BED\u68EE\u6797\u4E2D\u4F20\u6765\u4E86\u5F02\u5E38\u52A8\u9759\uFF0C\u6751\u957F\u8BF7\u4F60\u505A\u597D\u51C6\u5907\u540E\u524D\u5F80\u8C03\u67E5\u3002"
+  visibility: 0
+  startMode: 0
+  turnInMode: 0
+  repeatPolicy: 0
+  cooldownHours: 24
+  defaultTracked: 1
   giverNpcId: riverbend-village-chief
   acceptLocationId: riverbend
-  objectives:
-  - type: 0
-    targetId: food
-    contextId: riverbend-market
-    requiredAmount: 1
-    text: "\u5728\u6CB3\u6E7E\u5E02\u573A\u8D2D\u4E701\u4EFD\u7CAE\u98DF"
-  - type: 1
-    targetId: whispering-forest
-    contextId:
-    requiredAmount: 1
-    text: "\u524D\u5F80\u4F4E\u8BED\u68EE\u6797"
-  - type: 2
-    targetId: 366be2e0e40c4b4d93229a94ae7133ae
-    contextId: whispering-forest
-    requiredAmount: 1
-    text: "\u51FB\u8D251\u53EA\u53F2\u83B1\u59C6"
-  - type: 3
-    targetId: riverbend-village-chief
-    contextId: riverbend
-    requiredAmount: 1
-    text: "\u8FD4\u56DE\u6CB3\u6E7E\u6751\u5411\u6751\u957F\u6C47\u62A5"
-  acceptanceRewards:
-  - cardDefinitionId: 4bda315463bf4b73b63f1d232fb522e4
-    cardAmount: 8
-    protagonistExperience: 0
-  - cardDefinitionId: medicine
-    cardAmount: 1
-    protagonistExperience: 0
-  completionRewards:
-  - cardDefinitionId: 4bda315463bf4b73b63f1d232fb522e4
-    cardAmount: 10
-    protagonistExperience: 0
-  - cardDefinitionId:
-    cardAmount: 0
-    protagonistExperience: 10
+  turnInNpcIds:
+  - riverbend-village-chief
+  entryStageId: prepare_supplies
+  hardStartConditions:
+    mode: 0
+    invertResult: 0
+    conditions: []
+  availabilityConditions:
+    mode: 0
+    invertResult: 0
+    conditions: []
+  acceptConditions:
+    mode: 0
+    invertResult: 0
+    conditions: []
+  onAcceptEffects:
+  - effectId: grant_acceptance_coins
+    type: 0
+    targetId: 4bda315463bf4b73b63f1d232fb522e4
+    secondaryTargetId:
+    intValue: 8
+    boolValue: 0
+    stringValue:
+    reasonId:
+    notification:
+  - effectId: grant_acceptance_medicine
+    type: 0
+    targetId: medicine
+    secondaryTargetId:
+    intValue: 1
+    boolValue: 0
+    stringValue:
+    reasonId:
+    notification:
+  stages:
+  - stageId: prepare_supplies
+    title: "\u51C6\u5907\u8865\u7ED9"
+    objectiveSummary: "\u5728\u6CB3\u6E7E\u5E02\u573A\u8D2D\u4E701\u4EFD\u7CAE\u98DF"
+    activeReminderText: "\u5148\u53BB\u6CB3\u6E7E\u5E02\u573A\u51C6\u5907\u4E00\u4EFD\u7CAE\u98DF\u3002"
+    completionMode: 0
+    objectives:
+    - objectiveId: buy_food
+      type: 1
+      targetId: food
+      secondaryTargetId:
+      contextId: riverbend-market
+      requiredAmount: 1
+      progressMode: 0
+      actorRequirement: 1
+      optional: 0
+      showProgress: 1
+      displayText: "\u5728\u6CB3\u6E7E\u5E02\u573A\u8D2D\u4E701\u4EFD\u7CAE\u98DF"
+    onEnterEffects: []
+    onCompleteEffects: []
+    transitions:
+    - transitionId: prepare_to_travel
+      priority: 0
+      conditions:
+        mode: 0
+        invertResult: 0
+        conditions: []
+      requiredChoiceId:
+      targetStageId: travel_to_forest
+  - stageId: travel_to_forest
+    title: "\u524D\u5F80\u68EE\u6797"
+    objectiveSummary: "\u524D\u5F80\u4F4E\u8BED\u68EE\u6797"
+    activeReminderText: "\u51C6\u5907\u5B8C\u6210\u540E\u524D\u5F80\u4F4E\u8BED\u68EE\u6797\u3002"
+    completionMode: 0
+    objectives:
+    - objectiveId: enter_whispering_forest
+      type: 3
+      targetId: whispering-forest
+      secondaryTargetId:
+      contextId:
+      requiredAmount: 1
+      progressMode: 0
+      actorRequirement: 1
+      optional: 0
+      showProgress: 0
+      displayText: "\u524D\u5F80\u4F4E\u8BED\u68EE\u6797"
+    onEnterEffects: []
+    onCompleteEffects: []
+    transitions:
+    - transitionId: travel_to_investigate
+      priority: 0
+      conditions:
+        mode: 0
+        invertResult: 0
+        conditions: []
+      requiredChoiceId:
+      targetStageId: investigate_forest
+  - stageId: investigate_forest
+    title: "\u8C03\u67E5\u5F02\u54CD"
+    objectiveSummary: "\u51FB\u8D251\u53EA\u53F2\u83B1\u59C6"
+    activeReminderText: "\u5728\u4F4E\u8BED\u68EE\u6797\u51FB\u8D25\u53F2\u83B1\u59C6\uFF0C\u627E\u51FA\u5F02\u54CD\u6765\u6E90\u3002"
+    completionMode: 0
+    objectives:
+    - objectiveId: defeat_slime
+      type: 4
+      targetId: 366be2e0e40c4b4d93229a94ae7133ae
+      secondaryTargetId:
+      contextId: whispering-forest
+      requiredAmount: 1
+      progressMode: 0
+      actorRequirement: 2
+      optional: 0
+      showProgress: 1
+      displayText: "\u51FB\u8D251\u53EA\u53F2\u83B1\u59C6"
+    onEnterEffects: []
+    onCompleteEffects: []
+    transitions:
+    - transitionId: investigate_to_report
+      priority: 0
+      conditions:
+        mode: 0
+        invertResult: 0
+        conditions: []
+      requiredChoiceId:
+      targetStageId: report_to_chief
+  - stageId: report_to_chief
+    title: "\u5411\u6751\u957F\u6C47\u62A5"
+    objectiveSummary: "\u8FD4\u56DE\u6CB3\u6E7E\u6751\u5411\u6751\u957F\u6C47\u62A5"
+    activeReminderText: "\u8FD4\u56DE\u6CB3\u6E7E\u6751\uFF0C\u628A\u68EE\u6797\u4E2D\u7684\u53D1\u73B0\u544A\u8BC9\u6751\u957F\u3002"
+    completionMode: 0
+    objectives:
+    - objectiveId: talk_to_chief
+      type: 0
+      targetId: riverbend-village-chief
+      secondaryTargetId:
+      contextId: riverbend
+      requiredAmount: 1
+      progressMode: 0
+      actorRequirement: 0
+      optional: 0
+      showProgress: 0
+      displayText: "\u8FD4\u56DE\u6CB3\u6E7E\u6751\u5411\u6751\u957F\u6C47\u62A5"
+    onEnterEffects: []
+    onCompleteEffects: []
+    transitions: []
+  outcomes:
+  - outcomeId: threat_reported
+    priority: 0
+    isDefault: 1
+    choiceLabel: "\u6C47\u62A5\u68EE\u6797\u5F02\u5E38"
+    resolutionText: "\u3010\u4EFB\u52A1\u5B8C\u6210\uFF1A\u6797\u95F4\u5F02\u54CD\u3011\n\u83B7\u5F9710\u679A\u91D1\u5E01\u548C10\u70B9\u7ECF\u9A8C\u3002"
+    selectionConditions:
+      mode: 0
+      invertResult: 0
+      conditions: []
+    turnInConditions:
+      mode: 0
+      invertResult: 0
+      conditions:
+      - conditionId: turn_in_at_riverbend
+        type: 7
+        comparison: 0
+        targetId: riverbend
+        stringValue:
+        intValue: 0
+        boolValue: 0
+        questStatusValue: 0
+    effects:
+    - effectId: grant_completion_coins
+      type: 0
+      targetId: 4bda315463bf4b73b63f1d232fb522e4
+      secondaryTargetId:
+      intValue: 10
+      boolValue: 0
+      stringValue:
+      reasonId:
+      notification:
+    - effectId: grant_completion_experience
+      type: 1
+      targetId:
+      secondaryTargetId:
+      intValue: 10
+      boolValue: 0
+      stringValue:
+      reasonId:
+      notification:
+  dialogue:
+    offerText: "\u4F4E\u8BED\u68EE\u6797\u6700\u8FD1\u4E0D\u592A\u5BF9\u52B2\u3002\u4F60\u5148\u53BB\u5E02\u573A\u51C6\u5907\u4E00\u4EFD\u7CAE\u98DF\uFF0C\u518D\u53BB\u67E5\u770B\u3002"
+    acceptLabel: "\u63A5\u53D7\u59D4\u6258"
+    declineLabel: "\u6682\u4E0D\u63A5\u53D7"
+    acceptedText: "\u5148\u53BB\u6CB3\u6E7E\u5E02\u573A\u4E70\u4E00\u4EFD\u7CAE\u98DF\u3002"
+    suspendedText: "\u8FD9\u4EF6\u4E8B\u73B0\u5728\u8FD8\u65E0\u6CD5\u7EE7\u7EED\u3002"
+    completedText: "\u8C22\u8C22\u4F60\u5E26\u56DE\u68EE\u6797\u7684\u6D88\u606F\u3002"
+    failedText: "\u8FD9\u6B21\u8C03\u67E5\u6CA1\u80FD\u5B8C\u6210\u3002"
+    cancelledText: "\u60C5\u51B5\u5DF2\u7ECF\u6539\u53D8\uFF0C\u8FD9\u4EFD\u59D4\u6258\u53D6\u6D88\u4E86\u3002"
+    turnInLabel: "\u6C47\u62A5"
+    postponeLabel: "\u7A0D\u540E\u518D\u8BF4"

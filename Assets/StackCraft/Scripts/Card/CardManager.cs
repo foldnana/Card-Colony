@@ -23,6 +23,7 @@ namespace CryingSnow.StackCraft
         {
             currentStats = GetStatsSnapshot();
             OnStatsChanged?.Invoke(currentStats);
+            WorldQuestRuntime.Instance?.ReportInventorySnapshotChanged();
         }
         #endregion
 

@@ -90,7 +90,13 @@ namespace CryingSnow.StackCraft
             }
 
             if (notifyChanges)
+            {
                 NotifyContentsChanged();
+                WorldQuestRuntime.Instance?.ReportCardObtained(
+                    definition.Id,
+                    count,
+                    "backpack");
+            }
             return true;
         }
 
@@ -194,6 +200,15 @@ namespace CryingSnow.StackCraft
 
             CardManager.Instance?.NotifyStatsChanged();
             Changed?.Invoke();
+            foreach (IGrouping<string, CardInstance> group in cards
+                         .Where(value => value.Definition != null)
+                         .GroupBy(value => value.Definition.Id))
+            {
+                WorldQuestRuntime.Instance?.ReportCardObtained(
+                    group.Key,
+                    group.Count(),
+                    "backpack");
+            }
             return true;
         }
 

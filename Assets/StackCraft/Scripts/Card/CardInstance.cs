@@ -191,18 +191,19 @@ namespace CryingSnow.StackCraft
         #region Information & Visuals
         private void HandleWorldQuestChanged(WorldQuestViewModel quest)
         {
-            if (quest.QuestId == RiverbendForestQuestRules.QuestId)
-                RefreshWorldQuestMarker();
+            RefreshWorldQuestMarker();
         }
 
         private void RefreshWorldQuestMarker()
         {
-            bool isQuestNpc = Definition?.Id ==
-                RiverbendForestQuestRules.GiverNpcId;
-            bool visible = isQuestNpc &&
+            string marker = string.Empty;
+            Color markerColor = Color.white;
+            bool visible = Definition != null &&
                 WorldQuestRuntime.Instance != null &&
-                WorldQuestRuntime.Instance.GetViewModel(
-                    RiverbendForestQuestRules.QuestId).ShowsNpcMarker;
+                WorldQuestRuntime.Instance.TryGetNpcMarker(
+                    Definition.Id,
+                    out marker,
+                    out markerColor);
             if (!visible)
             {
                 if (_worldQuestMarker != null)
@@ -216,15 +217,9 @@ namespace CryingSnow.StackCraft
                     titleText,
                     titleText.transform.parent);
                 _worldQuestMarker.name = "WorldQuestMarker";
-                _worldQuestMarker.text = "!";
                 _worldQuestMarker.fontSize =
                     Mathf.Max(titleText.fontSize * 1.4f, 5f);
                 _worldQuestMarker.fontStyle = FontStyles.Bold;
-                _worldQuestMarker.color = new Color32(
-                    255,
-                    204,
-                    64,
-                    255);
                 _worldQuestMarker.alignment =
                     TextAlignmentOptions.Center;
                 _worldQuestMarker.transform.localPosition =
@@ -233,7 +228,11 @@ namespace CryingSnow.StackCraft
             }
 
             if (_worldQuestMarker != null)
+            {
+                _worldQuestMarker.text = marker;
+                _worldQuestMarker.color = markerColor;
                 _worldQuestMarker.gameObject.SetActive(true);
+            }
         }
 
         private (string, string) GetInfo()

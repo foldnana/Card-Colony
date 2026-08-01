@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CryingSnow.StackCraft
 {
@@ -18,9 +19,12 @@ namespace CryingSnow.StackCraft
 
         // Tracks the expanded/collapsed state of each group
         private readonly Dictionary<QuestGroup, bool> groupToggleState = new();
-        private TextButton worldQuestHeaderButton;
-        private TextButton worldQuestButton;
-        private bool worldQuestExpanded = true;
+        private readonly Dictionary<WorldQuestCategory, TextButton>
+            worldQuestHeaderButtons = new();
+        private readonly Dictionary<WorldQuestCategory, List<TextButton>>
+            worldQuestButtons = new();
+        private readonly Dictionary<WorldQuestCategory, bool>
+            worldQuestExpanded = new();
         #endregion
 
         #region Unity & Event Methods
@@ -129,12 +133,7 @@ namespace CryingSnow.StackCraft
 
             groupHeaderButtons.Clear();
             allQuestButtons.Clear();
-            if (worldQuestHeaderButton != null)
-                Destroy(worldQuestHeaderButton.gameObject);
-            if (worldQuestButton != null)
-                Destroy(worldQuestButton.gameObject);
-            worldQuestHeaderButton = null;
-            worldQuestButton = null;
+            ClearWorldQuestButtons();
         }
         #endregion
 
@@ -214,49 +213,95 @@ namespace CryingSnow.StackCraft
 
         private void CreateWorldQuestButtons()
         {
-            if (worldQuestHeaderButton != null)
-                Destroy(worldQuestHeaderButton.gameObject);
-            if (worldQuestButton != null)
-                Destroy(worldQuestButton.gameObject);
-            worldQuestHeaderButton = null;
-            worldQuestButton = null;
+            ClearWorldQuestButtons();
 
             WorldQuestRuntime runtime = WorldQuestRuntime.Instance;
             if (runtime == null)
                 return;
 
-            WorldQuestViewModel quest = runtime.GetViewModel(
-                RiverbendForestQuestRules.QuestId);
-            if (string.IsNullOrWhiteSpace(quest.QuestId))
-                return;
-
-            worldQuestHeaderButton = CreateItemButton(
-                $"主线任务 {(worldQuestExpanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}",
-                "MainStoryGroup",
-                35f);
-            worldQuestHeaderButton.SetColor(headerColor);
-            worldQuestHeaderButton.SetOnClick(() =>
+            IEnumerable<IGrouping<WorldQuestCategory, WorldQuestViewModel>>
+                groups = runtime.GetQuestList()
+                    .Where(quest =>
+                        quest.Status != WorldQuestStatus.Locked ||
+                        quest.Visibility !=
+                        WorldQuestVisibility.HiddenUntilAvailable)
+                    .GroupBy(quest => quest.Category)
+                    .OrderBy(group => group.Key);
+            foreach (IGrouping<WorldQuestCategory, WorldQuestViewModel> group
+                     in groups)
             {
-                worldQuestExpanded = !worldQuestExpanded;
-                if (worldQuestButton != null)
-                    worldQuestButton.gameObject.SetActive(
-                        worldQuestExpanded);
-                worldQuestHeaderButton.SetText(
-                    $"主线任务 {(worldQuestExpanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}");
-                ScheduleItemLayout();
-            });
+                WorldQuestCategory category = group.Key;
+                bool expanded = worldQuestExpanded.TryGetValue(
+                    category,
+                    out bool stored) ? stored : true;
+                worldQuestExpanded[category] = expanded;
+                TextButton header = CreateItemButton(
+                    $"{CategoryTitle(category)} " +
+                    $"{(expanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}",
+                    $"WorldQuestGroup:{category}",
+                    35f);
+                header.SetColor(headerColor);
+                worldQuestHeaderButtons.Add(category, header);
+                var buttons = new List<TextButton>();
+                worldQuestButtons.Add(category, buttons);
+                header.SetOnClick(() => ToggleWorldQuestGroup(category));
 
-            string completed = quest.Status == WorldQuestStatus.Completed
-                ? $" {SYMBOL_COMPLETED}"
-                : string.Empty;
-            worldQuestButton = CreateItemButton(
-                $"{SYMBOL_BULLET} {quest.Title}{completed}",
-                quest,
-                30f);
-            worldQuestButton.gameObject.SetActive(worldQuestExpanded);
-            worldQuestButton.transform.SetSiblingIndex(
-                worldQuestHeaderButton.transform.GetSiblingIndex() + 1);
+                int sibling = header.transform.GetSiblingIndex() + 1;
+                foreach (WorldQuestViewModel quest in group)
+                {
+                    string suffix = quest.Status == WorldQuestStatus.Completed
+                        ? $" {SYMBOL_COMPLETED}"
+                        : string.Empty;
+                    TextButton button = CreateItemButton(
+                        $"{SYMBOL_BULLET} {quest.Title}{suffix}",
+                        quest,
+                        30f);
+                    button.SetOnClick(() =>
+                        WorldQuestRuntime.Instance?.SetTrackedQuest(
+                            quest.QuestId));
+                    button.gameObject.SetActive(expanded);
+                    button.transform.SetSiblingIndex(sibling++);
+                    buttons.Add(button);
+                }
+            }
             ScheduleItemLayout();
+        }
+
+        private void ClearWorldQuestButtons()
+        {
+            foreach (TextButton header in worldQuestHeaderButtons.Values)
+                Destroy(header.gameObject);
+            foreach (TextButton button in worldQuestButtons.Values
+                         .SelectMany(buttons => buttons))
+            {
+                Destroy(button.gameObject);
+            }
+            worldQuestHeaderButtons.Clear();
+            worldQuestButtons.Clear();
+        }
+
+        private void ToggleWorldQuestGroup(WorldQuestCategory category)
+        {
+            bool expanded = !worldQuestExpanded[category];
+            worldQuestExpanded[category] = expanded;
+            foreach (TextButton button in worldQuestButtons[category])
+                button.gameObject.SetActive(expanded);
+            worldQuestHeaderButtons[category].SetText(
+                $"{CategoryTitle(category)} " +
+                $"{(expanded ? SYMBOL_EXPANDED : SYMBOL_COLLAPSED)}");
+            ScheduleItemLayout();
+        }
+
+        private static string CategoryTitle(WorldQuestCategory category)
+        {
+            return category switch
+            {
+                WorldQuestCategory.Main => "主线任务",
+                WorldQuestCategory.Side => "支线任务",
+                WorldQuestCategory.Contract => "委托",
+                WorldQuestCategory.Tutorial => "教学任务",
+                _ => "其他任务"
+            };
         }
 
         private void ToggleGroup(QuestGroup group)
@@ -300,6 +345,7 @@ namespace CryingSnow.StackCraft
             if (item is WorldQuestViewModel worldQuest)
             {
                 string body = worldQuest.Description;
+                body += $"\n\n状态：{StatusTitle(worldQuest.Status)}";
                 body += $"\n\n当前目标：{worldQuest.ObjectiveText}";
                 if (worldQuest.Status is WorldQuestStatus.Active or
                     WorldQuestStatus.ReadyToTurnIn)
@@ -308,6 +354,15 @@ namespace CryingSnow.StackCraft
                         $"\n进度：{worldQuest.CurrentAmount} / " +
                         $"{worldQuest.RequiredAmount}";
                 }
+                if (!string.IsNullOrWhiteSpace(
+                        worldQuest.StatusReasonId))
+                {
+                    body += "\n原因：" + WorldQuestRuntime.Instance
+                        ?.ResolveStatusReason(worldQuest.StatusReasonId);
+                }
+                if (!string.IsNullOrWhiteSpace(worldQuest.OutcomeId))
+                    body += $"\n结局：{worldQuest.OutcomeId}";
+                body += "\n\n点击任务可设为右侧追踪目标。";
                 return (worldQuest.Title, body);
             }
 
@@ -322,6 +377,22 @@ namespace CryingSnow.StackCraft
                 return worldQuest.QuestId;
 
             return null;
+        }
+
+        private static string StatusTitle(WorldQuestStatus status)
+        {
+            return status switch
+            {
+                WorldQuestStatus.Locked => "未解锁",
+                WorldQuestStatus.Available => "可接取",
+                WorldQuestStatus.Active => "进行中",
+                WorldQuestStatus.Suspended => "已中断",
+                WorldQuestStatus.ReadyToTurnIn => "可交付",
+                WorldQuestStatus.Completed => "已完成",
+                WorldQuestStatus.Failed => "失败",
+                WorldQuestStatus.Cancelled => "已取消",
+                _ => status.ToString()
+            };
         }
         #endregion
     }

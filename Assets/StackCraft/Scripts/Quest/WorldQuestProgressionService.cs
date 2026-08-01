@@ -1,75 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
+using UnityEngine;
 
 namespace CryingSnow.StackCraft
 {
-    public static class RiverbendForestQuestRules
-    {
-        public const string QuestId =
-            "story_riverbend_whispering_forest_01";
-        public const string GiverNpcId =
-            "riverbend-village-chief";
-        public const string MarketId = "riverbend-market";
-        public const string CommodityId = "food";
-        public const string ForestLocationId = "whispering-forest";
-        public const string SlimeCardId =
-            "366be2e0e40c4b4d93229a94ae7133ae";
-        public const int PurchaseObjectiveIndex = 0;
-        public const int EnterForestObjectiveIndex = 1;
-        public const int DefeatSlimeObjectiveIndex = 2;
-        public const int ReturnToChiefObjectiveIndex = 3;
-    }
-
+    // Compatibility facade for callers that have not yet moved to
+    // WorldQuestRuntime.ReportEvent. It contains no quest-specific rules.
     public static class WorldQuestProgressionService
     {
+        private static readonly ConditionalWeakTable<
+            GameData,
+            WorldQuestEngine> Engines = new();
+
         public static WorldQuestStateData EnsureQuestState(
             GameData gameData,
             string questId)
         {
             if (gameData == null)
                 throw new ArgumentNullException(nameof(gameData));
-            if (string.IsNullOrWhiteSpace(questId))
-                throw new ArgumentException(
-                    "Quest id is required.",
-                    nameof(questId));
-
-            gameData.WorldQuests ??= new List<WorldQuestStateData>();
-            WorldQuestStateData state = gameData.WorldQuests
-                .FirstOrDefault(candidate =>
-                    candidate != null &&
-                    candidate.QuestId == questId);
+            WorldQuestEngine engine = GetEngine(gameData);
+            WorldQuestStateData state = engine.GetState(questId);
             if (state == null)
-            {
-                state = new WorldQuestStateData
-                {
-                    QuestId = questId,
-                    Status = WorldQuestStatus.Available
-                };
-                gameData.WorldQuests.Add(state);
-            }
-
-            MergeDuplicateStates(gameData.WorldQuests, state);
-            Normalize(state);
-            gameData.WorldQuestStateVersion =
-                GameData.CurrentWorldQuestStateVersion;
-            return state;
+                throw new ArgumentException(
+                    $"Quest definition '{questId}' was not found.",
+                    nameof(questId));
+            return state.Clone();
         }
 
         public static bool TryAccept(GameData gameData, string questId)
         {
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            if (!IsSupportedQuest(questId) ||
-                state.Status != WorldQuestStatus.Available)
-            {
-                return false;
-            }
-
-            state.Status = WorldQuestStatus.Active;
-            state.ObjectiveIndex =
-                RiverbendForestQuestRules.PurchaseObjectiveIndex;
-            state.CurrentAmount = 0;
-            return true;
+            return gameData != null &&
+                   GetEngine(gameData).TryAccept(questId).Success;
         }
 
         public static bool ReportMarketPurchase(
@@ -80,22 +43,24 @@ namespace CryingSnow.StackCraft
             bool playerBuys,
             int quantity)
         {
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            if (!IsActiveObjective(
-                    state,
-                    RiverbendForestQuestRules.PurchaseObjectiveIndex) ||
-                !playerBuys ||
-                quantity <= 0 ||
-                marketId != RiverbendForestQuestRules.MarketId ||
-                commodityId != RiverbendForestQuestRules.CommodityId)
-            {
+            if (gameData == null)
                 return false;
-            }
-
-            Advance(
-                state,
-                RiverbendForestQuestRules.EnterForestObjectiveIndex);
-            return true;
+            return GetEngine(gameData).ReportEvent(new WorldQuestEvent(
+                Guid.NewGuid().ToString("N"),
+                WorldQuestEventType.MarketTradeCommitted,
+                gameData.WorldElapsedHours,
+                gameData.ActiveLocationId,
+                gameData.ProtagonistPersistentId,
+                true,
+                true,
+                commodityId,
+                string.Empty,
+                marketId,
+                quantity,
+                playerBuys
+                    ? WorldQuestTradeDirection.PlayerBuys
+                    : WorldQuestTradeDirection.PlayerSells)).Code ==
+                WorldQuestResultCode.Success;
         }
 
         public static bool ReportLocationEntered(
@@ -103,19 +68,24 @@ namespace CryingSnow.StackCraft
             string questId,
             string locationId)
         {
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            if (!IsActiveObjective(
-                    state,
-                    RiverbendForestQuestRules.EnterForestObjectiveIndex) ||
-                locationId != RiverbendForestQuestRules.ForestLocationId)
-            {
+            if (gameData == null)
                 return false;
-            }
-
-            Advance(
-                state,
-                RiverbendForestQuestRules.DefeatSlimeObjectiveIndex);
-            return true;
+            gameData.ActiveLocationId = locationId;
+            WorldQuestEngine engine = GetEngine(gameData);
+            return engine.ReportEvent(new WorldQuestEvent(
+                Guid.NewGuid().ToString("N"),
+                WorldQuestEventType.LocationEntered,
+                gameData.WorldElapsedHours,
+                locationId,
+                gameData.ProtagonistPersistentId,
+                true,
+                true,
+                locationId,
+                string.Empty,
+                string.Empty,
+                1,
+                WorldQuestTradeDirection.None)).Code ==
+                WorldQuestResultCode.Success;
         }
 
         public static bool ReportEnemyDefeated(
@@ -124,21 +94,54 @@ namespace CryingSnow.StackCraft
             string cardDefinitionId,
             bool creditedToPlayerParty)
         {
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            if (!IsActiveObjective(
-                    state,
-                    RiverbendForestQuestRules.DefeatSlimeObjectiveIndex) ||
-                !creditedToPlayerParty ||
-                cardDefinitionId != RiverbendForestQuestRules.SlimeCardId)
-            {
+            if (gameData == null)
                 return false;
-            }
+            WorldQuestEngine engine = GetEngine(gameData);
+            return engine.ReportEvent(new WorldQuestEvent(
+                Guid.NewGuid().ToString("N"),
+                WorldQuestEventType.CardDefeated,
+                gameData.WorldElapsedHours,
+                gameData.ActiveLocationId,
+                gameData.ProtagonistPersistentId,
+                creditedToPlayerParty,
+                creditedToPlayerParty,
+                cardDefinitionId,
+                string.Empty,
+                string.Empty,
+                1,
+                WorldQuestTradeDirection.None)).Code ==
+                WorldQuestResultCode.Success;
+        }
 
-            state.CurrentAmount = 1;
-            state.ObjectiveIndex =
-                RiverbendForestQuestRules.ReturnToChiefObjectiveIndex;
-            state.Status = WorldQuestStatus.ReadyToTurnIn;
-            return true;
+        public static bool ReportNpcTalked(
+            GameData gameData,
+            string questId,
+            string npcId)
+        {
+            if (gameData == null)
+                return false;
+            WorldQuestEngine engine = GetEngine(gameData);
+            if (engine.Registry.TryGet(
+                    questId,
+                    out WorldQuestDefinition definition) &&
+                !string.IsNullOrWhiteSpace(definition.AcceptLocationId))
+            {
+                gameData.ActiveLocationId = definition.AcceptLocationId;
+            }
+            return engine.ReportEvent(new WorldQuestEvent(
+                Guid.NewGuid().ToString("N"),
+                WorldQuestEventType.NpcTalked,
+                gameData.WorldElapsedHours,
+                gameData.ActiveLocationId,
+                gameData.ProtagonistPersistentId,
+                true,
+                true,
+                npcId,
+                string.Empty,
+                string.Empty,
+                1,
+                WorldQuestTradeDirection.None)).Code ==
+                WorldQuestResultCode.Success;
         }
 
         public static bool CanTurnIn(
@@ -146,12 +149,13 @@ namespace CryingSnow.StackCraft
             string questId,
             string npcId)
         {
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            return IsSupportedQuest(questId) &&
-                   state.Status == WorldQuestStatus.ReadyToTurnIn &&
-                   state.ObjectiveIndex ==
-                   RiverbendForestQuestRules.ReturnToChiefObjectiveIndex &&
-                   npcId == RiverbendForestQuestRules.GiverNpcId;
+            if (gameData == null)
+                return false;
+            WorldQuestEngine engine = GetEngine(gameData);
+            return engine.GetState(questId)?.Status ==
+                       WorldQuestStatus.ReadyToTurnIn &&
+                   engine.Registry.TryGet(questId, out var definition) &&
+                   definition.TurnInNpcIds.Contains(npcId);
         }
 
         public static bool TryComplete(
@@ -161,78 +165,27 @@ namespace CryingSnow.StackCraft
         {
             if (!CanTurnIn(gameData, questId, npcId))
                 return false;
-
-            WorldQuestStateData state = EnsureQuestState(gameData, questId);
-            state.Status = WorldQuestStatus.Completed;
-            state.CurrentAmount = 1;
-            return true;
+            WorldQuestEngine engine = GetEngine(gameData);
+            WorldQuestOutcomeDefinition outcome =
+                engine.GetEligibleOutcomes(questId).FirstOrDefault();
+            return outcome != null &&
+                   engine.TryTurnIn(
+                       questId,
+                       outcome.OutcomeId,
+                       npcId).Success;
         }
 
-        private static bool IsSupportedQuest(string questId)
+        private static WorldQuestEngine GetEngine(GameData gameData)
         {
-            return questId == RiverbendForestQuestRules.QuestId;
-        }
-
-        private static bool IsActiveObjective(
-            WorldQuestStateData state,
-            int objectiveIndex)
-        {
-            return state.Status == WorldQuestStatus.Active &&
-                   state.ObjectiveIndex == objectiveIndex;
-        }
-
-        private static void Advance(
-            WorldQuestStateData state,
-            int nextObjectiveIndex)
-        {
-            state.ObjectiveIndex = nextObjectiveIndex;
-            state.CurrentAmount = 0;
-        }
-
-        private static void Normalize(WorldQuestStateData state)
-        {
-            state.ObjectiveIndex = Math.Max(
-                0,
-                Math.Min(
-                    RiverbendForestQuestRules.ReturnToChiefObjectiveIndex,
-                    state.ObjectiveIndex));
-            state.CurrentAmount = Math.Max(0, state.CurrentAmount);
-            if (state.Status == WorldQuestStatus.Available)
+            return Engines.GetValue(gameData, data =>
             {
-                state.ObjectiveIndex = 0;
-                state.CurrentAmount = 0;
-            }
-        }
-
-        private static void MergeDuplicateStates(
-            List<WorldQuestStateData> states,
-            WorldQuestStateData destination)
-        {
-            for (int index = states.Count - 1; index >= 0; index--)
-            {
-                WorldQuestStateData candidate = states[index];
-                if (candidate == null ||
-                    ReferenceEquals(candidate, destination) ||
-                    candidate.QuestId != destination.QuestId)
-                {
-                    continue;
-                }
-
-                if (candidate.Status > destination.Status ||
-                    candidate.Status == destination.Status &&
-                    candidate.ObjectiveIndex > destination.ObjectiveIndex)
-                {
-                    destination.Status = candidate.Status;
-                    destination.ObjectiveIndex = candidate.ObjectiveIndex;
-                    destination.CurrentAmount = candidate.CurrentAmount;
-                }
-
-                destination.AcceptanceRewardClaimed |=
-                    candidate.AcceptanceRewardClaimed;
-                destination.CompletionRewardClaimed |=
-                    candidate.CompletionRewardClaimed;
-                states.RemoveAt(index);
-            }
+                var engine = new WorldQuestEngine(
+                    data,
+                    (IEnumerable<WorldQuestDefinition>)
+                    Resources.LoadAll<WorldQuestDefinition>("WorldQuests"));
+                engine.Initialize();
+                return engine;
+            });
         }
     }
 }

@@ -150,6 +150,7 @@ namespace CryingSnow.StackCraft
             UpdateTimeScale();
 
             OnDayStarted?.Invoke(CurrentDay);
+            WorldQuestRuntime.Instance?.ReportWorldDayStarted(CurrentDay);
         }
     }
 }

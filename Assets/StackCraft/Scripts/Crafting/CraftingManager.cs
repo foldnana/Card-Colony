@@ -324,6 +324,13 @@ namespace CryingSnow.StackCraft
 
             recipe.Execute(stack);
 
+            if (recipe.ResultingCard != null)
+            {
+                WorldQuestRuntime.Instance?.ReportCardCrafted(
+                    recipe.ResultingCard.Id,
+                    recipe.Id);
+            }
+
             stack.SetCraftingState(false);
             CardManager.Instance?.NotifyStatsChanged();
 
