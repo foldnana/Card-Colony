@@ -35,6 +35,7 @@ namespace CryingSnow.StackCraft
                 .GroupBy(entry => GetVisualGroupKey(entry, isCurrency))
                 .Select(group => new BackpackVisualGroup(
                     group.OrderBy(entry => entry.TableStackOrder)
+                        .ThenBy(entry => entry.InstanceId, StringComparer.Ordinal)
                         .ThenBy(entry => entry.SlotIndex),
                     group.Key.StartsWith("currency:", StringComparison.Ordinal)))
                 .OrderBy(group => group.Representative.SlotIndex)

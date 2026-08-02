@@ -325,6 +325,10 @@ namespace CryingSnow.StackCraft.EditorTools
             Sprite redButton,
             Sprite yellowButton)
         {
+            if (FindDescendant(root, "BackpackSidebarPageV2") != null ||
+                FindDescendant(root, "BackpackDrawerLayoutV1") != null)
+                return;
+
             StyleButton(
                 root,
                 "BackpackButton",

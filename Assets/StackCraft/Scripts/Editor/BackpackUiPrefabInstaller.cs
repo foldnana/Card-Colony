@@ -15,6 +15,11 @@ namespace CryingSnow.StackCraft.EditorTools
         [MenuItem("Tools/StackCraft/Install Backpack Tabletop UI")]
         public static void Install()
         {
+            BackpackDrawerPrefabInstaller.Install();
+        }
+
+        private static void InstallLegacy()
+        {
             GameObject root = PrefabUtility.LoadPrefabContents(UiRootPath);
             try
             {

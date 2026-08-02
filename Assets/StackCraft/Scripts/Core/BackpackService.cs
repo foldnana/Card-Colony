@@ -106,6 +106,19 @@ namespace CryingSnow.StackCraft
             Changed?.Invoke();
         }
 
+        public static bool TryMoveEntry(string instanceId, int targetSlotIndex)
+        {
+            BackpackData backpack = Current;
+            if (backpack == null ||
+                !backpack.TryMoveEntry(instanceId, targetSlotIndex))
+            {
+                return false;
+            }
+
+            Changed?.Invoke();
+            return true;
+        }
+
         public static bool TryStore(CardInstance card, BackpackData backpack)
         {
             return TryStoreInternal(

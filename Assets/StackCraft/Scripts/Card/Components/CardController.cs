@@ -73,6 +73,11 @@ namespace CryingSnow.StackCraft
             }
         }
 
+        private void OnDisable()
+        {
+            BackpackView.Instance?.HideWorldCardDragPreview(_card);
+        }
+
         #region Player Input
         public void OnPointerDown(PointerEventData eventData)
         {
@@ -225,6 +230,10 @@ namespace CryingSnow.StackCraft
 
         private void UpdateDragPosition()
         {
+            BackpackView.Instance?.UpdateWorldCardDragPreview(
+                _card,
+                Input.mousePosition,
+                _dragScreenOffset);
             if (TryResolveBackpackDragPosition(out Vector3 bridgedPosition))
             {
                 MoveDraggedStack(bridgedPosition);
@@ -276,6 +285,7 @@ namespace CryingSnow.StackCraft
             if (!_card.IsBeingDragged) return;
 
             _card.IsBeingDragged = false;
+            BackpackView.Instance?.HideWorldCardDragPreview(_card);
 
             CardManager.Instance?.TurnOffHighlightedCards();
             TradeManager.Instance?.TurnOffHighlightedZones();

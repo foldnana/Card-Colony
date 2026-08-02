@@ -440,7 +440,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void OriginalUiRoot_HasPartyStatusAndEightSlotBackpackTabletop()
+        public void OriginalUiRoot_HasPartyStatusAndEightSlotBackpackSidebarPage()
         {
             GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -461,21 +461,25 @@ namespace CardColony.Tests
             Assert.That(FindDescendant(panel.gameObject, "PartyMembersText"), Is.Not.Null);
             Assert.That(FindDescendant(panel.gameObject, "PartyStateText"), Is.Not.Null);
             Transform backpackRoot = FindDescendant(uiRoot, "BackpackRoot");
-            Assert.That(backpackRoot, Is.Not.Null, "正式 UIRoot 需要常驻的背包入口和小桌面");
+            Assert.That(backpackRoot, Is.Not.Null, "正式 UIRoot 需要背包数据视图");
             Assert.That(
                 backpackRoot.GetComponents<MonoBehaviour>().Any(component =>
                     component.GetType().FullName == "CryingSnow.StackCraft.BackpackView"),
                 Is.True);
-            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackButton"), Is.Not.Null);
-            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackTablePanel"), Is.Not.Null);
-            Transform scrollViewport = FindDescendant(backpackRoot.gameObject, "BackpackScrollViewport");
+            Transform menuPanel = FindDescendant(uiRoot, "MenuPanel");
+            Transform backpackTab = FindDescendant(uiRoot, "BackpackToggle");
+            Transform backpackPage = FindDescendant(uiRoot, "BackpackTablePanel");
+            Assert.That(backpackTab, Is.Not.Null);
+            Assert.That(backpackPage.parent, Is.EqualTo(menuPanel));
+            Assert.That(FindDescendant(uiRoot, "BackpackButton"), Is.Null);
+            Transform scrollViewport = FindDescendant(backpackPage.gameObject, "BackpackScrollViewport");
             Assert.That(scrollViewport, Is.Not.Null);
             Assert.That(scrollViewport.GetComponent<ScrollRect>(), Is.Not.Null);
             Assert.That(scrollViewport.GetComponent<RectMask2D>(), Is.Not.Null);
-            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackCapacityText"), Is.Not.Null);
-            Assert.That(FindDescendant(backpackRoot.gameObject, "BackpackCloseButton"), Is.Not.Null);
+            Assert.That(FindDescendant(backpackPage.gameObject, "BackpackCapacityText"), Is.Not.Null);
+            Assert.That(FindDescendant(uiRoot, "BackpackCloseButton"), Is.Null);
             Assert.That(
-                backpackRoot.GetComponentsInChildren<Transform>(true)
+                backpackPage.GetComponentsInChildren<Transform>(true)
                     .Count(child => child.name.StartsWith("BackpackSlot") &&
                         child.name != "BackpackSlots"),
                 Is.EqualTo(8));
@@ -491,14 +495,8 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void OriginalUiRoot_BackpackTableUsesDedicatedBagBackground()
+        public void OriginalUiRoot_BackpackSidebarMatchesLocationPageBackground()
         {
-            const string backgroundPath =
-                "Assets/StackCraft/Textures/UI/BackpackBackground.png";
-            Sprite expectedBackground = AssetDatabase.LoadAssetAtPath<Sprite>(backgroundPath);
-            Assert.That(expectedBackground, Is.Not.Null,
-                "背包图片需要作为独立的 Sprite 资源导入项目");
-
             GameObject uiRoot = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
             Transform table = FindDescendant(uiRoot, "BackpackTablePanel");
@@ -506,20 +504,17 @@ namespace CardColony.Tests
 
             Image tableImage = table.GetComponent<Image>();
             Assert.That(tableImage, Is.Not.Null);
-            Assert.That(tableImage.enabled, Is.False,
-                "旧的矩形面板图像需要关闭，避免挡住独立背包背景");
+            Assert.That(tableImage.enabled, Is.True);
+            Assert.That(
+                tableImage.sprite,
+                Is.EqualTo(FindDescendant(uiRoot, "LocationView")
+                    .GetComponent<Image>().sprite),
+                "背包页应沿用右侧信息栏的页面背景");
+            Assert.That(tableImage.color.a, Is.GreaterThanOrEqualTo(0.95f));
 
             Transform background = FindDescendant(table.gameObject, "BackpackBackground");
-            Assert.That(background, Is.Not.Null,
-                "背包背景需要作为独立子物体，以便单独调整大小和位置");
-            Image backgroundImage = background.GetComponent<Image>();
-            Assert.That(backgroundImage, Is.Not.Null);
-            Assert.That(backgroundImage.sprite, Is.EqualTo(expectedBackground),
-                "独立背包背景需要引用新的背包图片");
-            Assert.That(backgroundImage.color, Is.EqualTo(Color.white),
-                "背景图不应继续叠加旧的深色染色");
-            Assert.That(backgroundImage.preserveAspect, Is.True,
-                "背包背景需要保持原图比例，避免皮包边框被拉伸");
+            Assert.That(background, Is.Null,
+                "旧皮革背景不能残留在可编辑的右侧背包页中");
         }
 
         [Test]
@@ -538,53 +533,6 @@ namespace CardColony.Tests
                     CaptureBackpackLayout(scenePath),
                     Is.EqualTo(expectedLayout),
                     $"{scenePath} 必须使用和世界地图完全相同的背包布局");
-            }
-        }
-
-        [Test]
-        public void BackpackView_CreatesRaisedThreeDimensionalBoard()
-        {
-            System.Type boardType = FindType("CryingSnow.StackCraft.BackpackBoardView");
-            Assert.That(boardType, Is.Not.Null,
-                "背包打开后应使用独立的三维小桌面，而不是把物品转换成二维卡片");
-
-            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
-                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
-            GameObject uiInstance = Object.Instantiate(prefab);
-            try
-            {
-                Transform root = FindDescendant(uiInstance, "BackpackRoot");
-                Component view = root.GetComponents<MonoBehaviour>().First(component =>
-                    component.GetType().FullName == "CryingSnow.StackCraft.BackpackView");
-                PropertyInfo boardProperty = view.GetType().GetProperty("Board3D");
-                Assert.That(boardProperty, Is.Not.Null);
-
-                Component board = boardProperty.GetValue(view) as Component;
-                if (board == null)
-                {
-                    view.GetType().GetMethod(
-                            "EnsureBoard3D",
-                            BindingFlags.Instance | BindingFlags.NonPublic)
-                        .Invoke(view, null);
-                    board = boardProperty.GetValue(view) as Component;
-                }
-                Assert.That(board, Is.Not.Null);
-                Assert.That(board.transform, Is.Not.TypeOf<RectTransform>(),
-                    "三维背包桌面不能继续依附在屏幕空间 RectTransform 中");
-                Assert.That(
-                    board.GetComponentsInChildren<MeshRenderer>(true),
-                    Is.Not.Empty);
-                Assert.That(
-                    board.GetComponentsInChildren<BoxCollider>(true),
-                    Is.Not.Empty);
-                Assert.That(
-                    (float)boardType.GetProperty("SurfaceHeight").GetValue(board),
-                    Is.GreaterThan(0f),
-                    "背包桌面需要高于地图桌面，形成明确的双层桌面效果");
-            }
-            finally
-            {
-                Object.DestroyImmediate(uiInstance);
             }
         }
 
@@ -1906,7 +1854,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void BackpackOpenButton_TogglesAnOpenedBackpackClosed()
+        public void BackpackView_TogglesItsSidebarPage()
         {
             System.Type viewType = FindType("CryingSnow.StackCraft.BackpackView");
             var viewObject = new GameObject("BackpackViewToggleTest");
@@ -1927,7 +1875,7 @@ namespace CardColony.Tests
                     "Toggle",
                     BindingFlags.Instance | BindingFlags.Public);
                 Assert.That(toggle, Is.Not.Null,
-                    "The same backpack button must be able to open and close the board.");
+                    "BackpackView must still expose programmatic page toggling.");
 
                 viewType.GetMethod("Open").Invoke(view, null);
                 Assert.That(
@@ -1945,55 +1893,19 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void BackpackBoard_KeepsOnlyTheCloseControlOnTheOpenedSurface()
+        public void BackpackSidebar_ReplacesLegacyCloseControlAndThreeDimensionalSurface()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
-            GameObject instance = Object.Instantiate(prefab);
-
-            try
-            {
-                Transform root = FindDescendant(instance, "BackpackRoot");
-                Component view = root.GetComponents<MonoBehaviour>()
-                    .Single(component => component.GetType().FullName ==
-                        "CryingSnow.StackCraft.BackpackView");
-                System.Type viewType = view.GetType();
-                RectTransform panel = viewType.GetField(
-                        "tablePanel",
-                        BindingFlags.Instance | BindingFlags.NonPublic)
-                    .GetValue(view) as RectTransform;
-                Button close = viewType.GetField(
-                        "closeButton",
-                        BindingFlags.Instance | BindingFlags.NonPublic)
-                    .GetValue(view) as Button;
-
-                viewType.GetMethod(
-                        "ConfigureLegacyPanelFor3D",
-                        BindingFlags.Instance | BindingFlags.NonPublic)
-                    .Invoke(view, null);
-                viewType.GetMethod("Open").Invoke(view, null);
-
-                Assert.That(close, Is.Not.Null);
-                Assert.That(close.gameObject.activeSelf, Is.True);
-                Assert.That(
-                    close.transform.parent.GetInstanceID(),
-                    Is.EqualTo(root.GetInstanceID()),
-                    "The close button must follow the 3D board instead of the old side panel.");
-                Assert.That(
-                    panel.GetComponentsInChildren<Graphic>(true)
-                        .All(graphic => !graphic.enabled),
-                    Is.True,
-                    "The legacy title, capacity, background and slot graphics must stay hidden.");
-                Assert.That(
-                    panel.GetComponentsInChildren<Selectable>(true)
-                        .All(selectable => !selectable.gameObject.activeSelf),
-                    Is.True,
-                    "No legacy panel controls should remain beside the backpack.");
-            }
-            finally
-            {
-                Object.DestroyImmediate(instance);
-            }
+            Transform page = FindDescendant(prefab, "BackpackTablePanel");
+            Assert.That(page, Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "BackpackToggle"), Is.Not.Null);
+            Assert.That(FindDescendant(prefab, "BackpackCloseButton"), Is.Null);
+            Assert.That(
+                page.GetComponentsInChildren<Graphic>(true)
+                    .Any(graphic => graphic.enabled),
+                Is.True,
+                "The sidebar page must keep its serialized UI graphics visible.");
         }
 
         [Test]
@@ -2759,7 +2671,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void BackpackView_UsesThreeDimensionalCardsWhenBoardIsAvailable()
+        public void BackpackView_UsesScrollableIconsWithoutCreatingThreeDimensionalBoard()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -2798,44 +2710,37 @@ namespace CardColony.Tests
                 Assert.That(rebuild, Is.Not.Null);
                 rebuild.Invoke(view, new[] { backpack });
 
-                Component board = view.GetType().GetProperty("Board3D").GetValue(view)
-                    as Component;
-                if (board != null)
-                {
-                    Assert.That(
-                        root.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
-                            component.GetType().FullName ==
-                            "CryingSnow.StackCraft.BackpackItemView"),
-                        Is.Zero,
-                        "三维桌面可用时不应再生成二维背包卡");
-                    Assert.That(
-                        FindDescendant(root.gameObject, "BackpackCapacityText")
-                            .GetComponent<TMPro.TMP_Text>().text,
-                        Does.Contain("3/24"));
-                    return;
-                }
+                Assert.That(
+                    view.GetType().GetProperty("Board3D").GetValue(view),
+                    Is.Null,
+                    "图标背包不应再创建覆盖中央操作区的三维桌面");
 
+                Transform backpackPage = FindDescendant(
+                    uiInstance,
+                    "BackpackTablePanel");
                 Assert.That(
-                    root.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
+                    backpackPage.GetComponentsInChildren<MonoBehaviour>(true).Count(component =>
                         component.GetType().FullName == "CryingSnow.StackCraft.BackpackItemView"),
-                    Is.EqualTo(3), "已改名或移除定义的旧物品也需要显示为占位卡，不能成为幽灵物品");
+                    Is.EqualTo(3), "背包条目必须显示为可拖拽图标，不能成为幽灵物品");
                 Assert.That(
-                    FindDescendant(root.gameObject, "BackpackCapacityText")
+                    FindDescendant(backpackPage.gameObject, "BackpackCapacityText")
                         .GetComponent<TMPro.TMP_Text>().text,
                     Does.Contain("3/24"));
                 Assert.That(
-                    root.GetComponentsInChildren<Transform>(true).Count(child =>
+                    backpackPage.GetComponentsInChildren<Transform>(true).Count(child =>
                         child.name.StartsWith("BackpackSlot") &&
                         child.name != "BackpackSlots"),
                     Is.EqualTo(24), "自动扩容后 UI 也必须生成新格子");
-                RectTransform table = (RectTransform)FindDescendant(
-                    root.gameObject,
-                    "BackpackTablePanel");
+                RectTransform table = (RectTransform)backpackPage;
                 RectTransform slots = (RectTransform)FindDescendant(
-                    root.gameObject,
+                    backpackPage.gameObject,
                     "BackpackSlots");
-                Assert.That(table.sizeDelta.y, Is.LessThanOrEqualTo(440f),
-                    "无上限背包不能把桌面面板顶出屏幕");
+                Canvas.ForceUpdateCanvases();
+                Assert.That(
+                    table.rect.height,
+                    Is.EqualTo(((RectTransform)table.parent).rect.height - 60f)
+                        .Within(1f),
+                    "右侧背包抽屉应保持固定高度，不随容量扩展");
                 Assert.That(slots.sizeDelta.y, Is.GreaterThan(440f),
                     "额外格子应扩展滚动内容高度，而不是扩展面板高度");
             }

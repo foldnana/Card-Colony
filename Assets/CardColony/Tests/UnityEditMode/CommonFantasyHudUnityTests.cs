@@ -115,56 +115,53 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void UiRoot_CommonFantasyHudStylesBackpackWithoutReplacingBoard()
+        public void UiRoot_CommonFantasyHudKeepsSerializedBackpackSidebarPage()
         {
-            const string backpackBackgroundPath =
-                "Assets/StackCraft/Textures/UI/BackpackBackground.png";
             GameObject root =
                 AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
             Assert.That(root, Is.Not.Null);
 
-            AssertButton(
-                root,
-                "BackpackButton",
-                "Button_Rectangle_01_Convex_Purple.Png");
-            AssertButton(
-                root,
-                "BackpackCloseButton",
-                "Button_Rectangle_01_Convex_Red.Png");
-            AssertButton(
-                root,
-                "BackpackArrangeButton",
-                "Button_Rectangle_01_Convex_Yellow.Png");
-
-            Transform background = FindDescendant(
-                root.transform,
-                "BackpackBackground");
-            Image backgroundImage = background.GetComponent<Image>();
+            Transform backpackRoot =
+                FindDescendant(root.transform, "BackpackRoot");
             Assert.That(
-                AssetDatabase.GetAssetPath(backgroundImage.sprite),
-                Is.EqualTo(backpackBackgroundPath),
-                "换肤不能替换背包桌面的专用原画。");
-            Assert.That(backgroundImage.color, Is.EqualTo(Color.white));
-            Assert.That(backgroundImage.preserveAspect, Is.True);
+                FindDescendant(backpackRoot, "BackpackSidebarPageV2"),
+                Is.Not.Null,
+                "背包侧栏页面必须直接序列化在 UIRoot.prefab 中。");
+            Transform drawer = FindDescendant(
+                root.transform,
+                "BackpackTablePanel");
+            Image drawerImage = drawer.GetComponent<Image>();
+            Assert.That(drawerImage.enabled, Is.True);
+            Assert.That(
+                drawerImage.sprite,
+                Is.EqualTo(FindDescendant(root.transform, "LocationView")
+                    .GetComponent<Image>().sprite));
+            Assert.That(drawerImage.color.a, Is.GreaterThanOrEqualTo(0.95f));
+            Assert.That(
+                FindDescendant(drawer, "BackpackBackground"),
+                Is.Null,
+                "旧的中央皮革桌面不能残留在右侧抽屉中。");
+            Assert.That(
+                FindDescendant(drawer, "BackpackSelectedDetails"),
+                Is.Not.Null);
 
-            Transform border = FindDescendant(
-                background,
-                "BackpackFantasyBorder");
-            Assert.That(border, Is.Not.Null);
-            AssertSlicedSprite(
-                border.GetComponent<Image>(),
-                ComponentRoot + "Popup/Popup_01_Border.png");
-            Assert.That(border.GetComponent<Image>().raycastTarget, Is.False);
+            Assert.That(FindDescendant(root.transform, "BackpackButton"), Is.Null);
+            Assert.That(FindDescendant(root.transform, "BackpackCloseButton"), Is.Null);
+            Transform arrange = FindDescendant(drawer, "BackpackArrangeButton");
+            Assert.That(arrange.GetComponent<Image>().sprite, Is.Null);
+            Transform backpackTab = FindDescendant(root.transform, "BackpackToggle");
+            Transform locationTab = FindDescendant(root.transform, "LocationToggle");
+            Assert.That(
+                backpackTab.GetComponent<Toggle>().group,
+                Is.SameAs(locationTab.GetComponent<Toggle>().group));
 
             TMP_Text capacity = FindDescendant(
                 root.transform,
                 "BackpackCapacityText").GetComponent<TMP_Text>();
-            Assert.That(capacity.color.r,
-                Is.GreaterThan(capacity.color.b + 0.18f),
-                "背包容量文字需要使用金色。");
+            Assert.That(capacity.color.b,
+                Is.GreaterThanOrEqualTo(capacity.color.r),
+                "背包容量文字应使用清晰的冷白色，而不是旧皮革板金色。");
 
-            Transform backpackRoot =
-                FindDescendant(root.transform, "BackpackRoot");
             MonoBehaviour view = backpackRoot
                 .GetComponents<MonoBehaviour>()
                 .Single(component => component.GetType().FullName ==
@@ -172,22 +169,28 @@ namespace CardColony.Tests
             var serialized = new SerializedObject(view);
             foreach (string property in new[]
                      {
-                         "openButton",
-                         "openButtonLabel",
+                         "tabToggle",
+                         "fallbackToggle",
                          "tablePanel",
                          "capacityLabel",
-                         "closeButton",
-                         "arrangeButton",
-                         "slotsRoot",
-                         "dragLayer"
+                          "arrangeButton",
+                          "slotsRoot",
+                          "dragLayer",
+                          "selectedNameLabel",
+                          "selectedTypeLabel",
+                          "selectedDescriptionLabel"
                      })
             {
                 Assert.That(
                     serialized.FindProperty(property)
                         ?.objectReferenceValue,
                     Is.Not.Null,
-                    $"换肤不能清除 BackpackView.{property} 绑定。");
+                    $"预制体必须保存 BackpackView.{property} 绑定。");
             }
+            Assert.That(serialized.FindProperty("openButton").objectReferenceValue,
+                Is.Null);
+            Assert.That(serialized.FindProperty("closeButton").objectReferenceValue,
+                Is.Null);
         }
 
         [Test]

@@ -85,6 +85,27 @@ namespace CryingSnow.StackCraft
             return Entries.Find(entry => entry != null && entry.InstanceId == instanceId);
         }
 
+        public bool TryMoveEntry(string instanceId, int targetSlotIndex)
+        {
+            Normalize();
+            if (targetSlotIndex < 0 || targetSlotIndex >= SlotCapacity)
+                return false;
+
+            BackpackEntryData source = Find(instanceId);
+            if (source == null)
+                return false;
+            if (source.SlotIndex == targetSlotIndex)
+                return true;
+
+            BackpackEntryData occupant = Entries.Find(entry =>
+                entry != null && entry.SlotIndex == targetSlotIndex);
+            int sourceSlotIndex = source.SlotIndex;
+            source.SlotIndex = targetSlotIndex;
+            if (occupant != null)
+                occupant.SlotIndex = sourceSlotIndex;
+            return true;
+        }
+
         public bool TrySetTablePlacement(
             string instanceId,
             float positionX,

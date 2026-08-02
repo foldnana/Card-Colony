@@ -1535,26 +1535,21 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void UiRoot_InfoPanelSitsAboveBackpackButton()
+        public void UiRoot_BackpackUsesSidebarTabInsteadOfBottomButton()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
-            RectTransform infoPanel = (RectTransform)FindChild(
+            Transform header = FindChild(
                 prefab.transform,
-                "InfoPanel");
-            RectTransform backpackButton = (RectTransform)FindChild(
+                "Header");
+            Transform backpackToggle = FindChild(
                 prefab.transform,
-                "BackpackButton");
+                "BackpackToggle");
 
-            Assert.That(infoPanel, Is.Not.Null);
-            Assert.That(backpackButton, Is.Not.Null);
-            float backpackTop =
-                backpackButton.anchoredPosition.y +
-                backpackButton.rect.height;
-            Assert.That(
-                infoPanel.anchoredPosition.y,
-                Is.GreaterThanOrEqualTo(backpackTop + 10f),
-                "Hover details must sit above the backpack button with a visible gap.");
+            Assert.That(header, Is.Not.Null);
+            Assert.That(backpackToggle, Is.Not.Null);
+            Assert.That(backpackToggle.parent, Is.EqualTo(header));
+            Assert.That(FindChild(prefab.transform, "BackpackButton"), Is.Null);
         }
 
         [Test]
