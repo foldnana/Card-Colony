@@ -44,6 +44,9 @@ namespace CryingSnow.StackCraft
         public Camera OverlayCamera => overlayCamera;
         public RectTransform SlotsRoot => slotsRoot;
         public RectTransform DragLayer => dragLayer;
+        public bool IsPlayerCombatActive => CombatManager.Instance != null &&
+            CombatManager.Instance.ActiveCombats.Any(task =>
+                task.IsOngoing && task.PlayerCombatants.Any());
 
         private BackpackBoardView board3D;
         private Camera overlayCamera;
@@ -574,6 +577,14 @@ namespace CryingSnow.StackCraft
             if (item == null)
                 return;
 
+            if (IsPlayerCombatActive)
+            {
+                TryQueueCombatItem(item.EntryId, screenPosition);
+                DestroyItemDragView(item);
+                Refresh();
+                return;
+            }
+
             bool droppedInsideBackpack = IsOpen &&
                 ContainsScreenPoint(tablePanel, screenPosition);
             if (droppedInsideBackpack &&
@@ -598,13 +609,89 @@ namespace CryingSnow.StackCraft
                 }
             }
 
+            DestroyItemDragView(item);
+
+            Refresh();
+        }
+
+        private static void DestroyItemDragView(BackpackItemView item)
+        {
             item.gameObject.SetActive(false);
             if (Application.isPlaying)
                 Destroy(item.gameObject);
             else
                 DestroyImmediate(item.gameObject);
+        }
 
-            Refresh();
+        public bool TryQueueCombatItem(
+            string entryId,
+            Vector2 screenPosition)
+        {
+            BackpackEntryData entry = BackpackService.Current?.Find(entryId);
+            CardDefinition itemCard = ResolveDefinition(entry?.Card?.Id);
+            CombatItemDefinition item = itemCard?.CombatItemDefinition;
+            if (entry?.Card == null || entry.IsReserved || item == null)
+                return false;
+
+            CombatTask task = CombatFocusService.FocusedCombat;
+            if (task?.IsOngoing != true)
+            {
+                task = CombatManager.Instance?.ActiveCombats.FirstOrDefault(
+                    candidate => candidate.IsOngoing &&
+                        candidate.PlayerCombatants.Any());
+            }
+            if (task == null)
+                return false;
+
+            CardInstance target = FindCombatCardAtScreenPosition(
+                task,
+                screenPosition);
+            if (target == null || target.Definition.Faction != CardFaction.Player)
+                return false;
+            CardInstance actor = target;
+
+            CombatCommandResult result = CombatManager.Instance.TrySubmitCommand(new CombatCommand
+            {
+                SessionId = task.SessionId,
+                Type = CombatCommandType.UseItem,
+                ActorId = actor.PersistentId,
+                TargetId = target.PersistentId,
+                DefinitionId = item.Id,
+                BackpackEntryId = entryId
+            });
+            if (result.Accepted)
+                Refresh();
+            return result.Accepted;
+        }
+
+        private CardInstance FindCombatCardAtScreenPosition(
+            CombatTask task,
+            Vector2 screenPosition)
+        {
+            Camera camera = worldCamera != null ? worldCamera : Camera.main;
+            if (camera == null)
+                return null;
+            Ray ray = camera.ScreenPointToRay(screenPosition);
+            foreach (RaycastHit hit in Physics.RaycastAll(ray, 1000f)
+                         .OrderBy(value => value.distance))
+            {
+                CardInstance hitCard = hit.collider.GetComponentInParent<CardInstance>();
+                if (hitCard?.Combatant?.CurrentCombatTask == task)
+                    return hitCard;
+            }
+
+            return task.PlayerCombatants
+                .Select(card => new
+                {
+                    Card = card,
+                    Distance = Vector2.Distance(
+                        screenPosition,
+                        camera.WorldToScreenPoint(card.transform.position))
+                })
+                .Where(value => value.Distance <= 72f)
+                .OrderBy(value => value.Distance)
+                .Select(value => value.Card)
+                .FirstOrDefault();
         }
 
         private bool TryGetDropSlotIndex(

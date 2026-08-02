@@ -20,6 +20,9 @@ namespace CryingSnow.StackCraft
         public TimePace CurrentPace { get; private set; } = TimePace.Normal;
         public float NormalizedTime => Mathf.Clamp01(currentTime / dayDuration);
         public int CurrentDay { get; private set; } = 1;
+        public int CurrentWorldMinute =>
+            (Mathf.Max(1, CurrentDay) - 1) * 1440 +
+            Mathf.FloorToInt(NormalizedTime * 1440f);
 
         private float dayDuration;
         private float currentTime;

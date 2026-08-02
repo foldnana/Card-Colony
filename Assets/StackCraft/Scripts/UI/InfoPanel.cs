@@ -66,6 +66,9 @@ namespace CryingSnow.StackCraft
         private readonly Dictionary<object, InfoRequest> activeRequests = new();
         private (string header, string body) lastDisplayedInfo;
 
+        public InfoPriority? HighestActivePriority { get; private set; }
+        public event System.Action<InfoPriority?> HighestActivePriorityChanged;
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -170,6 +173,7 @@ namespace CryingSnow.StackCraft
 
         private void RefreshInfo()
         {
+            InfoPriority? previousPriority = HighestActivePriority;
             if (activeRequests.Count > 0)
             {
                 var highestPriorityRequest = activeRequests.Values
@@ -177,15 +181,21 @@ namespace CryingSnow.StackCraft
                     .ThenByDescending(req => req.RequestID)
                     .First();
 
+                HighestActivePriority = highestPriorityRequest.Priority;
+
                 UpdateInfo(highestPriorityRequest.Info);
 
                 SetActionButtons(highestPriorityRequest.Actions);
             }
             else
             {
+                HighestActivePriority = null;
                 ClearInfo();
                 SetActionButtons(null);
             }
+
+            if (previousPriority != HighestActivePriority)
+                HighestActivePriorityChanged?.Invoke(HighestActivePriority);
 
             RebuildLayout();
         }

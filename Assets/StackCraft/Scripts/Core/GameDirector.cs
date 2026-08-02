@@ -61,7 +61,7 @@ namespace CryingSnow.StackCraft
             {
                 if (DayCycleManager.Instance.IsEndingCycle) return;
 
-                SaveGame();
+                SaveGameAtStableCombatBoundary();
             }
         }
         #endregion
@@ -128,6 +128,8 @@ namespace CryingSnow.StackCraft
         public void SaveGame()
         {
             if (GameData == null) return;
+            if (CombatManager.Instance?.DeferSaveIfResolving() == true)
+                return;
             CaptureActiveLocationParty();
             OnBeforeSave?.Invoke(GameData);
             GameData.LastSaved = System.DateTime.Now;
@@ -135,6 +137,12 @@ namespace CryingSnow.StackCraft
             SaveSystem.SaveData<GameData>(GameData, fileName);
             SavedGames.TryAdd(fileName, GameData);
             OnAfterSave?.Invoke(GameData);
+        }
+
+        private void SaveGameAtStableCombatBoundary()
+        {
+            CombatManager.Instance?.FlushResolvingActionsForSave();
+            SaveGame();
         }
 
         /// <summary>
@@ -161,7 +169,7 @@ namespace CryingSnow.StackCraft
 
             bool enteringFromLocation = SceneManager.GetActiveScene().name == locationScene &&
                 !string.IsNullOrWhiteSpace(GameData.ActiveLocationId);
-            SaveGame();
+            SaveGameAtStableCombatBoundary();
             if (enteringFromLocation)
                 GameData.PushLocation(GameData.ActiveLocationId);
             else
@@ -186,7 +194,7 @@ namespace CryingSnow.StackCraft
             if (partyMembers != null)
                 GameData.UpdatePartyMembers(partyMembers);
 
-            SaveGame();
+            SaveGameAtStableCombatBoundary();
             if (GameData.TryPopLocation(out string parentLocationId))
             {
                 GameData.ActiveLocationId = parentLocationId;
@@ -209,7 +217,7 @@ namespace CryingSnow.StackCraft
             if (partyMembers != null)
                 GameData.UpdatePartyMembers(partyMembers);
 
-            SaveGame();
+            SaveGameAtStableCombatBoundary();
             GameData.LocationHistory?.Clear();
             GameData.ActiveLocationId = null;
             StartCoroutine(TravelSequence(defaultScene, null));
@@ -233,7 +241,7 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void BackToTitle()
         {
-            SaveGame();
+            SaveGameAtStableCombatBoundary();
             StartCoroutine(TravelSequence(titleScene, null));
         }
 
@@ -422,7 +430,7 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            SaveGame();
+            SaveGameAtStableCombatBoundary();
 
             string targetScene = targetScenes[(currentIndex + 1) % targetScenes.Count];
 

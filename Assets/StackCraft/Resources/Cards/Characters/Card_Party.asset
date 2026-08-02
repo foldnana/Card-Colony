@@ -11,18 +11,31 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ff53e602cd2085541a74f5a3c45fb3d5, type: 3}
   m_Name: Card_Party
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   id: 0c0b7586468f41d38bd20c99684bd6ad
   displayName: Party
   description: Your traveling party on the world map.
   artTexture: {fileID: 2800000, guid: 333e6e8b7a20f524cb003290b070993b, type: 3}
+  baseTextureOverride: {fileID: 0}
   category: 2
   faction: 1
+  isLocationStatic: 0
+  playerDraggable: 1
+  ambientNpcAiEnabled: 0
+  ambientWanderRadius: 1
+  ambientMoveSpeed: 0.5
+  ambientIdleRange: {x: 2, y: 4}
+  dialogueEnabled: 0
+  dialogueOpeningText: 
+  dialogueReplyText: 
+  dialogueResponseText: 
   combatType: 0
   loot: []
   isAggressive: 0
   aggroRadius: 5
   attackRadius: 1.5
+  produceCard: {fileID: 0}
+  produceInterval: 10
   isSellable: 0
   sellPrice: 0
   hasDurability: 0
@@ -36,6 +49,10 @@ MonoBehaviour:
   dodge: 5
   criticalChance: 5
   criticalMultiplier: 150
+  experienceReward: 0
+  innateCombatSkills: []
+  grantedCombatSkills: []
+  combatItemDefinition: {fileID: 0}
   equipmentSlot: 0
   statModifiers: []
   classChangeResult: {fileID: 0}

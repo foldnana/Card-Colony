@@ -54,8 +54,10 @@ namespace CryingSnow.StackCraft
             !_card.IsDowned &&
             GetComponent<NpcTrader>() == null &&
             (_card.Definition == null || _card.Definition.PlayerDraggable) &&
-            _card.Stack != null &&
-            !_card.Stack.IsLocked;
+            ((inCombat &&
+              _card.Definition?.Faction == CardFaction.Player &&
+              !_combatant.IsAttacking) ||
+             (_card.Stack != null && !_card.Stack.IsLocked));
 
         private void Awake()
         {
@@ -110,6 +112,13 @@ namespace CryingSnow.StackCraft
             MarketCardBuyer.NotifyCardClicked(_card);
             NpcTrader.NotifyCardClicked(_card);
 
+            if (inCombat)
+            {
+                CombatFocusService.Select(_card);
+                if (_card.Definition?.Faction != CardFaction.Player)
+                    return;
+            }
+
             if (!CanBeDragged) return;
 
             foreach (ICardDragStartHandler handler in GetComponents<ICardDragStartHandler>())
@@ -136,8 +145,7 @@ namespace CryingSnow.StackCraft
             if (inCombat)
             {
                 if (_combatant.CurrentCombatTask != null &&
-                    _combatant.CurrentCombatTask.PlayerIsAttacker &&
-                    _combatant.CurrentCombatTask.Attackers.Contains(_card) &&
+                    _card.Definition.Faction == CardFaction.Player &&
                     !_combatant.IsAttacking)
                 {
                     _card.Stack = new CardStack(_card, transform.position);
@@ -320,11 +328,13 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            bool wantsToFlee = !_combatant.CurrentCombatTask.Rect.IsPositionInside(transform.position);
+            bool wantsToFlee = _combatant.CurrentCombatTask.Rect
+                .IsRetreatDropPosition(transform.position);
 
             if (wantsToFlee)
             {
-                bool fleeSuccessful = _combatant.CurrentCombatTask.Flee(_card);
+                bool fleeSuccessful = CombatManager.Instance != null &&
+                    CombatManager.Instance.TryRetreat(_card);
                 if (fleeSuccessful)
                 {
                     CardManager.Instance.RegisterStack(_card.Stack);
@@ -453,6 +463,15 @@ namespace CryingSnow.StackCraft
         #region World Interactions
         private bool HandleClick()
         {
+            if (inCombat && _combatant?.CurrentCombatTask != null)
+            {
+                CombatFocusService.Select(_card);
+                _combatant.CurrentCombatTask.Rect?.RepositionCard(_card);
+                _card.Stack?.RemoveCard(_card);
+                _card.Stack = null;
+                return true;
+            }
+
             if (!AllowsNativeCardInteraction())
                 return false;
 

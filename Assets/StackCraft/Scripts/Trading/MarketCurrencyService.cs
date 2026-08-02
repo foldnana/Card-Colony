@@ -14,7 +14,7 @@ namespace CryingSnow.StackCraft
                 return 0;
 
             int backpackCount = backpack?.Entries?.Count(entry =>
-                entry?.Card != null && entry.Card.Id == currency.Id) ?? 0;
+                entry?.IsAvailable == true && entry.Card.Id == currency.Id) ?? 0;
             int worldCount = worldCards?.Count(card =>
                 card != null && card.BaseDefinition == currency) ?? 0;
             return backpackCount + worldCount;
@@ -31,7 +31,7 @@ namespace CryingSnow.StackCraft
 
             List<BackpackEntryData> storedCoins = backpack?.Entries?
                 .Where(entry =>
-                    entry?.Card != null &&
+                    entry?.IsAvailable == true &&
                     entry.Card.Id == currency.Id)
                 .Take(amount)
                 .ToList() ?? new List<BackpackEntryData>();

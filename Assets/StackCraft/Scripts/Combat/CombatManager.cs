@@ -8,6 +8,14 @@ namespace CryingSnow.StackCraft
     public class CombatManager : MonoBehaviour
     {
         public static CombatManager Instance { get; private set; }
+        public event System.Action<CombatEvent> EventPublished;
+
+        internal void Publish(CombatEvent combatEvent)
+        {
+            EventPublished?.Invoke(combatEvent);
+        }
+
+        internal void PublishEvent(CombatEvent combatEvent) => Publish(combatEvent);
 
         #region Serialized Fields
         [Header("RPS Settings")]
@@ -92,6 +100,11 @@ namespace CryingSnow.StackCraft
         #endregion
 
         private readonly List<CombatTask> _activeCombats = new();
+        private long nextRequestedSequence;
+        private bool deferredSaveRequested;
+        private const int HitUiPoolCapacity = 16;
+        private readonly Queue<HitUI> hitUiPool = new();
+        private int activeHitUiCount;
 
         #region Unity Lifecycle & Event Handlers
         private void Awake()
@@ -119,10 +132,44 @@ namespace CryingSnow.StackCraft
                 if (!_activeCombats[i].IsOngoing)
                     _activeCombats.RemoveAt(i);
             }
+
+            if (deferredSaveRequested &&
+                !_activeCombats.Any(task =>
+                    task?.Phase == CombatPhase.ResolvingAction))
+            {
+                deferredSaveRequested = false;
+                GameDirector.Instance?.SaveGame();
+            }
+        }
+
+        public bool DeferSaveIfResolving()
+        {
+            if (!_activeCombats.Any(task =>
+                    task?.Phase == CombatPhase.ResolvingAction))
+                return false;
+            deferredSaveRequested = true;
+            return true;
+        }
+
+        /// <summary>
+        /// Completes only the presentation currently sitting on an action boundary so a
+        /// scene transition or application quit can persist an atomic combat state.
+        /// </summary>
+        public void FlushResolvingActionsForSave()
+        {
+            foreach (CombatTask task in _activeCombats
+                         .Where(task => task?.Phase == CombatPhase.ResolvingAction)
+                         .ToList())
+            {
+                task.CompletePendingActionImmediately();
+            }
+            deferredSaveRequested = false;
         }
 
         private void OnDestroy()
         {
+            if (_activeCombats.Contains(CombatFocusService.FocusedCombat))
+                CombatFocusService.Clear();
             if (GameDirector.Instance != null)
             {
                 GameDirector.Instance.OnSceneDataReady -= HandleSceneDataReady;
@@ -160,12 +207,41 @@ namespace CryingSnow.StackCraft
 
             foreach (var combatData in sceneData.SavedCombats)
             {
+                combatData.NormalizeAndMigrate();
+                if (combatData.RandomState == 0u)
+                {
+                    combatData.RandomState = CombatRandom.MixSeed(
+                        sceneData.RandomSeed == 0 ? 1 : sceneData.RandomSeed,
+                        TimeManager.Instance?.CurrentWorldMinute ?? 0,
+                        combatData.CreatedSequence);
+                }
                 List<CardInstance> attackers = RestoreCardList(combatData.Attackers);
                 List<CardInstance> defenders = RestoreCardList(combatData.Defenders);
 
                 if (attackers.Count > 0 && defenders.Count > 0)
                 {
-                    var task = CreateCombatTaskInternal(attackers, defenders, combatData.PlayerIsAttacker);
+                    CombatRect rect = CreateInteractionRect(attackers, defenders);
+                    if (rect == null)
+                        continue;
+                    var task = new CombatTask(
+                        attackers,
+                        defenders,
+                        combatData.PlayerIsAttacker,
+                        rect,
+                        combatData.SessionId,
+                        combatData.RandomState,
+                        combatData.CreatedSequence,
+                        restored: true);
+                    attackers.ForEach(card => card.Combatant.EnterCombat(task));
+                    defenders.ForEach(card => card.Combatant.EnterCombat(task));
+                    task.RestoreRuntime(combatData);
+                    _activeCombats.Add(task);
+                    nextRequestedSequence = System.Math.Max(
+                        nextRequestedSequence,
+                        task.QueuedCommands
+                            .Select(command => command?.RequestedSequence ?? 0L)
+                            .DefaultIfEmpty(0L)
+                            .Max());
 
                     if (combatData.RectPosition != null && combatData.RectPosition.Length == 3 && task.Rect != null)
                     {
@@ -181,6 +257,10 @@ namespace CryingSnow.StackCraft
                     }
                 }
             }
+
+            EnsureDefaultCombatFocus();
+            new CombatItemReservationService(BackpackService.Current)
+                .ReleaseOrphans(_activeCombats);
         }
 
         private List<CardInstance> RestoreCardList(List<CardData> dataList)
@@ -226,6 +306,13 @@ namespace CryingSnow.StackCraft
             // 3. Otherwise, create a standard, isolated combat.
             else
             {
+                if (_activeCombats.Count >= 8)
+                {
+                    Debug.LogWarning(
+                        "[Combat][Session:none][Command:none] " +
+                        "Operation=StartCombat Code=SessionLimitReached");
+                    return null;
+                }
                 return CreateCombatTaskInternal(attackers, defenders, playerIsAttacker);
             }
         }
@@ -287,6 +374,7 @@ namespace CryingSnow.StackCraft
             defenders.ForEach(d => d.Combatant.EnterCombat(task));
 
             _activeCombats.Add(task);
+            EnsureDefaultCombatFocus();
 
             // Preserve the original post-detach overlap pass for combat.
             CardManager.Instance?.ResolveOverlaps(rect);
@@ -296,6 +384,22 @@ namespace CryingSnow.StackCraft
 
         private CombatTask MergeCombats(List<CardInstance> initialAttackers, List<CardInstance> initialDefenders, List<CombatTask> tasksToMerge)
         {
+            foreach (CombatTask task in tasksToMerge
+                         .Where(task => task?.Phase == CombatPhase.ResolvingAction)
+                         .ToList())
+                task.CompletePendingActionImmediately();
+            tasksToMerge = tasksToMerge
+                .Where(task => task?.IsOngoing == true)
+                .OrderBy(task => task.CreatedSequence)
+                .ToList();
+            if (tasksToMerge.Count == 0)
+                return CreateCombatTaskInternal(
+                    initialAttackers.Where(card => card != null &&
+                        card.CurrentHealth > 0 && !card.IsDowned).ToList(),
+                    initialDefenders.Where(card => card != null &&
+                        card.CurrentHealth > 0 && !card.IsDowned).ToList(),
+                    true);
+
             var allPlayerUnits = new List<CardInstance>();
             var allMobUnits = new List<CardInstance>();
 
@@ -305,6 +409,8 @@ namespace CryingSnow.StackCraft
             // Consolidate all units from all involved combats into two faction-based lists.
             foreach (var card in allInitialCombatants.Concat(allExistingCombatants))
             {
+                if (card == null || card.CurrentHealth <= 0 || card.IsDowned)
+                    continue;
                 // Avoid adding duplicates if a card somehow existed in multiple lists.
                 if (allPlayerUnits.Contains(card) || allMobUnits.Contains(card)) continue;
 
@@ -318,15 +424,41 @@ namespace CryingSnow.StackCraft
                 }
             }
 
-            // Clean up the old combats that are being merged.
+            CombatTask oldest = tasksToMerge
+                .Where(task => task != null)
+                .OrderBy(task => task.CreatedSequence)
+                .FirstOrDefault();
+
+            // Clean up the old visuals after retaining their runtime state.
             foreach (var task in tasksToMerge)
             {
                 task.CleanUpForMerge();
                 _activeCombats.Remove(task);
             }
 
-            // In merged combats, Player faction is always considered the attacker for simplicity.
-            return CreateCombatTaskInternal(allPlayerUnits, allMobUnits, true);
+            CombatRect rect = CreateInteractionRect(allPlayerUnits, allMobUnits);
+            if (rect == null)
+                return null;
+            var merged = new CombatTask(
+                allPlayerUnits,
+                allMobUnits,
+                true,
+                rect,
+                oldest?.SessionId,
+                oldest?.RandomState ?? 1u,
+                oldest?.CreatedSequence ?? 0L,
+                restored: true);
+            merged.ResetJoinOrderForMerge();
+            foreach (CombatTask source in tasksToMerge)
+                merged.ImportRuntimeFrom(source);
+            merged.CompleteJoinOrderForMerge();
+            allPlayerUnits.ForEach(card => card.Combatant.EnterCombat(merged));
+            allMobUnits.ForEach(card => card.Combatant.EnterCombat(merged));
+            _activeCombats.Add(merged);
+            EnsureDefaultCombatFocus();
+            merged.PublishMerged();
+            CardManager.Instance?.ResolveOverlaps(rect);
+            return merged;
         }
 
         /// <summary>
@@ -388,12 +520,81 @@ namespace CryingSnow.StackCraft
             return null;
         }
 
+        public CombatCommandResult TrySubmitCommand(CombatCommand command)
+        {
+            if (command == null)
+                return CombatCommandResult.Failure(
+                    CombatCommandResultCode.SessionNotFound,
+                    "没有收到战斗命令。");
+
+            CombatTask task = !string.IsNullOrWhiteSpace(command.SessionId)
+                ? _activeCombats.FirstOrDefault(value => value.SessionId == command.SessionId)
+                : _activeCombats.FirstOrDefault(value => value.ContainsCombatant(command.ActorId));
+            if (task == null)
+                return CombatCommandResult.Failure(
+                    CombatCommandResultCode.SessionNotFound,
+                    "战斗已经不存在。");
+            if (task.Phase != CombatPhase.Running &&
+                task.Phase != CombatPhase.ResolvingAction)
+                return CombatCommandResult.Failure(
+                    CombatCommandResultCode.SessionNotRunning,
+                    "战斗当前不能接受行动。");
+
+            command.SessionId = task.SessionId;
+            command.RequestedSequence = ++nextRequestedSequence;
+            CombatCommandResult result = task.TrySubmitCommand(command);
+            if (!result.Accepted)
+            {
+                Debug.LogWarning(
+                    $"[Combat][Session:{task.SessionId}]" +
+                    $"[Command:{command.CommandId}] " +
+                    $"Actor={command.ActorId} " +
+                    $"Operation=TrySubmitCommand Code={result.Code}");
+            }
+            return result;
+        }
+
+        public bool TryRetreat(CardInstance card)
+        {
+            CombatTask task = card?.Combatant?.CurrentCombatTask;
+            if (task == null)
+                return false;
+            CombatCommandResult result = TrySubmitCommand(new CombatCommand
+            {
+                SessionId = task.SessionId,
+                ActorId = card.PersistentId,
+                Type = CombatCommandType.Retreat
+            });
+            return result.Accepted && card.Combatant?.CurrentCombatTask != task;
+        }
+
+        public void NotifyPresentationImpact(string sessionId, long actionSequence)
+        {
+            _activeCombats.FirstOrDefault(task => task.SessionId == sessionId)
+                ?.NotifyPresentationImpact(actionSequence);
+        }
+
+        public void NotifyPresentationCompleted(string sessionId, long actionSequence)
+        {
+            _activeCombats.FirstOrDefault(task => task.SessionId == sessionId)
+                ?.NotifyPresentationCompleted(actionSequence);
+        }
+
         public void EndAllCombats()
         {
             foreach (CombatTask task in _activeCombats.ToList())
                 task.EndImmediately();
 
             _activeCombats.Clear();
+        }
+
+        private void EnsureDefaultCombatFocus()
+        {
+            if (CombatFocusService.FocusedCombat?.IsOngoing == true)
+                return;
+            CombatTask defaultTask = CombatFocusService.ChooseDefault(_activeCombats);
+            if (defaultTask != null)
+                CombatFocusService.Focus(defaultTask);
         }
 
         /// <summary>
@@ -407,8 +608,31 @@ namespace CryingSnow.StackCraft
         /// <param name="hitResult">The result data (damage, hit type, advantage) used to configure the UI.</param>
         public void SpawnHitUI(Vector3 position, HitResult hitResult)
         {
-            var hitUI = Instantiate(hitUIPrefab, position, Quaternion.Euler(90, 0, 0), WorldCanvas.Instance?.transform);
-            hitUI.Initialize(hitResult);
+            if (hitUIPrefab == null || activeHitUiCount >= HitUiPoolCapacity)
+                return;
+            HitUI hitUI = hitUiPool.Count > 0
+                ? hitUiPool.Dequeue()
+                : Instantiate(
+                    hitUIPrefab,
+                    WorldCanvas.Instance?.transform);
+            activeHitUiCount++;
+            Transform value = hitUI.transform;
+            value.SetParent(WorldCanvas.Instance?.transform, false);
+            value.SetPositionAndRotation(position, Quaternion.Euler(90, 0, 0));
+            hitUI.gameObject.SetActive(true);
+            hitUI.Initialize(hitResult, ReleaseHitUI);
+        }
+
+        private void ReleaseHitUI(HitUI hitUI)
+        {
+            activeHitUiCount = Mathf.Max(0, activeHitUiCount - 1);
+            if (hitUI == null)
+                return;
+            hitUI.gameObject.SetActive(false);
+            if (hitUiPool.Count < HitUiPoolCapacity)
+                hitUiPool.Enqueue(hitUI);
+            else
+                Destroy(hitUI.gameObject);
         }
 
         /// <summary>

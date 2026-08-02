@@ -27,6 +27,8 @@ namespace CryingSnow.StackCraft
         public string EntryId { get; private set; }
         public IReadOnlyList<string> EntryIds => entryIds;
         public RectTransform RectTransform => (RectTransform)transform;
+        public bool IsReserved => entry?.IsReserved == true;
+        private bool dragStarted;
 
         public void Bind(
             BackpackEntryData entry,
@@ -167,6 +169,11 @@ namespace CryingSnow.StackCraft
                 TextAlignmentOptions.Center);
             Stretch(dragTitle.rectTransform);
             dragHeader.gameObject.SetActive(false);
+            if (IsReserved)
+            {
+                canvasGroup.alpha = 0.55f;
+                background.color = new Color(0.12f, 0.13f, 0.16f, 1f);
+            }
         }
 
         public void OnPointerClick(PointerEventData eventData)
@@ -237,22 +244,29 @@ namespace CryingSnow.StackCraft
 
         public void OnBeginDrag(PointerEventData eventData)
         {
+            dragStarted = false;
+            if (IsReserved)
+                return;
             Select();
             if (canvasGroup != null)
                 canvasGroup.blocksRaycasts = false;
             owner?.BeginItemDrag(this, eventData.position);
+            dragStarted = true;
         }
 
         public void OnDrag(PointerEventData eventData)
         {
-            owner?.UpdateItemDrag(this, eventData.position);
+            if (dragStarted)
+                owner?.UpdateItemDrag(this, eventData.position);
         }
 
         public void OnEndDrag(PointerEventData eventData)
         {
             if (canvasGroup != null)
                 canvasGroup.blocksRaycasts = true;
-            owner?.EndItemDrag(this, eventData.position);
+            if (dragStarted)
+                owner?.EndItemDrag(this, eventData.position);
+            dragStarted = false;
         }
 
         private static Image CreateImage(string name, Transform parent, Color color)

@@ -334,11 +334,17 @@ namespace CryingSnow.StackCraft
 
         public void SaveCombats(List<CombatTask> activeCombats)
         {
+            if (activeCombats.Any(task =>
+                    task != null && task.Phase == CombatPhase.ResolvingAction))
+            {
+                return;
+            }
+
             SavedCombats.Clear();
 
             foreach (var task in activeCombats)
             {
-                if (task.IsOngoing)
+                if (task.IsOngoing && task.Phase == CombatPhase.Running)
                 {
                     SavedCombats.Add(new CombatData(task));
                 }
@@ -481,15 +487,26 @@ namespace CryingSnow.StackCraft
     [System.Serializable]
     public class CombatData
     {
+        public int Version = 2;
+        public string SessionId;
+        public uint RandomState;
+        public long CreatedSequence;
         public List<CardData> Attackers = new();
         public List<CardData> Defenders = new();
         public bool PlayerIsAttacker;
         public float[] RectPosition;
+        public List<CombatantRuntimeData> RuntimeStates = new();
+        public List<CombatCommand> QueuedCommands = new();
+        public List<string> ResolvedDefeatIds = new();
 
         public CombatData() { }
 
         public CombatData(CombatTask task)
         {
+            Version = 2;
+            SessionId = task.SessionId;
+            RandomState = task.RandomState;
+            CreatedSequence = task.CreatedSequence;
             PlayerIsAttacker = task.PlayerIsAttacker;
 
             foreach (var card in task.Attackers)
@@ -507,7 +524,76 @@ namespace CryingSnow.StackCraft
                 Vector3 pos = task.Rect.transform.position;
                 RectPosition = new float[] { pos.x, pos.y, pos.z };
             }
+
+
+            long fallbackSequence = 0;
+            foreach (CardInstance card in task.Attackers.Concat(task.Defenders))
+            {
+                if (card?.Combatant == null)
+                    continue;
+                RuntimeStates.Add(new CombatantRuntimeData
+                {
+                    PersistentId = card.PersistentId,
+                    ActionProgress = card.Combatant.ActionProgress,
+                    JoinSequence = task.GetJoinSequence(card, fallbackSequence++),
+                    RetreatProtectionRemaining =
+                        card.Combatant.ReaggroProtectionRemaining,
+                    SkillCooldowns = card.Combatant.SkillCooldowns
+                        .Select(pair => new CombatSkillCooldownData
+                        {
+                            SkillId = pair.Key,
+                            RemainingSeconds = pair.Value
+                        })
+                        .ToList()
+                });
+            }
+            QueuedCommands.AddRange(task.QueuedCommands);
+            ResolvedDefeatIds.AddRange(task.ResolvedDefeatIds);
         }
+
+        public void NormalizeAndMigrate()
+        {
+            Attackers ??= new List<CardData>();
+            Defenders ??= new List<CardData>();
+            RuntimeStates ??= new List<CombatantRuntimeData>();
+            QueuedCommands ??= new List<CombatCommand>();
+            ResolvedDefeatIds ??= new List<string>();
+
+            if (Version >= 2)
+                return;
+
+            Version = 2;
+            SessionId = string.IsNullOrWhiteSpace(SessionId)
+                ? System.Guid.NewGuid().ToString("N")
+                : SessionId;
+            int index = 0;
+            foreach (CardData card in Attackers.Concat(Defenders))
+            {
+                RuntimeStates.Add(new CombatantRuntimeData
+                {
+                    PersistentId = card?.PersistentId,
+                    ActionProgress = Mathf.Min(90f, index++ * 10f),
+                    JoinSequence = index
+                });
+            }
+        }
+    }
+
+    [System.Serializable]
+    public sealed class CombatantRuntimeData
+    {
+        public string PersistentId;
+        public float ActionProgress;
+        public long JoinSequence;
+        public float RetreatProtectionRemaining;
+        public List<CombatSkillCooldownData> SkillCooldowns = new();
+    }
+
+    [System.Serializable]
+    public sealed class CombatSkillCooldownData
+    {
+        public string SkillId;
+        public float RemainingSeconds;
     }
 
     [System.Serializable]

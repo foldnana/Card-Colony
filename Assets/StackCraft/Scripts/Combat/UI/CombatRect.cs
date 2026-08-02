@@ -200,6 +200,24 @@ namespace CryingSnow.StackCraft
             return Rect.rect.Contains(localPoint);
         }
 
+        public bool IsRetreatDropPosition(
+            Vector3 worldPosition,
+            float minimumOutsideDistance = 0.25f)
+        {
+            if (Rect == null)
+                return false;
+            Vector2 local = Rect.InverseTransformPoint(worldPosition);
+            UnityEngine.Rect bounds = Rect.rect;
+            if (bounds.Contains(local))
+                return false;
+            Vector2 closest = new(
+                Mathf.Clamp(local.x, bounds.xMin, bounds.xMax),
+                Mathf.Clamp(local.y, bounds.yMin, bounds.yMax));
+            Vector3 localDelta = new(local.x - closest.x, local.y - closest.y, 0f);
+            float worldDistance = Rect.TransformVector(localDelta).magnitude;
+            return worldDistance >= Mathf.Max(0f, minimumOutsideDistance);
+        }
+
         /// <summary>
         /// Animates a card back to its designated layout position within the combat area.
         /// </summary>

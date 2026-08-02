@@ -49,6 +49,10 @@ MonoBehaviour:
   dodge: 5
   criticalChance: 5
   criticalMultiplier: 150
+  experienceReward: 0
+  innateCombatSkills: []
+  grantedCombatSkills: []
+  combatItemDefinition: {fileID: 11400000, guid: 43056031ff01dca4c8845f6011718813, type: 2}
   equipmentSlot: 0
   statModifiers: []
   classChangeResult: {fileID: 0}

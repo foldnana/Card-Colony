@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace CryingSnow.StackCraft
 {
@@ -12,11 +13,23 @@ namespace CryingSnow.StackCraft
 
         private CardInstance _card;
         private CardAI _aiComponent;
+        private readonly Dictionary<string, float> skillCooldowns = new();
+        public float ReaggroProtectionRemaining { get; private set; }
 
         private void Awake()
         {
             _card = GetComponent<CardInstance>();
             _aiComponent = GetComponent<CardAI>();
+        }
+
+        private void Update()
+        {
+            if (!IsInCombat && ReaggroProtectionRemaining > 0f)
+            {
+                ReaggroProtectionRemaining = Mathf.Max(
+                    0f,
+                    ReaggroProtectionRemaining - Time.deltaTime);
+            }
         }
 
         /// <summary>
@@ -83,7 +96,7 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void InitializeCombatActionProgress()
         {
-            ActionProgress = Random.Range(0f, 0.5f);
+            ActionProgress = 0f;
         }
 
         /// <summary>
@@ -93,7 +106,10 @@ namespace CryingSnow.StackCraft
         {
             if (_card.CurrentHealth > 0)
             {
-                ActionProgress += amount;
+                ActionProgress = Mathf.Clamp(
+                    ActionProgress + amount,
+                    0f,
+                    CombatActionScheduler.ProgressCap);
             }
         }
 
@@ -104,5 +120,61 @@ namespace CryingSnow.StackCraft
         {
             ActionProgress = 0f;
         }
+
+        public void SetActionProgress(float value)
+        {
+            ActionProgress = Mathf.Clamp(
+                value,
+                0f,
+                CombatActionScheduler.ProgressCap);
+        }
+
+        public void ConsumeActionProgress()
+        {
+            ActionProgress = Mathf.Max(
+                0f,
+                ActionProgress - CombatActionScheduler.ActionThreshold);
+        }
+
+        public float GetSkillCooldown(string skillId)
+        {
+            return !string.IsNullOrWhiteSpace(skillId) &&
+                skillCooldowns.TryGetValue(skillId, out float remaining)
+                ? remaining
+                : 0f;
+        }
+
+        public void SetSkillCooldown(string skillId, float seconds)
+        {
+            if (string.IsNullOrWhiteSpace(skillId))
+                return;
+            skillCooldowns[skillId] = Mathf.Max(0f, seconds);
+        }
+
+        public void TickCombatRuntime(float deltaTime)
+        {
+            if (deltaTime <= 0f)
+                return;
+            foreach (string skillId in new List<string>(skillCooldowns.Keys))
+            {
+                float remaining = Mathf.Max(0f, skillCooldowns[skillId] - deltaTime);
+                if (remaining <= 0f)
+                    skillCooldowns.Remove(skillId);
+                else
+                    skillCooldowns[skillId] = remaining;
+            }
+            ReaggroProtectionRemaining = Mathf.Max(
+                0f,
+                ReaggroProtectionRemaining - deltaTime);
+        }
+
+        public void GrantReaggroProtection(float seconds)
+        {
+            ReaggroProtectionRemaining = Mathf.Max(
+                ReaggroProtectionRemaining,
+                seconds);
+        }
+
+        public IReadOnlyDictionary<string, float> SkillCooldowns => skillCooldowns;
     }
 }

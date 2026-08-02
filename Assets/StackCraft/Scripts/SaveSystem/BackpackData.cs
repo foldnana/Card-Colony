@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine.Serialization;
 
 namespace CryingSnow.StackCraft
 {
@@ -72,6 +73,9 @@ namespace CryingSnow.StackCraft
             if (index < 0)
                 return false;
 
+            if (Entries[index].IsReserved)
+                return false;
+
             card = Entries[index].Card;
             Entries.RemoveAt(index);
             return card != null;
@@ -92,13 +96,15 @@ namespace CryingSnow.StackCraft
                 return false;
 
             BackpackEntryData source = Find(instanceId);
-            if (source == null)
+            if (source == null || source.IsReserved)
                 return false;
             if (source.SlotIndex == targetSlotIndex)
                 return true;
 
             BackpackEntryData occupant = Entries.Find(entry =>
                 entry != null && entry.SlotIndex == targetSlotIndex);
+            if (occupant != null && occupant.IsReserved)
+                return false;
             int sourceSlotIndex = source.SlotIndex;
             source.SlotIndex = targetSlotIndex;
             if (occupant != null)
@@ -128,9 +134,34 @@ namespace CryingSnow.StackCraft
         public void Compact()
         {
             Normalize();
+            var fixedSlots = new HashSet<int>(Entries
+                .FindAll(entry => entry.IsReserved)
+                .ConvertAll(entry => entry.SlotIndex));
+            int nextSlot = 0;
+            foreach (BackpackEntryData entry in Entries
+                         .FindAll(entry => !entry.IsReserved))
+            {
+                while (fixedSlots.Contains(nextSlot))
+                    nextSlot++;
+                entry.SlotIndex = nextSlot++;
+            }
             Entries.Sort((left, right) => left.SlotIndex.CompareTo(right.SlotIndex));
-            for (int index = 0; index < Entries.Count; index++)
-                Entries[index].SlotIndex = index;
+        }
+
+        internal bool TryConsumeReserved(
+            string instanceId,
+            string commandId,
+            out CardData card)
+        {
+            card = null;
+            BackpackEntryData entry = Find(instanceId);
+            if (entry == null || !entry.IsReserved ||
+                entry.ReservationCommandId != commandId)
+                return false;
+
+            card = entry.Card;
+            Entries.Remove(entry);
+            return card != null;
         }
 
         private int FindFirstFreeSlot()
@@ -177,5 +208,32 @@ namespace CryingSnow.StackCraft
         public float TablePositionZ;
         public string TableStackId;
         public int TableStackOrder;
+        [FormerlySerializedAs("ReservedCombatSessionId")]
+        public string ReservationOwnerId;
+        [FormerlySerializedAs("ReservedCommandId")]
+        public string ReservationCommandId;
+
+        public bool IsReserved =>
+            !string.IsNullOrWhiteSpace(ReservationOwnerId) &&
+            !string.IsNullOrWhiteSpace(ReservationCommandId);
+        public bool IsAvailable => Card != null && !IsReserved;
+
+        public string ReservedCombatSessionId
+        {
+            get => ReservationOwnerId;
+            set => ReservationOwnerId = value;
+        }
+
+        public string ReservedCommandId
+        {
+            get => ReservationCommandId;
+            set => ReservationCommandId = value;
+        }
+
+        public void ClearReservation()
+        {
+            ReservationOwnerId = null;
+            ReservationCommandId = null;
+        }
     }
 }

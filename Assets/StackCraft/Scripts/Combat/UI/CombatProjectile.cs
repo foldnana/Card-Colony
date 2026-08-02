@@ -30,7 +30,7 @@ namespace CryingSnow.StackCraft
 
             Tween moveTween = transform.DOMove(targetPos, duration)
                 .SetEase(Ease.Linear)
-                .SetUpdate(true)
+                .SetUpdate(false)
                 .OnComplete(() => Destroy(gameObject));
 
             return moveTween;

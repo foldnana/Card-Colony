@@ -69,6 +69,14 @@ namespace CryingSnow.StackCraft
                 return true;
             }
 
+            if (owner != null && owner.IsPlayerCombatActive)
+            {
+                if (EntryIds != null && EntryIds.Count == 1)
+                    owner.TryQueueCombatItem(EntryId, Input.mousePosition);
+                board?.ReturnToSlot(this);
+                return true;
+            }
+
             if (owner != null && owner.TryTakeProxyToWorld(this, dropPosition))
                 return true;
 

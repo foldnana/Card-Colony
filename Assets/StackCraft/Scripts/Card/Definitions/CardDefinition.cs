@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace CryingSnow.StackCraft
 {
@@ -130,6 +131,16 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0), Tooltip("Experience granted when this hostile card is defeated.")]
         private int experienceReward;
 
+        [FormerlySerializedAs("combatSkills")]
+        [SerializeField, Tooltip("Active combat skills innate to this character (maximum three are shown in combat UI).")]
+        private List<CombatSkillDefinition> innateCombatSkills = new();
+
+        [SerializeField, Tooltip("Active combat skills granted while this equipment is equipped.")]
+        private List<CombatSkillDefinition> grantedCombatSkills = new();
+
+        [SerializeField, Tooltip("Optional combat behavior for this consumable.")]
+        private CombatItemDefinition combatItemDefinition;
+
         // Equipment
         [SerializeField, Tooltip("Only applies if Card Category is Equipment.")]
         private EquipmentSlot equipmentSlot;
@@ -175,6 +186,10 @@ namespace CryingSnow.StackCraft
 
         public int Nutrition => nutrition;
         public int ExperienceReward => experienceReward;
+        public IReadOnlyList<CombatSkillDefinition> InnateCombatSkills => innateCombatSkills;
+        public IReadOnlyList<CombatSkillDefinition> GrantedCombatSkills => grantedCombatSkills;
+        public CombatItemDefinition CombatItemDefinition => combatItemDefinition;
+        public IReadOnlyList<CombatSkillDefinition> CombatSkills => innateCombatSkills;
 
         public EquipmentSlot EquipmentSlot => equipmentSlot;
         public List<StatModifier> StatModifiers => statModifiers;

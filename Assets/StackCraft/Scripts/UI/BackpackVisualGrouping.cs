@@ -31,7 +31,7 @@ namespace CryingSnow.StackCraft
 
             isCurrency ??= _ => false;
             return backpack.Entries
-                .Where(entry => entry?.Card != null)
+                .Where(entry => entry?.IsAvailable == true)
                 .GroupBy(entry => GetVisualGroupKey(entry, isCurrency))
                 .Select(group => new BackpackVisualGroup(
                     group.OrderBy(entry => entry.TableStackOrder)

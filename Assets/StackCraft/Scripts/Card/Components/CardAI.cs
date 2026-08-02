@@ -229,6 +229,7 @@ namespace CryingSnow.StackCraft
                             c.Definition.Faction == CardFaction.Player &&
                             c.Combatant != null &&
                             !c.Combatant.IsInCombat &&
+                            c.Combatant.ReaggroProtectionRemaining <= 0f &&
                             !(DialogueManager.Instance?.IsCardInDialogue(c) ?? false) &&
                             (c.transform.position - myPosition).sqrMagnitude <= radiusSq)
                 .OrderBy(c => (c.transform.position - myPosition).sqrMagnitude)

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using DG.Tweening;
+using System;
 
 namespace CryingSnow.StackCraft
 {
@@ -33,6 +34,12 @@ namespace CryingSnow.StackCraft
 
         [SerializeField, Tooltip("The sprite to display when the attack has a Combat Type Disadvantage.")]
         private Sprite disadvantageSprite;
+        private Vector3 initialScale;
+
+        private void Awake()
+        {
+            initialScale = transform.localScale;
+        }
 
         /// <summary>
         /// Sets the visual state of the damage pop-up based on the outcome of a hit result.
@@ -45,8 +52,12 @@ namespace CryingSnow.StackCraft
         /// <param name="result">
         /// The <see cref="HitResult"/> data structure containing the type of hit, damage amount, and combat advantage.
         /// </param>
-        public void Initialize(HitResult result)
+        public void Initialize(HitResult result, Action<HitUI> release = null)
         {
+            transform.DOKill();
+            transform.localScale = initialScale == Vector3.zero
+                ? Vector3.one
+                : initialScale;
             switch (result.Type)
             {
                 case HitType.Miss:
@@ -85,8 +96,14 @@ namespace CryingSnow.StackCraft
             }
 
             transform.DOPunchScale(new Vector3(0.15f, 0.15f), 1f)
-                .SetUpdate(true)
-                .OnComplete(() => Destroy(gameObject));
+                .SetUpdate(false)
+                .OnComplete(() =>
+                {
+                    if (release != null)
+                        release(this);
+                    else
+                        Destroy(gameObject);
+                });
         }
     }
 }

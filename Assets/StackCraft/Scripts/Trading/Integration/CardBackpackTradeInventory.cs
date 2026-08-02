@@ -41,7 +41,8 @@ namespace CryingSnow.StackCraft
             if (definition == null)
                 return 0;
             return BackpackService.Current?.Entries?.Count(entry =>
-                entry?.Card?.Id == definition.Id) ?? 0;
+                entry?.IsAvailable == true &&
+                entry.Card.Id == definition.Id) ?? 0;
         }
 
         public bool CanReceive(string commodityId, int quantity)
@@ -107,7 +108,8 @@ namespace CryingSnow.StackCraft
             if (entries.Count != quantity)
             {
                 entries = backpack.Entries
-                    .Where(entry => entry?.Card?.Id == definition.Id)
+                    .Where(entry => entry?.IsAvailable == true &&
+                        entry.Card.Id == definition.Id)
                     .Take(quantity)
                     .ToList();
             }
@@ -272,7 +274,8 @@ namespace CryingSnow.StackCraft
                 originalCapacity = backpack.SlotCapacity;
 
                 int storedCoinCount = originalEntries.Count(entry =>
-                    entry?.Card?.Id == currency.Id);
+                    entry?.IsAvailable == true &&
+                    entry.Card.Id == currency.Id);
                 int tableCoinCount = Math.Max(
                     0,
                     totalPrice - storedCoinCount);
@@ -332,7 +335,8 @@ namespace CryingSnow.StackCraft
                 int storedCoinsToSpend = Math.Min(
                     totalPrice,
                     originalEntries.Count(entry =>
-                        entry?.Card?.Id == currency.Id));
+                        entry?.IsAvailable == true &&
+                        entry.Card.Id == currency.Id));
                 if (storedCoinsToSpend + tableCoins.Count <
                     totalPrice)
                 {
@@ -348,7 +352,8 @@ namespace CryingSnow.StackCraft
 
                 foreach (BackpackEntryData entry in originalEntries
                              .Where(entry =>
-                                 entry?.Card?.Id == currency.Id)
+                                 entry?.IsAvailable == true &&
+                                 entry.Card.Id == currency.Id)
                              .Take(storedCoinsToSpend))
                 {
                     if (!backpack.TryRemove(
@@ -365,7 +370,8 @@ namespace CryingSnow.StackCraft
             {
                 List<BackpackEntryData> goods = originalEntries
                     .Where(entry =>
-                        entry?.Card?.Id == commodity.Id)
+                        entry?.IsAvailable == true &&
+                        entry.Card.Id == commodity.Id)
                     .Take(quantity)
                     .ToList();
                 if (goods.Count != quantity)
