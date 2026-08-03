@@ -2,7 +2,6 @@ using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
 
 namespace CryingSnow.StackCraft
 {
@@ -12,9 +11,10 @@ namespace CryingSnow.StackCraft
         [SerializeField] private CanvasGroup panel;
         [SerializeField] private Toggle combatToggle;
         [SerializeField] private TMP_Text combatToggleLabel;
+        [SerializeField] private CombatLogPresenter combatLog;
         [SerializeField] private TMP_Text actorLabel;
         [SerializeField] private TMP_Text targetLabel;
-        [SerializeField] private Button basicAttackButton;
+        [SerializeField] private Button retreatButton;
         [SerializeField] private Button[] skillButtons = new Button[3];
         [SerializeField] private TMP_Text[] skillLabels = new TMP_Text[3];
 
@@ -22,11 +22,13 @@ namespace CryingSnow.StackCraft
         private CombatTask activeCombat;
         private readonly CombatTargetingController targeting = new();
         private float nextRefreshAt;
+        private bool wasInPlayerCombat;
 
         private void Awake()
         {
             panel ??= GetComponent<CanvasGroup>();
-            basicAttackButton?.onClick.AddListener(QueueBasicAttack);
+            combatLog ??= GetComponentInChildren<CombatLogPresenter>(true);
+            retreatButton?.onClick.AddListener(QueueRetreat);
             for (int index = 0; index < skillButtons.Length; index++)
             {
                 int captured = index;
@@ -39,7 +41,7 @@ namespace CryingSnow.StackCraft
 
         private void OnDestroy()
         {
-            basicAttackButton?.onClick.RemoveListener(QueueBasicAttack);
+            retreatButton?.onClick.RemoveListener(QueueRetreat);
             combatToggle?.onValueChanged.RemoveListener(HandleCombatToggleChanged);
             CombatFocusService.FocusChanged -= HandleFocusChanged;
             Unsubscribe();
@@ -63,7 +65,6 @@ namespace CryingSnow.StackCraft
                 nextRefreshAt = Time.unscaledTime + 0.1f;
                 Refresh();
             }
-            CancelTargetingOnBlankClick();
         }
 
         private void TrySubscribe()
@@ -107,40 +108,31 @@ namespace CryingSnow.StackCraft
 
         private void HandleFocusChanged()
         {
-            if (targeting.IsSelectingTarget)
-                targeting.TryAcceptSelectedCard(CombatFocusService.LastSelectedCard);
             Refresh();
         }
 
-        private void HandleCombatToggleChanged(bool isOn)
-        {
-            if (!isOn)
-                targeting.Cancel();
-            Refresh();
-        }
-
-        private void CancelTargetingOnBlankClick()
-        {
-            if (!targeting.IsSelectingTarget || !Input.GetMouseButtonDown(0) ||
-                EventSystem.current?.IsPointerOverGameObject() == true)
-                return;
-            Camera camera = Camera.main;
-            if (camera == null)
-                return;
-            Ray ray = camera.ScreenPointToRay(Input.mousePosition);
-            bool clickedCard = Physics.RaycastAll(ray, 1000f)
-                .Any(hit => hit.collider.GetComponentInParent<CardInstance>() != null);
-            if (!clickedCard)
-                targeting.Cancel();
-        }
+        private void HandleCombatToggleChanged(bool isOn) => Refresh();
 
         private void Refresh()
         {
             bool inCombat = activeCombat?.IsOngoing == true &&
                 activeCombat.PlayerCombatants.Any();
+            bool shouldAutoOpen = ShouldAutoOpenCombatToggle(
+                wasInPlayerCombat,
+                inCombat);
+            wasInPlayerCombat = inCombat;
+            if (shouldAutoOpen && combatToggle != null && !combatToggle.isOn)
+                combatToggle.isOn = true;
+            bool logVisible = combatLog?.IsVisible == true;
+            bool showCombatPage = ShouldShowCombatPage(
+                inCombat,
+                logVisible,
+                combatToggle == null || combatToggle.isOn);
             if (combatToggleLabel != null)
-                combatToggleLabel.text = inCombat ? "战斗" : "地点";
-            SetVisible(inCombat && (combatToggle == null || combatToggle.isOn));
+                combatToggleLabel.text = inCombat || logVisible
+                    ? "战斗"
+                    : "地点";
+            SetVisible(showCombatPage);
             if (!inCombat)
                 return;
 
@@ -173,48 +165,81 @@ namespace CryingSnow.StackCraft
                 if (exists && skillLabels[index] != null)
                 {
                     float cooldown = actor.Combatant.GetSkillCooldown(skills[index].Id);
-                    string reason = actor.IsDowned
-                        ? "角色倒地"
-                        : actor.Combatant.IsAttacking
-                            ? "正在执行动作"
-                            : cooldown > 0f
-                                ? $"冷却 {cooldown:0.0}秒"
-                                : actor.CurrentEnergy < skills[index].EnergyCost
-                                    ? "精力不足"
-                                    : $"消耗{skills[index].EnergyCost}精力";
-                    skillLabels[index].text =
-                        $"{skills[index].DisplayName}  {reason}";
+                    skillLabels[index].text = FormatSkillLabel(
+                        skills[index],
+                        cooldown,
+                        actor.IsDowned,
+                        actor.Combatant.IsAttacking,
+                        actor.CurrentEnergy);
+                }
+            }
+
+            if (retreatButton != null)
+            {
+                retreatButton.interactable = actor != null && !actor.IsDowned &&
+                    actor.Combatant?.IsAttacking != true;
+                if (retreatButton.transform is RectTransform retreatRect)
+                {
+                    retreatRect.anchoredPosition = new Vector2(
+                        retreatRect.anchoredPosition.x,
+                        -236f - skills.Length * 62f);
                 }
             }
         }
 
-        private void QueueBasicAttack()
+        private static bool ShouldAutoOpenCombatToggle(
+            bool wasInCombat,
+            bool isInCombat) => isInCombat && !wasInCombat;
+
+        internal static bool ShouldShowCombatPage(
+            bool isInCombat,
+            bool isLogVisible,
+            bool isToggleOn) => isToggleOn && (isInCombat || isLogVisible);
+
+        private static string FormatSkillLabel(
+            CombatSkillDefinition skill,
+            float cooldown,
+            bool isDowned,
+            bool isAttacking,
+            int currentEnergy)
         {
-            CardInstance actor = CombatFocusService.SelectedActor;
-            CardInstance target = CombatFocusService.SelectedTarget;
-            if (activeCombat == null || actor == null || target == null)
-                return;
-            targeting.SubmitBasicAttack(activeCombat, actor, target);
+            string state = isDowned
+                ? "角色倒地"
+                : isAttacking
+                    ? "正在执行动作"
+                    : cooldown > 0f
+                        ? $"冷却 {cooldown:0.0}秒"
+                        : currentEnergy < skill.EnergyCost
+                            ? "精力不足"
+                            : $"{skill.PowerMultiplier * 100f:0}% · " +
+                              $"{skill.CooldownSeconds:0.#}秒冷却";
+            return $"{skill.DisplayName}  {state}";
         }
 
         private void QueueSkill(int index)
         {
-            CardInstance actor = CombatFocusService.SelectedActor;
-            CardInstance target = CombatFocusService.SelectedTarget;
+            CardInstance actor = CombatFocusService.SelectedActor ??
+                activeCombat?.PlayerCombatants.FirstOrDefault();
             CombatSkillDefinition skill = CombatSkillService.Resolve(actor)
                 .Where(value => value != null).Take(3).ElementAtOrDefault(index);
-            if (activeCombat == null || actor == null || target == null || skill == null)
+            if (activeCombat == null || actor == null || skill == null)
                 return;
-            if (targeting.IsSelectingTarget &&
-                targeting.PendingDefinitionId == skill.Id)
-            {
-                targeting.Cancel();
-                Refresh();
+            targeting.SubmitSkillToAutomaticTarget(
+                activeCombat,
+                actor,
+                CombatFocusService.SelectedTarget,
+                skill);
+            Refresh();
+        }
+
+        private void QueueRetreat()
+        {
+            CardInstance actor = CombatFocusService.SelectedActor ??
+                activeCombat?.PlayerCombatants.FirstOrDefault();
+            if (actor == null || subscribedManager == null)
                 return;
-            }
-            targeting.BeginSkillTargeting(activeCombat, actor, skill);
-            if (targetLabel != null)
-                targetLabel.text = $"为 {skill.DisplayName} 选择一个敌人";
+            subscribedManager.TryRetreat(actor);
+            Refresh();
         }
 
         private void SetVisible(bool visible)

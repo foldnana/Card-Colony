@@ -285,6 +285,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   advantageMultiplier: 1.5
   disadvantageMultiplier: 0.75
+  combatSpeedMultiplier: 0.4
   combatRectPrefab: {fileID: 8122051869140798555, guid: d7f97b1703c8e0c47a6962638643c572, type: 3}
   hitUIPrefab: {fileID: 5677774716157683505, guid: e5d893f9cfc4b6842a9cdb1af54fdee9, type: 3}
   arrowProjectile: {fileID: 2028612934944564429, guid: 8efa49a2dbc8d89408413744269a9c6c, type: 3}
@@ -1086,6 +1087,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 106379277237671019, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 497838615681961426, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: m_AnchorMax.y
       value: 0
@@ -1129,6 +1134,30 @@ PrefabInstance:
     - target: {fileID: 953087422094877653, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: onValueChanged.m_PersistentCalls.m_Calls.Array.data[1].m_TargetAssemblyTypeName
       value: CryingSnow.StackCraft.MenuView, Assembly-CSharp
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMax.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchorMin.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1219496109822000610, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 1225375140556120073, guid: 5e2985d7789c5254b831d166e6931134, type: 3}
       propertyPath: m_AnchorMax.x

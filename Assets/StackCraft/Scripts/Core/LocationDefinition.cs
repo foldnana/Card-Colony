@@ -79,6 +79,8 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(0f)] private float randomSpawnMinSpacing = 0.8f;
         [SerializeField, Min(0f)] private float randomSpawnPartyClearance = 2f;
         [SerializeField] private List<LocationRandomCardSpawn> randomCardSpawns = new();
+        [SerializeField, Tooltip("Hostile cards patrol but do not hunt players or join player combat automatically in this location.")]
+        private bool suppressHostileAutoAggro;
         [Header("Market services")]
         [SerializeField] private MarketProfile publicMarketProfile;
         [SerializeField] private CardDefinition marketCurrencyCardDefinition;
@@ -106,6 +108,7 @@ namespace CryingSnow.StackCraft
         public float RandomSpawnMinSpacing => randomSpawnMinSpacing;
         public float RandomSpawnPartyClearance => randomSpawnPartyClearance;
         public IReadOnlyList<LocationRandomCardSpawn> RandomCardSpawns => randomCardSpawns;
+        public bool SuppressHostileAutoAggro => suppressHostileAutoAggro;
         public MarketProfile PublicMarketProfile => publicMarketProfile;
         public CardDefinition MarketCurrencyCardDefinition =>
             marketCurrencyCardDefinition;

@@ -61,6 +61,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     RandomSpawnAreaSize = new Vector2(13.2f, 5.4f),
                     RandomSpawnMinSpacing = 1.05f,
                     RandomSpawnPartyClearance = 2.1f,
+                    SuppressHostileAutoAggro = true,
                     RandomCardSpawns = new[]
                     {
                         new LocationTemplateRandomSpawn(

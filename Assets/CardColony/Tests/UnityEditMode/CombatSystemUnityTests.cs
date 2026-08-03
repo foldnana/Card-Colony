@@ -315,6 +315,229 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void PowerStrike_UsesCooldownOnlyAndDealsDoubleDamage()
+        {
+            UnityEngine.Object skill = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                "Assets/StackCraft/Resources/Combat/Skills/Skill_PowerStrike.asset");
+            Assert.That(skill, Is.Not.Null);
+            Type skillType = skill.GetType();
+            Assert.That(skillType.GetProperty("EnergyCost").GetValue(skill),
+                Is.EqualTo(0));
+            Assert.That(skillType.GetProperty("CooldownSeconds").GetValue(skill),
+                Is.EqualTo(4f));
+            Assert.That(skillType.GetProperty("PowerMultiplier").GetValue(skill),
+                Is.EqualTo(2f));
+            Assert.That(skillType.GetProperty("Description").GetValue(skill),
+                Does.Contain("200%"));
+        }
+
+        [Test]
+        public void CombatHud_ShowsSkillsAndRetreatWithoutBasicAttackButton()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+            Transform[] transforms = prefab.GetComponentsInChildren<Transform>(true);
+            Assert.That(transforms.Any(value => value.name == "BasicAttackButton"),
+                Is.False);
+            Transform retreat = transforms.FirstOrDefault(
+                value => value.name == "RetreatButton");
+            Assert.That(retreat, Is.Not.Null);
+
+            Type presenterType = FindType(
+                "CryingSnow.StackCraft.CombatHudPresenter");
+            var serialized = new SerializedObject(
+                prefab.GetComponentInChildren(presenterType, true));
+            Assert.That(serialized.FindProperty("basicAttackButton"), Is.Null);
+            Assert.That(serialized.FindProperty("retreatButton")?.objectReferenceValue,
+                Is.EqualTo(retreat.GetComponent<UnityEngine.UI.Button>()));
+        }
+
+        [Test]
+        public void CombatTargeting_AutomaticTargetPrefersSelectedEnemyThenFirstEnemy()
+        {
+            Type controllerType = FindType(
+                "CryingSnow.StackCraft.CombatTargetingController");
+            MethodInfo chooseTarget = controllerType.GetMethod(
+                "ChooseAutomaticTarget",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(chooseTarget, Is.Not.Null);
+
+            Type cardType = FindType("CryingSnow.StackCraft.CardInstance");
+            GameObject firstObject = new("FirstEnemy");
+            GameObject preferredObject = new("PreferredEnemy");
+            try
+            {
+                Component first = firstObject.AddComponent(cardType);
+                Component preferred = preferredObject.AddComponent(cardType);
+                Array candidates = Array.CreateInstance(cardType, 2);
+                candidates.SetValue(first, 0);
+                candidates.SetValue(preferred, 1);
+
+                Assert.That(chooseTarget.Invoke(
+                        null,
+                        new object[] { candidates, preferred }),
+                    Is.SameAs(preferred));
+                Assert.That(chooseTarget.Invoke(
+                        null,
+                        new object[] { candidates, null }),
+                    Is.SameAs(first));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(firstObject);
+                UnityEngine.Object.DestroyImmediate(preferredObject);
+            }
+
+            string hudSource = File.ReadAllText(
+                "Assets/StackCraft/Scripts/Combat/UI/CombatHudPresenter.cs");
+            Assert.That(hudSource, Does.Contain(
+                "targeting.SubmitSkillToAutomaticTarget"));
+            Assert.That(hudSource, Does.Not.Contain(
+                "targeting.BeginSkillTargeting"));
+        }
+
+        [Test]
+        public void CombatUi_LogIsRenderedByCanvasAndHudAutoOpensOnlyOnCombatEntry()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+            Transform logPanel = prefab.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(value => value.name == "CombatLogPanel");
+            Assert.That(logPanel, Is.Not.Null);
+            Assert.That(logPanel.GetComponentInParent<Canvas>(true), Is.Not.Null,
+                "CombatLogPanel must live below a Canvas or Unity UI cannot render it.");
+
+            Transform combatHud = prefab.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(value => value.name == "CombatHudPanel");
+            Transform locationView = prefab.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(value => value.name == "LocationView");
+            Assert.That(combatHud, Is.Not.Null);
+            Assert.That(locationView, Is.Not.Null);
+            Assert.That(combatHud.parent, Is.EqualTo(locationView),
+                "Combat HUD must occupy the right-side location content area, not PauseMenu.");
+            Assert.That(logPanel.parent, Is.EqualTo(combatHud),
+                "Combat log should be contained in the combat page instead of floating over cards.");
+
+            RectTransform logRect = (RectTransform)logPanel;
+            Assert.That(logRect.anchorMin, Is.EqualTo(new Vector2(0f, 0f)));
+            Assert.That(logRect.anchorMax, Is.EqualTo(new Vector2(1f, 0f)));
+            Assert.That(logRect.anchoredPosition.y, Is.GreaterThanOrEqualTo(12f));
+            Transform logText = logPanel.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(value => value.name == "LogText");
+            Assert.That(logText, Is.Not.Null);
+            RectTransform logTextRect = (RectTransform)logText;
+            Assert.That(logTextRect.offsetMin.y, Is.LessThan(logTextRect.offsetMax.y),
+                "Combat log text bounds must not be vertically inverted.");
+
+            Type presenterType = FindType(
+                "CryingSnow.StackCraft.CombatHudPresenter");
+            MethodInfo shouldAutoOpen = presenterType.GetMethod(
+                "ShouldAutoOpenCombatToggle",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            MethodInfo shouldShowCombatPage = presenterType.GetMethod(
+                "ShouldShowCombatPage",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(shouldAutoOpen, Is.Not.Null);
+            Assert.That(shouldAutoOpen.Invoke(null, new object[] { false, true }),
+                Is.True, "Entering player combat should open the combat tab.");
+            Assert.That(shouldAutoOpen.Invoke(null, new object[] { true, true }),
+                Is.False, "A player may close the tab while combat remains active.");
+            Assert.That(shouldAutoOpen.Invoke(null, new object[] { true, false }),
+                Is.False);
+            Assert.That(shouldShowCombatPage, Is.Not.Null);
+            Assert.That(shouldShowCombatPage.Invoke(
+                    null,
+                    new object[] { false, true, true }),
+                Is.True,
+                "The combat page must remain visible while the result log lingers.");
+            Assert.That(shouldShowCombatPage.Invoke(
+                    null,
+                    new object[] { false, false, true }),
+                Is.False);
+            Assert.That(shouldShowCombatPage.Invoke(
+                    null,
+                    new object[] { true, true, false }),
+                Is.False,
+                "Closing the combat toggle must still hide the page.");
+
+            var hudSerialized = new SerializedObject(
+                combatHud.GetComponent(presenterType));
+            SerializedProperty combatLog = hudSerialized.FindProperty("combatLog");
+            Assert.That(combatLog, Is.Not.Null);
+            Assert.That(combatLog.objectReferenceValue,
+                Is.EqualTo(logPanel.GetComponent(FindType(
+                    "CryingSnow.StackCraft.CombatLogPresenter"))));
+        }
+
+        [Test]
+        public void CombatTiming_UsesReducedConfigurableDeltaMultiplier()
+        {
+            Type managerType = FindType("CryingSnow.StackCraft.CombatManager");
+            FieldInfo defaultMultiplier = managerType.GetField(
+                "DefaultCombatSpeedMultiplier",
+                BindingFlags.Public | BindingFlags.Static);
+            MethodInfo scaleDelta = managerType.GetMethod(
+                "ScaleCombatDelta",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            Assert.That(defaultMultiplier, Is.Not.Null);
+            Assert.That((float)defaultMultiplier.GetRawConstantValue(),
+                Is.EqualTo(0.4f).Within(0.0001f));
+            Assert.That(scaleDelta, Is.Not.Null);
+            Assert.That(scaleDelta.Invoke(null, new object[] { 1f, 0.4f }),
+                Is.EqualTo(0.4f).Within(0.0001f));
+            Assert.That(scaleDelta.Invoke(null, new object[] { 1f, -1f }),
+                Is.EqualTo(0f));
+
+            string managerSource = File.ReadAllText(
+                "Assets/StackCraft/Scripts/Combat/CombatManager.cs");
+            Assert.That(managerSource, Does.Match(
+                @"ScaleCombatDelta\(\s*Time\.deltaTime,\s*combatSpeedMultiplier\)"));
+
+            foreach (string scenePath in new[]
+            {
+                "Assets/StackCraft/Scenes/Main.unity",
+                "Assets/StackCraft/Scenes/Location.unity",
+                "Assets/StackCraft/Scenes/Island.unity"
+            })
+            {
+                Assert.That(File.ReadAllText(scenePath),
+                    Does.Contain("combatSpeedMultiplier: 0.4"),
+                    $"{scenePath} must serialize the intended pacing value.");
+            }
+        }
+
+        [Test]
+        public void WhisperingForest_HostilesPatrolWithoutStartingCombat()
+        {
+            UnityEngine.Object forest = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                "Assets/StackCraft/Resources/Locations/Location_WhisperingForest.asset");
+            UnityEngine.Object slime = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(
+                "Assets/StackCraft/Resources/Cards/Mobs/Card_Slime.asset");
+            Assert.That(forest, Is.Not.Null);
+            Assert.That(slime, Is.Not.Null);
+
+            var forestSerialized = new SerializedObject(forest);
+            SerializedProperty suppressAggro = forestSerialized.FindProperty(
+                "suppressHostileAutoAggro");
+            Assert.That(suppressAggro, Is.Not.Null);
+            Assert.That(suppressAggro.boolValue, Is.True);
+
+            Type cardAiType = FindType("CryingSnow.StackCraft.CardAI");
+            MethodInfo shouldUseAggressiveBehavior = cardAiType.GetMethod(
+                "ShouldUseAggressiveBehavior",
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Assert.That(shouldUseAggressiveBehavior, Is.Not.Null);
+            Assert.That(shouldUseAggressiveBehavior.Invoke(
+                    null,
+                    new[] { slime, forest }),
+                Is.False,
+                "Whispering Forest monsters should not hunt or auto-join player combat.");
+        }
+
+        [Test]
         public void BackpackCombatItemDrag_HasDedicatedQueuePathAndReservationFeedback()
         {
             Type backpackView = FindType("CryingSnow.StackCraft.BackpackView");

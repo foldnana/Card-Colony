@@ -25,9 +25,6 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string BorderSpritePath =
             "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
             "Sprites/Component/Popup/Popup_01_Border.png";
-        private const string BlueButtonPath =
-            "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-            "Sprites/Component/Button/Button_Rectangle_01_Convex_Blue.Png";
         private const string PurpleButtonPath =
             "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
             "Sprites/Component/Button/Button_Rectangle_01_Convex_Purple.Png";
@@ -71,12 +68,12 @@ namespace CryingSnow.StackCraft.EditorTools
                 "skill_protagonist_power_strike";
             serialized.FindProperty("displayName").stringValue = "奋力一击";
             serialized.FindProperty("description").stringValue =
-                "消耗2点体力，对一个敌人造成150%伤害。";
+                "对一个敌人造成200%伤害，仅受冷却时间限制。";
             serialized.FindProperty("targetRule").enumValueIndex =
                 (int)CombatTargetRule.SingleLivingEnemy;
-            serialized.FindProperty("energyCost").intValue = 2;
+            serialized.FindProperty("energyCost").intValue = 0;
             serialized.FindProperty("cooldownSeconds").floatValue = 4f;
-            serialized.FindProperty("powerMultiplier").floatValue = 1.5f;
+            serialized.FindProperty("powerMultiplier").floatValue = 2f;
             serialized.FindProperty("flatPower").intValue = 0;
             serialized.FindProperty("canCritical").boolValue = true;
             serialized.FindProperty("retargetIfInvalid").boolValue = true;
@@ -160,7 +157,10 @@ namespace CryingSnow.StackCraft.EditorTools
                 if (oldHud != null)
                     Object.DestroyImmediate(oldHud.gameObject);
 
-                Transform mainPanel = Find(root.transform, "MainPanel") ?? root.transform;
+                Transform locationView =
+                    Find(root.transform, "LocationView") ??
+                    Find(root.transform, "MenuPanel") ??
+                    root.transform;
                 Toggle locationToggle = Find(root.transform, "LocationToggle")?
                     .GetComponent<Toggle>();
                 TMP_Text toggleLabel = locationToggle != null
@@ -168,16 +168,20 @@ namespace CryingSnow.StackCraft.EditorTools
                     : null;
                 InfoPanel infoPanel = root.GetComponentInChildren<InfoPanel>(true);
 
-                CombatLogPresenter log = CreateCombatLog(
-                    root.transform,
-                    template,
-                    infoPanel);
-                CreateCombatHud(
-                    mainPanel,
+                CombatHudPresenter hud = CreateCombatHud(
+                    locationView,
                     template,
                     locationToggle,
                     toggleLabel);
+                CombatLogPresenter log = CreateCombatLog(
+                    hud.transform,
+                    template,
+                    infoPanel);
+                var hudSerialized = new SerializedObject(hud);
+                hudSerialized.FindProperty("combatLog").objectReferenceValue = log;
+                hudSerialized.ApplyModifiedPropertiesWithoutUndo();
 
+                EditorUtility.SetDirty(hud);
                 EditorUtility.SetDirty(log);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
             }
@@ -195,10 +199,10 @@ namespace CryingSnow.StackCraft.EditorTools
             GameObject panelObject = CreateUiObject("CombatLogPanel", parent);
             RectTransform rect = (RectTransform)panelObject.transform;
             rect.anchorMin = Vector2.zero;
-            rect.anchorMax = Vector2.zero;
-            rect.pivot = Vector2.zero;
-            rect.anchoredPosition = new Vector2(18f, 106f);
-            rect.sizeDelta = new Vector2(420f, 190f);
+            rect.anchorMax = new Vector2(1f, 0f);
+            rect.pivot = new Vector2(0.5f, 0f);
+            rect.anchoredPosition = new Vector2(0f, 16f);
+            rect.sizeDelta = new Vector2(-32f, 190f);
             Image background = panelObject.AddComponent<Image>();
             background.sprite = LoadSprite(PanelSpritePath);
             background.type = Image.Type.Sliced;
@@ -220,7 +224,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 string.Empty,
                 18f,
                 new Color(0.95f, 0.88f, 0.77f));
-            SetRect(logText.rectTransform, 18f, -46f, -18f, -14f);
+            SetRect(logText.rectTransform, 18f, -46f, -18f, -174f);
             logText.alignment = TextAlignmentOptions.BottomLeft;
             logText.enableWordWrapping = true;
             logText.lineSpacing = 4f;
@@ -244,7 +248,7 @@ namespace CryingSnow.StackCraft.EditorTools
             return presenter;
         }
 
-        private static void CreateCombatHud(
+        private static CombatHudPresenter CreateCombatHud(
             Transform parent,
             TMP_Text template,
             Toggle locationToggle,
@@ -287,14 +291,6 @@ namespace CryingSnow.StackCraft.EditorTools
                 new Color(1f, 0.60f, 0.52f));
             SetRect(target.rectTransform, 22f, -178f, -22f, -224f);
 
-            Button basic = CreateButton(
-                "BasicAttackButton",
-                panelObject.transform,
-                template,
-                "普通攻击",
-                BlueButtonPath,
-                new Vector2(22f, -236f),
-                new Vector2(376f, 54f));
             var buttons = new Button[3];
             var labels = new TMP_Text[3];
             for (int index = 0; index < 3; index++)
@@ -303,18 +299,26 @@ namespace CryingSnow.StackCraft.EditorTools
                     $"SkillButton{index + 1}",
                     panelObject.transform,
                     template,
-                    index == 0 ? "奋力一击  -2体力" : "技能",
+                    index == 0 ? "奋力一击  200% · 4秒冷却" : "技能",
                     index == 0 ? PurpleButtonPath : DarkButtonPath,
-                    new Vector2(22f, -302f - index * 62f),
+                    new Vector2(22f, -236f - index * 62f),
                     new Vector2(376f, 54f));
                 labels[index] = buttons[index].GetComponentInChildren<TMP_Text>(true);
             }
+            Button retreat = CreateButton(
+                "RetreatButton",
+                panelObject.transform,
+                template,
+                "撤退",
+                DarkButtonPath,
+                new Vector2(22f, -422f),
+                new Vector2(376f, 54f));
 
             TMP_Text hint = CreateText(
                 "CombatHint",
                 panelObject.transform,
                 template,
-                "点击友方卡选择行动者，点击敌方卡选择目标。\n将角色拖出战斗框可尝试撤退。",
+                "点击技能会自动选择敌人，并替换角色的下一次普通攻击。\n也可以点击撤退，或将角色拖出战斗框。",
                 17f,
                 new Color(0.72f, 0.78f, 0.84f));
             SetRect(hint.rectTransform, 22f, -500f, -22f, -570f);
@@ -326,10 +330,11 @@ namespace CryingSnow.StackCraft.EditorTools
             serialized.FindProperty("combatToggleLabel").objectReferenceValue = toggleLabel;
             serialized.FindProperty("actorLabel").objectReferenceValue = actor;
             serialized.FindProperty("targetLabel").objectReferenceValue = target;
-            serialized.FindProperty("basicAttackButton").objectReferenceValue = basic;
+            serialized.FindProperty("retreatButton").objectReferenceValue = retreat;
             SetObjectArray(serialized.FindProperty("skillButtons"), buttons);
             SetObjectArray(serialized.FindProperty("skillLabels"), labels);
             serialized.ApplyModifiedPropertiesWithoutUndo();
+            return presenter;
         }
 
         private static void SetObjectArray<T>(SerializedProperty property, T[] values)

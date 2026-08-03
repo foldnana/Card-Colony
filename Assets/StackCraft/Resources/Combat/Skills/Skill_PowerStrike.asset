@@ -14,12 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   id: skill_protagonist_power_strike
   displayName: "\u594B\u529B\u4E00\u51FB"
-  description: "\u6D88\u80172\u70B9\u4F53\u529B\uFF0C\u5BF9\u4E00\u4E2A\u654C\u4EBA\u9020\u6210150%\u4F24\u5BB3\u3002"
+  description: "\u5BF9\u4E00\u4E2A\u654C\u4EBA\u9020\u6210200%\u4F24\u5BB3\uFF0C\u4EC5\u53D7\u51B7\u5374\u65F6\u95F4\u9650\u5236\u3002"
   icon: {fileID: 0}
   targetRule: 0
-  energyCost: 2
+  energyCost: 0
   cooldownSeconds: 4
-  powerMultiplier: 1.5
+  powerMultiplier: 2
   flatPower: 0
   canCritical: 1
   retargetIfInvalid: 1

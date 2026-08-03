@@ -7,6 +7,8 @@ namespace CryingSnow.StackCraft
 {
     public class CombatManager : MonoBehaviour
     {
+        public const float DefaultCombatSpeedMultiplier = 0.4f;
+
         public static CombatManager Instance { get; private set; }
         public event System.Action<CombatEvent> EventPublished;
 
@@ -25,6 +27,10 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Damage multiplier for a disadvantageous type (e.g., 0.75 for 25% penalty).")]
         private float disadvantageMultiplier = 0.75f;
 
+        [Header("Combat Timing")]
+        [SerializeField, Range(0.1f, 1f), Tooltip("Scales combat simulation speed without changing card attack-speed stats.")]
+        private float combatSpeedMultiplier = DefaultCombatSpeedMultiplier;
+
         [Header("UI References")]
         [SerializeField, Tooltip("The prefab used to create the visual area for active combat (a rectangle that holds units).")]
         private CombatRect combatRectPrefab;
@@ -42,6 +48,7 @@ namespace CryingSnow.StackCraft
         #region Public Properties
         public float AdvantageMultiplier => advantageMultiplier;
         public float DisadvantageMultiplier => disadvantageMultiplier;
+        public float CombatSpeedMultiplier => combatSpeedMultiplier;
 
         public IEnumerable<CombatTask> ActiveCombats => _activeCombats;
         public IEnumerable<CombatRect> ActiveCombatRects => _activeCombats
@@ -125,7 +132,9 @@ namespace CryingSnow.StackCraft
 
         private void Update()
         {
-            float delta = Time.deltaTime;
+            float delta = ScaleCombatDelta(
+                Time.deltaTime,
+                combatSpeedMultiplier);
             for (int i = _activeCombats.Count - 1; i >= 0; i--)
             {
                 _activeCombats[i].Update(delta);
@@ -141,6 +150,11 @@ namespace CryingSnow.StackCraft
                 GameDirector.Instance?.SaveGame();
             }
         }
+
+        internal static float ScaleCombatDelta(
+            float deltaTime,
+            float speedMultiplier) =>
+            Mathf.Max(0f, deltaTime) * Mathf.Max(0f, speedMultiplier);
 
         public bool DeferSaveIfResolving()
         {
@@ -565,7 +579,21 @@ namespace CryingSnow.StackCraft
                 ActorId = card.PersistentId,
                 Type = CombatCommandType.Retreat
             });
-            return result.Accepted && card.Combatant?.CurrentCombatTask != task;
+            bool retreated = result.Accepted &&
+                card.Combatant?.CurrentCombatTask != task;
+            if (retreated && card.Stack == null)
+            {
+                CardStack stack = new(card, card.transform.position);
+                CardManager.Instance?.RegisterStack(stack);
+                Vector3 position = Board.Instance != null
+                    ? Board.Instance.EnforcePlacementRules(
+                        card.transform.position,
+                        stack)
+                    : card.transform.position;
+                stack.SetTargetPosition(position);
+                CardManager.Instance?.ResolveOverlaps();
+            }
+            return retreated;
         }
 
         public void NotifyPresentationImpact(string sessionId, long actionSequence)

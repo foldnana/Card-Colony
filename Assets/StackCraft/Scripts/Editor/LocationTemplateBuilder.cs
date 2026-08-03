@@ -101,6 +101,7 @@ namespace CryingSnow.StackCraft.EditorTools
         public float RandomSpawnPartyClearance = 2f;
         public IReadOnlyList<LocationTemplateRandomSpawn> RandomCardSpawns =
             Array.Empty<LocationTemplateRandomSpawn>();
+        public bool SuppressHostileAutoAggro;
         public CardDefinition MarketCurrencyCardDefinition;
         public CardDefinition MarketBuyerCardDefinition;
         public CardDefinition MarketPickupCardDefinition;
@@ -182,6 +183,8 @@ namespace CryingSnow.StackCraft.EditorTools
             ReplaceRandomSpawns(
                 serialized.FindProperty("randomCardSpawns"),
                 template.RandomCardSpawns);
+            serialized.FindProperty("suppressHostileAutoAggro").boolValue =
+                template.SuppressHostileAutoAggro;
             serialized.FindProperty("marketCurrencyCardDefinition")
                 .objectReferenceValue = template.MarketCurrencyCardDefinition;
             serialized.FindProperty("marketBuyerCardDefinition")

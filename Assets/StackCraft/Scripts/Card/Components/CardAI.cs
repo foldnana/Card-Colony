@@ -73,7 +73,9 @@ namespace CryingSnow.StackCraft
 
                 EnsureDetachedFromStack();
 
-                if (_card.Definition.IsAggressive)
+                if (ShouldUseAggressiveBehavior(
+                    _card.Definition,
+                    LocationSceneController.Instance?.ActiveDefinition))
                 {
                     ExecuteAggressiveBehavior();
                 }
@@ -83,6 +85,13 @@ namespace CryingSnow.StackCraft
                 }
             }
         }
+
+        internal static bool ShouldUseAggressiveBehavior(
+            CardDefinition definition,
+            LocationDefinition location) =>
+            definition != null &&
+            definition.IsAggressive &&
+            !(location?.SuppressHostileAutoAggro ?? false);
 
         private bool CanMove()
         {

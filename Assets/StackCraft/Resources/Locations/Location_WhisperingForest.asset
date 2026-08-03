@@ -30,6 +30,7 @@ MonoBehaviour:
   randomSpawnAreaSize: {x: 13.2, y: 5.4}
   randomSpawnMinSpacing: 1.05
   randomSpawnPartyClearance: 2.1
+  suppressHostileAutoAggro: 1
   randomCardSpawns:
   - definition: {fileID: 11400000, guid: 819eb0291ba0479448286c2ec007085d, type: 2}
     minimumCount: 2

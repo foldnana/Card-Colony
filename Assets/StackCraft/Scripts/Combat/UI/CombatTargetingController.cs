@@ -31,6 +31,34 @@ namespace CryingSnow.StackCraft
             return Submit(task, actor, target, CombatCommandType.UseSkill, skill?.Id);
         }
 
+        public CombatCommandResult SubmitSkillToAutomaticTarget(
+            CombatTask task,
+            CardInstance actor,
+            CardInstance preferredTarget,
+            CombatSkillDefinition skill)
+        {
+            CardInstance target = ChooseAutomaticTarget(
+                task?.LivingEnemiesOf(actor),
+                preferredTarget);
+            if (target == null)
+                return CombatCommandResult.Failure(
+                    CombatCommandResultCode.InvalidTarget,
+                    "当前战斗中没有可用的敌方目标。");
+            return SubmitSkill(task, actor, target, skill);
+        }
+
+        internal static CardInstance ChooseAutomaticTarget(
+            IEnumerable<CardInstance> livingEnemies,
+            CardInstance preferredTarget)
+        {
+            List<CardInstance> candidates = livingEnemies?
+                .Where(target => target != null)
+                .ToList() ?? new List<CardInstance>();
+            return preferredTarget != null && candidates.Contains(preferredTarget)
+                ? preferredTarget
+                : candidates.FirstOrDefault();
+        }
+
         public bool BeginSkillTargeting(
             CombatTask task,
             CardInstance actor,

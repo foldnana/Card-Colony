@@ -8713,6 +8713,10 @@ namespace CardColony.Tests
                     "Assets/CardColony/Art/Backgrounds/WhisperingForestBackground_v2.png"));
             Assert.That(serialized.FindProperty("randomizeCardsOnEntry").boolValue,
                 Is.True, "野外地点需要在每次从世界地图进入时重新生成内容");
+            Assert.That(
+                serialized.FindProperty("suppressHostileAutoAggro")?.boolValue,
+                Is.True,
+                "Whispering Forest monsters should patrol until the player initiates combat.");
             Vector2 mapSize = serialized.FindProperty("mapSize").vector2Value;
             Vector2 randomCenter =
                 serialized.FindProperty("randomSpawnAreaCenter").vector2Value;

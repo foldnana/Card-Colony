@@ -24,6 +24,8 @@ namespace CryingSnow.StackCraft
     [DisallowMultipleComponent]
     public sealed class LocationSceneController : MonoBehaviour
     {
+        public static LocationSceneController Instance { get; private set; }
+
         [SerializeField] private List<LocationDefinition> locationDefinitions = new();
         [SerializeField] private Button returnButton;
         [SerializeField] private TMP_Text locationTitleLabel;
@@ -71,6 +73,7 @@ namespace CryingSnow.StackCraft
 
         private void Awake()
         {
+            Instance = this;
             returnButton?.onClick.AddListener(ReturnToWorldMap);
             ProtagonistStatePresenter.Ensure(gameObject);
             if (GameDirector.Instance != null)
@@ -79,6 +82,8 @@ namespace CryingSnow.StackCraft
 
         private void OnDestroy()
         {
+            if (Instance == this)
+                Instance = null;
             returnButton?.onClick.RemoveListener(ReturnToWorldMap);
             if (GameDirector.Instance != null)
                 GameDirector.Instance.OnSceneDataReady -= HandleSceneDataReady;
