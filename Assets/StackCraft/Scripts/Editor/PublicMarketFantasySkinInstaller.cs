@@ -68,6 +68,7 @@ namespace CryingSnow.StackCraft.EditorTools
             try
             {
                 ApplyToPrefabContents(root);
+                CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
                 AssetDatabase.SaveAssets();
                 Debug.Log(

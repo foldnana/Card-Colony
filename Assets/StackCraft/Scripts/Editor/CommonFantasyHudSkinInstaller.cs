@@ -11,11 +11,10 @@ namespace CryingSnow.StackCraft.EditorTools
     {
         private const string UiRootPath =
             "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+        private const string DialoguePanelPath =
+            "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab";
         private const string LocationScenePath =
             "Assets/StackCraft/Scenes/Location.unity";
-        private const string ComponentRoot =
-            "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-            "Sprites/Component/";
         private const string UltimateShapeRoot =
             "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/";
         private const string PanelSpritePath =
@@ -26,10 +25,6 @@ namespace CryingSnow.StackCraft.EditorTools
             "Semi Rounded/" +
             "Semi Rounded - Outline - 6px - 300ppu.png";
         private const string ListSpritePath = PanelSpritePath;
-        private const string ButtonRoot =
-            ComponentRoot + "Button/";
-        private const string LocationReturnButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Blue.Png";
         private const string DarkButtonSpritePath = PanelSpritePath;
         private const string BlueButtonSpritePath = PanelSpritePath;
         private const string PurpleButtonSpritePath = BlueButtonSpritePath;
@@ -40,31 +35,37 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string SelectionLightSpritePath = BorderSpritePath;
 
         private static readonly Color PanelNavy =
-            new(0.075f, 0.070f, 0.085f, 0.985f);
+            new(0.82f, 0.84f, 0.86f, 0.985f);
         private static readonly Color HeaderNavy =
-            new(0.145f, 0.125f, 0.135f, 1f);
-        private static readonly Color ModernDarkButtonNavy =
-            new(0.169f, 0.235f, 0.341f, 1f);
+            new(0.72f, 0.77f, 0.82f, 1f);
+        private static readonly Color LightButtonBlue =
+            new(0.67f, 0.76f, 0.86f, 1f);
+        private static readonly Color LightDanger =
+            new(0.84f, 0.67f, 0.66f, 1f);
+        private static readonly Color LightSuccess =
+            new(0.64f, 0.80f, 0.68f, 1f);
+        private static readonly Color LightAmber =
+            new(0.88f, 0.76f, 0.57f, 1f);
         private static readonly Color ContentNavy =
-            new(0.095f, 0.090f, 0.105f, 1f);
+            new(0.90f, 0.91f, 0.92f, 1f);
         private static readonly Color ListNavy =
-            new(0.115f, 0.108f, 0.120f, 1f);
+            new(0.84f, 0.86f, 0.87f, 1f);
         private static readonly Color QuestNavy =
-            new(0.095f, 0.090f, 0.105f, 1f);
+            new(0.88f, 0.90f, 0.94f, 1f);
         private static readonly Color RecipeBrown =
-            new(0.105f, 0.095f, 0.085f, 1f);
+            new(0.92f, 0.88f, 0.82f, 1f);
         private static readonly Color Cyan =
-            new(0.38f, 0.82f, 0.97f, 1f);
+            new(0.10f, 0.38f, 0.58f, 1f);
         private static readonly Color WarmIvory =
-            new(0.96f, 0.87f, 0.71f, 1f);
+            new(0.14f, 0.16f, 0.19f, 1f);
         private static readonly Color Gold =
-            new(0.98f, 0.75f, 0.30f, 1f);
+            new(0.60f, 0.36f, 0.08f, 1f);
         private static readonly Color Green =
-            new(0.58f, 0.88f, 0.62f, 1f);
+            new(0.15f, 0.44f, 0.25f, 1f);
         private static readonly Color Silver =
-            new(0.72f, 0.78f, 0.82f, 1f);
+            new(0.34f, 0.38f, 0.42f, 1f);
 
-        [MenuItem("Tools/StackCraft/Apply Common Fantasy HUD Skin")]
+        [MenuItem("Tools/StackCraft/Apply Ultimate Clean Light HUD Skin")]
         public static void Apply()
         {
             ApplyPrefabOnly();
@@ -80,13 +81,28 @@ namespace CryingSnow.StackCraft.EditorTools
             {
                 ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
-                AssetDatabase.SaveAssets();
-                Debug.Log("Applied the common fantasy HUD skin.");
             }
             finally
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
+
+            GameObject dialogue =
+                PrefabUtility.LoadPrefabContents(DialoguePanelPath);
+            try
+            {
+                ApplyToDialoguePrefabContents(dialogue);
+                PrefabUtility.SaveAsPrefabAsset(
+                    dialogue,
+                    DialoguePanelPath);
+            }
+            finally
+            {
+                PrefabUtility.UnloadPrefabContents(dialogue);
+            }
+
+            AssetDatabase.SaveAssets();
+            Debug.Log("Applied the Ultimate Clean Light HUD skin.");
         }
 
         [MenuItem(
@@ -215,6 +231,61 @@ namespace CryingSnow.StackCraft.EditorTools
             StylePartyAndJournalPanels(
                 root.transform,
                 panelSprite);
+            WireCombatLocationView(root.transform);
+            StyleExtendedLightInterfaces(
+                root.transform,
+                panelSprite,
+                borderSprite,
+                listSprite);
+        }
+
+        private static void WireCombatLocationView(Transform root)
+        {
+            Transform combatPage = FindDescendant(root, "CombatHudPanel");
+            Transform sidebar = FindDescendant(root, "MenuPanel");
+            if (combatPage != null && sidebar != null &&
+                combatPage.parent != sidebar)
+            {
+                combatPage.SetParent(sidebar, false);
+            }
+            if (combatPage is RectTransform combatRect)
+            {
+                combatRect.anchorMin = Vector2.zero;
+                combatRect.anchorMax = Vector2.one;
+                combatRect.offsetMin = new Vector2(14f, 14f);
+                combatRect.offsetMax = new Vector2(-14f, -72f);
+                combatRect.SetAsLastSibling();
+            }
+
+            CombatHudPresenter presenter = combatPage?
+                .GetComponent<CombatHudPresenter>();
+            WorldMapLocationView locationView = FindDescendant(
+                    root,
+                    "LocationView")?
+                .GetComponent<WorldMapLocationView>();
+            if (presenter == null || locationView == null)
+                return;
+
+            var serialized = new SerializedObject(presenter);
+            serialized.FindProperty("locationView").objectReferenceValue =
+                locationView;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        internal static void ApplyToDialoguePrefabContents(GameObject root)
+        {
+            if (root == null)
+                throw new MissingReferenceException(
+                    "Light skin requires a DialoguePanel prefab.");
+
+            Sprite panelSprite = LoadRequiredSprite(PanelSpritePath);
+            StyleOptionalImage(root.transform, "DialoguePanel", panelSprite,
+                ContentNavy);
+            StyleOptionalImage(root.transform, "SpeakerHeader", panelSprite,
+                HeaderNavy);
+            StyleOptionalButton(root.transform, "ReplyButton", panelSprite);
+            StyleOptionalButton(root.transform, "GoodbyeButton", panelSprite);
+            EnsureReadableText(root.transform);
         }
 
         private static void StyleTopStatus(
@@ -515,6 +586,15 @@ namespace CryingSnow.StackCraft.EditorTools
             infoBorder.transform.SetAsFirstSibling();
             StyleText(infoPanel, "InfoText", WarmIvory);
             StyleText(infoPanel, "ActionButton", Gold);
+            Transform actionButton =
+                RequireDescendant(infoPanel, "ActionButton");
+            LayoutElement actionLayout =
+                actionButton.GetComponent<LayoutElement>();
+            if (actionLayout == null)
+                actionLayout = actionButton.gameObject.AddComponent<LayoutElement>();
+            actionLayout.minWidth = 140f;
+            actionLayout.preferredWidth = 140f;
+            actionLayout.flexibleWidth = 0f;
 
             Transform npcPanel =
                 RequireDescendant(root, "NpcTradePanel");
@@ -615,6 +695,269 @@ namespace CryingSnow.StackCraft.EditorTools
                 new Vector2(-5f, -7f));
         }
 
+        private static void StyleExtendedLightInterfaces(
+            Transform root,
+            Sprite panelSprite,
+            Sprite borderSprite,
+            Sprite listSprite)
+        {
+            foreach (string name in new[]
+                     {
+                         "BackpackSelectedDetails",
+                         "CombatHudPanel",
+                         "CombatLogPanel",
+                         "PublicMarketModal",
+                         "PublicMarketBackpackPanel",
+                         "PublicMarketMarketPanel",
+                         "PublicMarketTransactionPanel",
+                         "PauseMenu"
+                     })
+            {
+                StyleOptionalImage(
+                    root,
+                    name,
+                    panelSprite,
+                    ContentNavy);
+                Transform surface = FindDescendant(root, name);
+                if (surface != null)
+                {
+                    EnsureShadow(
+                        surface.gameObject,
+                        new Color(0.08f, 0.12f, 0.16f, 0.20f),
+                        new Vector2(-2f, -3f));
+                }
+            }
+
+            StyleOptionalImage(
+                root,
+                "PublicMarketFantasyHeader",
+                panelSprite,
+                HeaderNavy);
+            StyleOptionalImage(
+                root,
+                "PublicMarketFantasyFrame",
+                borderSprite,
+                new Color(0.30f, 0.70f, 0.94f, 0.88f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketFantasyHeaderHighlight",
+                borderSprite,
+                new Color(0.30f, 0.70f, 0.94f, 0.64f));
+
+            StyleOptionalImage(
+                root,
+                "PublicMarketBackpackPanelFantasyBorder",
+                borderSprite,
+                new Color(0.30f, 0.62f, 0.92f, 0.72f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketTransactionPanelFantasyBorder",
+                borderSprite,
+                new Color(0.98f, 0.63f, 0.22f, 0.72f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketMarketPanelFantasyBorder",
+                borderSprite,
+                new Color(0.32f, 0.78f, 0.52f, 0.72f));
+
+            foreach (string name in new[]
+                     {
+                         "NpcTradeRowTemplate",
+                         "PublicMarketBackpackPanelScrollView",
+                         "PublicMarketMarketPanelScrollView",
+                         "BackpackSlot1",
+                         "BackpackSlot2",
+                         "BackpackSlot3",
+                         "BackpackSlot4",
+                         "BackpackSlot5",
+                         "BackpackSlot6",
+                         "BackpackSlot7",
+                         "BackpackSlot8"
+                     })
+            {
+                StyleOptionalImage(root, name, listSprite, ListNavy);
+            }
+
+            StyleMarketRow(
+                root,
+                "PublicMarketBackpackRowTemplate",
+                listSprite);
+            StyleMarketRow(
+                root,
+                "PublicMarketMarketRowTemplate",
+                listSprite);
+
+            foreach (string name in new[]
+                     {
+                         "PublicMarketCloseButton",
+                         "PublicMarketDecreaseButton",
+                         "PublicMarketIncreaseButton",
+                         "PublicMarketMaximumButton",
+                         "PublicMarketConfirmButton",
+                         "SkillButton1",
+                         "SkillButton2",
+                         "SkillButton3",
+                         "RetreatButton"
+                     })
+            {
+                StyleOptionalButton(root, name, panelSprite);
+                if (name.StartsWith("SkillButton") ||
+                    name == "RetreatButton")
+                {
+                    FitCombatActionButton(root, name);
+                }
+            }
+            StyleOptionalButton(
+                root,
+                "PublicMarketCloseButton",
+                panelSprite,
+                LightDanger,
+                new Color(0.38f, 0.10f, 0.09f, 1f));
+            StyleOptionalButton(
+                root,
+                "PublicMarketMaximumButton",
+                panelSprite,
+                LightAmber,
+                new Color(0.42f, 0.25f, 0.05f, 1f));
+            StyleOptionalButton(
+                root,
+                "PublicMarketConfirmButton",
+                panelSprite,
+                LightSuccess,
+                new Color(0.08f, 0.32f, 0.16f, 1f));
+
+            foreach (string name in new[]
+                     {
+                         "BackpackTablePanel",
+                         "BackpackSelectedDetails",
+                         "InfoPanel",
+                         "NpcTradePanel",
+                         "NpcTradeScrollView",
+                         "WorldMapPartyStatusPanel",
+                         "QuestsView",
+                         "RecipesView",
+                         "CombatHudPanel",
+                         "CombatLogPanel",
+                         "PublicMarketModal"
+                     })
+            {
+                Transform panel = FindDescendant(root, name);
+                if (panel != null)
+                    EnsureReadableText(panel);
+            }
+        }
+
+        private static void StyleMarketRow(
+            Transform root,
+            string name,
+            Sprite sprite)
+        {
+            Transform row = FindDescendant(root, name);
+            if (row == null)
+                return;
+            StyleOptionalImage(row, name, sprite, ListNavy);
+            EnsureShadow(
+                row.gameObject,
+                new Color(0.08f, 0.12f, 0.16f, 0.18f),
+                new Vector2(0f, -2f));
+
+            MarketCommodityListItem item =
+                row.GetComponent<MarketCommodityListItem>();
+            if (item == null)
+                return;
+            var serialized = new SerializedObject(item);
+            serialized.FindProperty("buyButtonSprite")
+                .objectReferenceValue = sprite;
+            serialized.FindProperty("sellButtonSprite")
+                .objectReferenceValue = sprite;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static void StyleOptionalButton(
+            Transform root,
+            string name,
+            Sprite sprite)
+        {
+            StyleOptionalButton(
+                root,
+                name,
+                sprite,
+                LightButtonBlue,
+                WarmIvory);
+        }
+
+        private static void StyleOptionalButton(
+            Transform root,
+            string name,
+            Sprite sprite,
+            Color background,
+            Color text)
+        {
+            Transform target = FindDescendant(root, name);
+            if (target == null || target.GetComponent<Button>() == null)
+                return;
+            StyleButton(
+                target,
+                sprite,
+                background,
+                text);
+        }
+
+        private static void FitCombatActionButton(
+            Transform root,
+            string name)
+        {
+            RectTransform rect =
+                FindDescendant(root, name) as RectTransform;
+            if (rect == null)
+                return;
+            float y = rect.anchoredPosition.y;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, y);
+            rect.sizeDelta = new Vector2(-44f, rect.sizeDelta.y);
+        }
+
+        private static void StyleOptionalImage(
+            Transform root,
+            string name,
+            Sprite sprite,
+            Color color)
+        {
+            Transform target = FindDescendant(root, name);
+            Image image = target?.GetComponent<Image>();
+            if (image != null)
+                StyleImage(image, sprite, color);
+        }
+
+        private static void EnsureReadableText(Transform root)
+        {
+            TMP_Text[] labels =
+                root.GetComponentsInChildren<TMP_Text>(true);
+            foreach (TMP_Text label in labels)
+            {
+                float luminance = ColorLuminance(label.color);
+                if (luminance <= 0.52f)
+                    continue;
+
+                const float targetLuminance = 0.28f;
+                float darken = Mathf.Clamp01(
+                    (luminance - targetLuminance) /
+                    Mathf.Max(0.001f, luminance));
+                Color darkened = Color.Lerp(label.color, Color.black, darken);
+                darkened.a = label.color.a;
+                label.color = darkened;
+            }
+        }
+
+        private static float ColorLuminance(Color color)
+        {
+            return 0.2126f * color.r +
+                   0.7152f * color.g +
+                   0.0722f * color.b;
+        }
+
         internal static void StyleLocationReturnButton(Button button)
         {
             if (button == null)
@@ -622,9 +965,9 @@ namespace CryingSnow.StackCraft.EditorTools
                     "Location return button is missing.");
             StyleButton(
                 button.transform,
-                LoadRequiredSprite(LocationReturnButtonSpritePath),
-                Color.white,
-                Color.white);
+                LoadRequiredSprite(PanelSpritePath),
+                LightButtonBlue,
+                WarmIvory);
         }
 
         private static void StyleToggle(
@@ -635,7 +978,7 @@ namespace CryingSnow.StackCraft.EditorTools
         {
             Transform target = RequireDescendant(root, name);
             Image image = target.GetComponent<Image>();
-            StyleImage(image, sprite, ModernDarkButtonNavy);
+            StyleImage(image, sprite, LightButtonBlue);
             EnsureShadow(
                 target.gameObject,
                 new Color(0f, 0f, 0.01f, 0.65f),
@@ -661,7 +1004,7 @@ namespace CryingSnow.StackCraft.EditorTools
             TMP_Text label = target
                 .GetComponentInChildren<TMP_Text>(true);
             if (label != null)
-                label.color = Color.white;
+                label.color = WarmIvory;
         }
 
         private static void StyleButton(
@@ -674,7 +1017,7 @@ namespace CryingSnow.StackCraft.EditorTools
             StyleButton(
                 target,
                 sprite,
-                ModernDarkButtonNavy,
+                LightButtonBlue,
                 labelColor);
         }
 
@@ -774,8 +1117,9 @@ namespace CryingSnow.StackCraft.EditorTools
 
             if (shadow == null)
                 shadow = target.AddComponent<Shadow>();
+            color.a = Mathf.Min(color.a, 0.22f);
             shadow.effectColor = color;
-            shadow.effectDistance = distance;
+            shadow.effectDistance = Vector2.ClampMagnitude(distance, 4f);
             shadow.useGraphicAlpha = true;
             return shadow;
         }

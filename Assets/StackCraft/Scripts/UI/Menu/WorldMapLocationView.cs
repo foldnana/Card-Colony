@@ -1269,7 +1269,7 @@ namespace CryingSnow.StackCraft
                 ConfigureText(typeAndDangerLabel, 20f, TextAlignmentOptions.MidlineLeft);
                 ConfigureText(descriptionLabel, 19f, TextAlignmentOptions.TopLeft);
                 if (descriptionLabel != null)
-                    descriptionLabel.color = new Color(0.84f, 0.84f, 0.84f, 1f);
+                    descriptionLabel.color = new Color(0.28f, 0.31f, 0.34f, 1f);
                 return;
             }
 

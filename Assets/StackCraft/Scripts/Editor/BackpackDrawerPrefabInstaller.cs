@@ -137,6 +137,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 DestroyIfPresent(root.transform, "BackpackCloseButton");
                 DestroyIfPresent(backpackRoot, "BackpackDrawerLayoutV1");
                 drawer.gameObject.SetActive(false);
+                CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
                 AssetDatabase.SaveAssets();
                 Debug.Log("Backpack sidebar page serialized into UIRoot.prefab.");

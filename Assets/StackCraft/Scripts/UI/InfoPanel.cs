@@ -208,7 +208,7 @@ namespace CryingSnow.StackCraft
 
             if (!string.IsNullOrEmpty(newInfo.header))
             {
-                headerText = $"<size={headerSize}><color=#F2C94C>【{newInfo.header}】</color></size>\n";
+                headerText = $"<size={headerSize}><color=#8A5A00>【{newInfo.header}】</color></size>\n";
             }
             if (!string.IsNullOrEmpty(newInfo.body))
             {

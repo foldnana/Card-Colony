@@ -161,6 +161,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 canvasGroup.interactable = false;
                 canvasGroup.blocksRaycasts = false;
 
+                CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
                 AssetDatabase.SaveAssets();
                 Debug.Log("Installed the fixed world-map party status panel into UIRoot.");

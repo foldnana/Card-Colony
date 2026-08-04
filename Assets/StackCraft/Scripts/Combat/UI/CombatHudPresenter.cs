@@ -11,6 +11,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private CanvasGroup panel;
         [SerializeField] private Toggle combatToggle;
         [SerializeField] private TMP_Text combatToggleLabel;
+        [SerializeField] private WorldMapLocationView locationView;
         [SerializeField] private CombatLogPresenter combatLog;
         [SerializeField] private TMP_Text actorLabel;
         [SerializeField] private TMP_Text targetLabel;
@@ -23,6 +24,8 @@ namespace CryingSnow.StackCraft
         private readonly CombatTargetingController targeting = new();
         private float nextRefreshAt;
         private bool wasInPlayerCombat;
+        private bool locationViewSuppressed;
+        private bool locationViewWasVisible;
 
         private void Awake()
         {
@@ -182,7 +185,7 @@ namespace CryingSnow.StackCraft
                 {
                     retreatRect.anchoredPosition = new Vector2(
                         retreatRect.anchoredPosition.x,
-                        -236f - skills.Length * 62f);
+                        -166f - skills.Length * 50f);
                 }
             }
         }
@@ -249,6 +252,27 @@ namespace CryingSnow.StackCraft
             panel.alpha = visible ? 1f : 0f;
             panel.blocksRaycasts = visible;
             panel.interactable = visible;
+
+            if (locationView == null)
+                return;
+            if (visible)
+            {
+                if (!locationViewSuppressed)
+                {
+                    CanvasGroup locationGroup =
+                        locationView.GetComponent<CanvasGroup>();
+                    locationViewWasVisible = locationGroup != null &&
+                        locationGroup.alpha > 0.5f &&
+                        locationGroup.blocksRaycasts;
+                }
+                locationView.ToggleView(false);
+                locationViewSuppressed = true;
+            }
+            else if (locationViewSuppressed)
+            {
+                locationView.ToggleView(locationViewWasVisible);
+                locationViewSuppressed = false;
+            }
         }
     }
 }

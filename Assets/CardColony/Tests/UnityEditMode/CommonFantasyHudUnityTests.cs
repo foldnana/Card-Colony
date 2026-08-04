@@ -64,8 +64,8 @@ namespace CardColony.Tests
             TMP_Text cards = FindDescendant(
                 stats,
                 "CardLabel").GetComponent<TMP_Text>();
-            Assert.That(dayText.color.r,
-                Is.GreaterThan(dayText.color.b + 0.08f),
+            Assert.That(ColorLuminance(dayText.color),
+                Is.LessThan(0.35f),
                 "日期需要使用暖象牙白。");
             Assert.That(nutrition.color.g,
                 Is.GreaterThan(nutrition.color.r + 0.08f),
@@ -122,8 +122,8 @@ namespace CardColony.Tests
                 Is.GreaterThan(title.color.r + 0.12f));
             Assert.That(type.color.r,
                 Is.GreaterThan(type.color.b + 0.20f));
-            Assert.That(description.color.r,
-                Is.GreaterThan(description.color.b + 0.05f));
+            Assert.That(ColorLuminance(description.color),
+                Is.LessThan(0.35f));
         }
 
         [Test]
@@ -401,11 +401,11 @@ namespace CardColony.Tests
                 Assert.That(returnTransform, Is.Not.Null);
                 AssertSlicedSprite(
                     returnTransform.GetComponent<Image>(),
-                    ButtonRoot +
-                    "Button_Rectangle_01_Convex_Blue.Png");
+                    UltimateRoundedFill);
                 Assert.That(
-                    returnTransform.GetComponent<Image>().color,
-                    Is.EqualTo(Color.white));
+                    ColorLuminance(
+                        returnTransform.GetComponent<Image>().color),
+                    Is.InRange(0.62f, 0.92f));
                 Button returnButton =
                     returnTransform.GetComponent<Button>();
                 Assert.That(
@@ -599,7 +599,14 @@ namespace CardColony.Tests
                     component.GetType() == typeof(Shadow));
             Assert.That(shadow, Is.Not.Null);
             Assert.That(shadow.effectDistance.y, Is.LessThan(-1f));
-            Assert.That(shadow.effectColor.a, Is.GreaterThanOrEqualTo(0.45f));
+            Assert.That(shadow.effectColor.a, Is.InRange(0.12f, 0.30f));
+        }
+
+        private static float ColorLuminance(Color color)
+        {
+            return 0.2126f * color.r +
+                   0.7152f * color.g +
+                   0.0722f * color.b;
         }
 
         private static Transform FindDescendant(

@@ -1,4 +1,7 @@
+using System.IO;
+using System.Linq;
 using NUnit.Framework;
+using TMPro;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
@@ -9,13 +12,15 @@ namespace CardColony.Tests
     {
         private const string UiRootPath =
             "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+        private const string DialoguePanelPath =
+            "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab";
         private const string ShapeRoot =
             "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/";
         private const string RoundedPanelFill =
             ShapeRoot + "Semi Rounded/Semi Rounded - 300ppu.png";
-        private const string ModernDarkButtonFill =
+        private const string LightButtonFill =
             ShapeRoot + "Semi Rounded/Semi Rounded - 300ppu.png";
-        private const string ModernDarkButtonOutline =
+        private const string LightButtonOutline =
             ShapeRoot +
             "Semi Rounded/Semi Rounded - Outline - 6px - 300ppu.png";
 
@@ -47,7 +52,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void UiRoot_RightSidebarPrefabUsesModernDarkRoundedTabs()
+        public void UiRoot_RightSidebarPrefabUsesLightRoundedTabs()
         {
             GameObject root =
                 AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
@@ -67,7 +72,7 @@ namespace CardColony.Tests
             Assert.That(header, Is.Not.Null);
             AssertSlicedSprite(
                 header.GetComponent<Image>(),
-                ModernDarkButtonFill);
+                LightButtonFill);
             Assert.That(((RectTransform)header).sizeDelta.y, Is.InRange(58f, 68f));
 
             foreach (string tabName in new[]
@@ -81,15 +86,14 @@ namespace CardColony.Tests
                 Transform tab = FindDescendant(sidebar, tabName);
                 Assert.That(tab, Is.Not.Null, tabName);
                 Image tabImage = tab.GetComponent<Image>();
-                AssertSlicedSprite(tabImage, ModernDarkButtonFill);
-                Assert.That(tabImage.color.r, Is.LessThan(0.25f));
-                Assert.That(tabImage.color.g, Is.LessThan(0.3f));
-                Assert.That(tabImage.color.b, Is.LessThan(0.4f));
+                AssertSlicedSprite(tabImage, LightButtonFill);
+                Assert.That(ColorLuminance(tabImage.color),
+                    Is.InRange(0.62f, 0.92f));
                 Assert.That(tabImage.color.a, Is.EqualTo(1f));
                 Image selection = FindDirectChild(
                     tab,
                     "FantasySelectionHighlight")?.GetComponent<Image>();
-                AssertSlicedSprite(selection, ModernDarkButtonOutline);
+                AssertSlicedSprite(selection, LightButtonOutline);
                 Assert.That(selection.raycastTarget, Is.False);
             }
 
@@ -112,6 +116,220 @@ namespace CardColony.Tests
                 Assert.That(pageRect.offsetMax.x, Is.InRange(-18f, -12f));
                 Assert.That(pageRect.offsetMax.y, Is.InRange(-76f, -68f));
             }
+        }
+
+        [Test]
+        public void UiRoot_ExtendedInterfacesUseLightSurfaces()
+        {
+            GameObject root =
+                AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
+            Assert.That(root, Is.Not.Null);
+
+            foreach (string panelName in new[]
+                     {
+                         "BackpackTablePanel",
+                         "BackpackSelectedDetails",
+                         "InfoPanel",
+                         "NpcTradePanel",
+                         "NpcTradeScrollView",
+                         "WorldMapPartyStatusPanel",
+                         "QuestsView",
+                         "RecipesView",
+                         "CombatHudPanel",
+                         "CombatLogPanel",
+                         "PublicMarketModal",
+                         "PublicMarketBackpackPanel",
+                         "PublicMarketMarketPanel",
+                         "PublicMarketTransactionPanel"
+                     })
+            {
+                Transform panel = FindDescendant(root.transform, panelName);
+                Assert.That(panel, Is.Not.Null, panelName);
+                AssertLightSurface(panel.GetComponent<Image>(), panelName);
+            }
+
+            foreach (string buttonName in new[]
+                     {
+                         "PublicMarketCloseButton",
+                         "PublicMarketDecreaseButton",
+                         "PublicMarketIncreaseButton",
+                         "PublicMarketMaximumButton",
+                         "PublicMarketConfirmButton",
+                         "SkillButton1",
+                         "SkillButton2",
+                         "SkillButton3",
+                         "RetreatButton"
+                     })
+            {
+                Transform button = FindDescendant(root.transform, buttonName);
+                Assert.That(button, Is.Not.Null, buttonName);
+                AssertLightSurface(button.GetComponent<Image>(), buttonName);
+                AssertReadableOnLight(button, buttonName);
+            }
+
+            foreach (string borderName in new[]
+                     {
+                         "PublicMarketBackpackPanelFantasyBorder",
+                         "PublicMarketMarketPanelFantasyBorder",
+                         "PublicMarketTransactionPanelFantasyBorder"
+                     })
+            {
+                Transform border = FindDescendant(root.transform, borderName);
+                Assert.That(border, Is.Not.Null, borderName);
+                AssertSlicedSprite(
+                    border.GetComponent<Image>(),
+                    LightButtonOutline);
+            }
+
+            Transform action = FindDescendant(root.transform, "ActionButton");
+            Assert.That(action, Is.Not.Null);
+            LayoutElement actionLayout = action.GetComponent<LayoutElement>();
+            Assert.That(actionLayout, Is.Not.Null);
+            Assert.That(actionLayout.minWidth, Is.GreaterThanOrEqualTo(120f));
+            Assert.That(actionLayout.preferredWidth, Is.GreaterThanOrEqualTo(120f));
+        }
+
+        [Test]
+        public void CombatHud_SuppressesLocationPageAndKeepsActionsInsideSidebar()
+        {
+            GameObject root =
+                AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
+            Assert.That(root, Is.Not.Null);
+
+            Transform combat = FindDescendant(root.transform, "CombatHudPanel");
+            Transform location = FindDescendant(root.transform, "LocationView");
+            Transform sidebar = FindDescendant(root.transform, "MenuPanel");
+            Assert.That(combat, Is.Not.Null);
+            Assert.That(location, Is.Not.Null);
+            Assert.That(combat.parent, Is.EqualTo(sidebar),
+                "战斗页必须与地点页平级，否则隐藏地点页时战斗页也会消失。");
+
+            System.Type presenterType = FindType(
+                "CryingSnow.StackCraft.CombatHudPresenter");
+            System.Type locationViewType = FindType(
+                "CryingSnow.StackCraft.WorldMapLocationView");
+            Component presenter = combat.GetComponent(presenterType);
+            Assert.That(presenter, Is.Not.Null);
+            var serialized = new SerializedObject(presenter);
+            Assert.That(
+                serialized.FindProperty("locationView").objectReferenceValue,
+                Is.EqualTo(location.GetComponent(locationViewType)));
+
+            foreach (string buttonName in new[]
+                     {
+                         "SkillButton1",
+                         "SkillButton2",
+                         "SkillButton3",
+                         "RetreatButton"
+                     })
+            {
+                RectTransform button = (RectTransform)FindDescendant(
+                    combat,
+                    buttonName);
+                Assert.That(button.anchorMin.x, Is.EqualTo(0f));
+                Assert.That(button.anchorMax.x, Is.EqualTo(1f));
+                Assert.That(button.offsetMin.x, Is.InRange(16f, 28f));
+                Assert.That(button.offsetMax.x, Is.InRange(-28f, -16f));
+            }
+
+            const float minimumSidebarHeight = 514f;
+            RectTransform log = (RectTransform)FindDescendant(
+                combat,
+                "CombatLogPanel");
+            Assert.That(log, Is.Not.Null);
+            float logTopFromPageTop = minimumSidebarHeight -
+                log.anchoredPosition.y - log.sizeDelta.y;
+            float lowestActionBottom = new[]
+                {
+                    "SkillButton1",
+                    "SkillButton2",
+                    "SkillButton3",
+                    "RetreatButton"
+                }
+                .Select(buttonName => (RectTransform)FindDescendant(
+                    combat,
+                    buttonName))
+                .Max(button => -button.anchoredPosition.y +
+                               button.sizeDelta.y);
+            Assert.That(lowestActionBottom,
+                Is.LessThan(logTopFromPageTop),
+                "At the 600px project height, combat actions must not overlap the log.");
+            Assert.That(
+                FindDescendant(combat, "CombatHint").gameObject.activeSelf,
+                Is.False,
+                "The long hint must stay hidden in the compact combat layout.");
+        }
+
+        [Test]
+        public void DialoguePanel_UsesLightRoundedSurfaces()
+        {
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(
+                DialoguePanelPath);
+            Assert.That(root, Is.Not.Null);
+
+            foreach (string surfaceName in new[]
+                     {
+                         "DialoguePanel",
+                         "SpeakerHeader",
+                         "ReplyButton",
+                         "GoodbyeButton"
+                     })
+            {
+                Transform surface = FindDescendant(
+                    root.transform,
+                    surfaceName);
+                Assert.That(surface, Is.Not.Null, surfaceName);
+                AssertLightSurface(surface.GetComponent<Image>(), surfaceName);
+            }
+            AssertReadableOnLight(root.transform, "DialoguePanel");
+        }
+
+        [Test]
+        public void LegacyUiInstallersFinishWithTheLightSkin()
+        {
+            foreach (string path in new[]
+                     {
+                         "Assets/StackCraft/Scripts/Editor/" +
+                         "PublicMarketFantasySkinInstaller.cs",
+                         "Assets/StackCraft/Scripts/Editor/" +
+                         "BackpackDrawerPrefabInstaller.cs",
+                         "Assets/StackCraft/Scripts/Editor/" +
+                         "WorldMapPartyStatusUiPrefabInstaller.cs"
+                     })
+            {
+                Assert.That(
+                    File.ReadAllText(path),
+                    Does.Contain(
+                        "CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root)"),
+                    path);
+            }
+        }
+
+        private static void AssertLightSurface(Image image, string name)
+        {
+            AssertSlicedSprite(image, LightButtonFill);
+            Assert.That(ColorLuminance(image.color),
+                Is.InRange(0.62f, 0.96f), name);
+            Assert.That(image.color.a, Is.GreaterThan(0.85f), name);
+        }
+
+        private static void AssertReadableOnLight(Transform root, string name)
+        {
+            foreach (TMP_Text text in
+                     root.GetComponentsInChildren<TMP_Text>(true))
+            {
+                Assert.That(
+                    ColorLuminance(text.color),
+                    Is.LessThan(0.52f),
+                    $"{name}/{text.name}");
+            }
+        }
+
+        private static float ColorLuminance(Color color)
+        {
+            return 0.2126f * color.r +
+                   0.7152f * color.g +
+                   0.0722f * color.b;
         }
 
         private static void AssertSlicedSprite(
@@ -155,6 +373,19 @@ namespace CardColony.Tests
                 if (child.name == name)
                     return child;
             }
+            return null;
+        }
+
+        private static System.Type FindType(string fullName)
+        {
+            foreach (System.Reflection.Assembly assembly in
+                     System.AppDomain.CurrentDomain.GetAssemblies())
+            {
+                System.Type type = assembly.GetType(fullName, false);
+                if (type != null)
+                    return type;
+            }
+            Assert.Fail($"Type not found: {fullName}");
             return null;
         }
     }

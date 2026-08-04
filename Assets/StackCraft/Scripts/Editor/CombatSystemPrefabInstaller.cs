@@ -158,7 +158,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     Object.DestroyImmediate(oldHud.gameObject);
 
                 Transform locationView =
-                    Find(root.transform, "LocationView") ??
+                    Find(root.transform, "LocationView");
+                Transform menuPanel =
                     Find(root.transform, "MenuPanel") ??
                     root.transform;
                 Toggle locationToggle = Find(root.transform, "LocationToggle")?
@@ -169,10 +170,11 @@ namespace CryingSnow.StackCraft.EditorTools
                 InfoPanel infoPanel = root.GetComponentInChildren<InfoPanel>(true);
 
                 CombatHudPresenter hud = CreateCombatHud(
-                    locationView,
+                    menuPanel,
                     template,
                     locationToggle,
-                    toggleLabel);
+                    toggleLabel,
+                    locationView?.GetComponent<WorldMapLocationView>());
                 CombatLogPresenter log = CreateCombatLog(
                     hud.transform,
                     template,
@@ -183,6 +185,8 @@ namespace CryingSnow.StackCraft.EditorTools
 
                 EditorUtility.SetDirty(hud);
                 EditorUtility.SetDirty(log);
+                CommonFantasyHudSkinInstaller
+                    .ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
             }
             finally
@@ -202,7 +206,7 @@ namespace CryingSnow.StackCraft.EditorTools
             rect.anchorMax = new Vector2(1f, 0f);
             rect.pivot = new Vector2(0.5f, 0f);
             rect.anchoredPosition = new Vector2(0f, 16f);
-            rect.sizeDelta = new Vector2(-32f, 190f);
+            rect.sizeDelta = new Vector2(-32f, 120f);
             Image background = panelObject.AddComponent<Image>();
             background.sprite = LoadSprite(PanelSpritePath);
             background.type = Image.Type.Sliced;
@@ -224,7 +228,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 string.Empty,
                 18f,
                 new Color(0.95f, 0.88f, 0.77f));
-            SetRect(logText.rectTransform, 18f, -46f, -18f, -174f);
+            SetRect(logText.rectTransform, 18f, -42f, -18f, -108f);
             logText.alignment = TextAlignmentOptions.BottomLeft;
             logText.enableWordWrapping = true;
             logText.lineSpacing = 4f;
@@ -252,14 +256,15 @@ namespace CryingSnow.StackCraft.EditorTools
             Transform parent,
             TMP_Text template,
             Toggle locationToggle,
-            TMP_Text toggleLabel)
+            TMP_Text toggleLabel,
+            WorldMapLocationView locationView)
         {
             GameObject panelObject = CreateUiObject("CombatHudPanel", parent);
             RectTransform rect = (RectTransform)panelObject.transform;
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
-            rect.offsetMin = new Vector2(8f, 8f);
-            rect.offsetMax = new Vector2(-8f, -8f);
+            rect.offsetMin = new Vector2(14f, 14f);
+            rect.offsetMax = new Vector2(-14f, -72f);
             Image background = panelObject.AddComponent<Image>();
             background.sprite = LoadSprite(PanelSpritePath);
             background.type = Image.Type.Sliced;
@@ -281,7 +286,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 "未选择角色",
                 21f,
                 new Color(0.96f, 0.87f, 0.71f));
-            SetRect(actor.rectTransform, 22f, -74f, -22f, -174f);
+            SetRect(actor.rectTransform, 22f, -60f, -22f, -116f);
             TMP_Text target = CreateText(
                 "TargetStatus",
                 panelObject.transform,
@@ -289,7 +294,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 "未选择敌人",
                 19f,
                 new Color(1f, 0.60f, 0.52f));
-            SetRect(target.rectTransform, 22f, -178f, -22f, -224f);
+            SetRect(target.rectTransform, 22f, -120f, -22f, -156f);
 
             var buttons = new Button[3];
             var labels = new TMP_Text[3];
@@ -301,8 +306,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     template,
                     index == 0 ? "奋力一击  200% · 4秒冷却" : "技能",
                     index == 0 ? PurpleButtonPath : DarkButtonPath,
-                    new Vector2(22f, -236f - index * 62f),
-                    new Vector2(376f, 54f));
+                    new Vector2(22f, -166f - index * 50f),
+                    new Vector2(376f, 44f));
                 labels[index] = buttons[index].GetComponentInChildren<TMP_Text>(true);
             }
             Button retreat = CreateButton(
@@ -311,8 +316,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 template,
                 "撤退",
                 DarkButtonPath,
-                new Vector2(22f, -422f),
-                new Vector2(376f, 54f));
+                new Vector2(22f, -316f),
+                new Vector2(376f, 44f));
 
             TMP_Text hint = CreateText(
                 "CombatHint",
@@ -322,12 +327,15 @@ namespace CryingSnow.StackCraft.EditorTools
                 17f,
                 new Color(0.72f, 0.78f, 0.84f));
             SetRect(hint.rectTransform, 22f, -500f, -22f, -570f);
+            hint.gameObject.SetActive(false);
 
             var presenter = panelObject.AddComponent<CombatHudPresenter>();
             var serialized = new SerializedObject(presenter);
             serialized.FindProperty("panel").objectReferenceValue = group;
             serialized.FindProperty("combatToggle").objectReferenceValue = locationToggle;
             serialized.FindProperty("combatToggleLabel").objectReferenceValue = toggleLabel;
+            serialized.FindProperty("locationView").objectReferenceValue =
+                locationView;
             serialized.FindProperty("actorLabel").objectReferenceValue = actor;
             serialized.FindProperty("targetLabel").objectReferenceValue = target;
             serialized.FindProperty("retreatButton").objectReferenceValue = retreat;
@@ -357,10 +365,10 @@ namespace CryingSnow.StackCraft.EditorTools
             GameObject buttonObject = CreateUiObject(name, parent);
             RectTransform rect = (RectTransform)buttonObject.transform;
             rect.anchorMin = new Vector2(0f, 1f);
-            rect.anchorMax = new Vector2(0f, 1f);
-            rect.pivot = new Vector2(0f, 1f);
-            rect.anchoredPosition = anchoredPosition;
-            rect.sizeDelta = size;
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 1f);
+            rect.anchoredPosition = new Vector2(0f, anchoredPosition.y);
+            rect.sizeDelta = new Vector2(-44f, size.y);
             Image image = buttonObject.AddComponent<Image>();
             image.sprite = LoadSprite(spritePath);
             image.type = Image.Type.Sliced;

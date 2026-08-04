@@ -34,12 +34,12 @@ namespace CryingSnow.StackCraft
         {
             return type switch
             {
-                CombatEventType.DamageApplied => "#FF8A80",
-                CombatEventType.HealingApplied => "#83E28E",
-                CombatEventType.RetreatFailed => "#FFB74D",
-                CombatEventType.RetreatSucceeded => "#70D6FF",
-                CombatEventType.ExperienceGranted => "#D6B8FF",
-                _ => "#F1E5CF"
+                CombatEventType.DamageApplied => "#9C2F2A",
+                CombatEventType.HealingApplied => "#24733A",
+                CombatEventType.RetreatFailed => "#9A5A00",
+                CombatEventType.RetreatSucceeded => "#17628C",
+                CombatEventType.ExperienceGranted => "#694A91",
+                _ => "#3F454B"
             };
         }
     }

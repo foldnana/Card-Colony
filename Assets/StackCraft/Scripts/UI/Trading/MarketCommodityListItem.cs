@@ -18,17 +18,19 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Sprite sellButtonSprite;
 
         private static readonly Color WarmIvory =
-            new(0.98f, 0.89f, 0.72f, 1f);
+            new(0.14f, 0.16f, 0.19f, 1f);
         private static readonly Color PriceGold =
-            new(0.99f, 0.76f, 0.28f, 1f);
+            new(0.60f, 0.36f, 0.08f, 1f);
         private static readonly Color StockBlue =
-            new(0.46f, 0.84f, 1f, 1f);
+            new(0.10f, 0.38f, 0.58f, 1f);
         private static readonly Color DetailsSilver =
-            new(0.76f, 0.80f, 0.84f, 1f);
+            new(0.34f, 0.38f, 0.42f, 1f);
         private static readonly Color TrendGreen =
-            new(0.58f, 0.88f, 0.68f, 1f);
+            new(0.15f, 0.44f, 0.25f, 1f);
         private static readonly Color SellPromptGold =
-            new(0.96f, 0.71f, 0.34f, 1f);
+            new(0.60f, 0.36f, 0.08f, 1f);
+        private static readonly Color LightRow =
+            new(0.84f, 0.86f, 0.87f, 1f);
 
         public void Bind(
             CommodityDefinition commodity,
@@ -100,7 +102,7 @@ namespace CryingSnow.StackCraft
                 {
                     background.sprite = buttonSprite;
                     background.type = Image.Type.Sliced;
-                    background.color = Color.white;
+                    background.color = LightRow;
                 }
             }
             ColorBlock colors = ColorBlock.defaultColorBlock;

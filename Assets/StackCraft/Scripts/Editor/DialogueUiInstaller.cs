@@ -170,6 +170,8 @@ namespace CryingSnow.StackCraft.EditorTools
             serializedView.ApplyModifiedPropertiesWithoutUndo();
 
             root.SetActive(false);
+            CommonFantasyHudSkinInstaller
+                .ApplyToDialoguePrefabContents(root);
             GameObject prefab = PrefabUtility.SaveAsPrefabAsset(root, PrefabPath);
             Object.DestroyImmediate(root);
             return prefab;

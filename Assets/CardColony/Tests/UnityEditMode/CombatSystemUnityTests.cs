@@ -413,10 +413,13 @@ namespace CardColony.Tests
                 .FirstOrDefault(value => value.name == "CombatHudPanel");
             Transform locationView = prefab.GetComponentsInChildren<Transform>(true)
                 .FirstOrDefault(value => value.name == "LocationView");
+            Transform menuPanel = prefab.GetComponentsInChildren<Transform>(true)
+                .FirstOrDefault(value => value.name == "MenuPanel");
             Assert.That(combatHud, Is.Not.Null);
             Assert.That(locationView, Is.Not.Null);
-            Assert.That(combatHud.parent, Is.EqualTo(locationView),
-                "Combat HUD must occupy the right-side location content area, not PauseMenu.");
+            Assert.That(menuPanel, Is.Not.Null);
+            Assert.That(combatHud.parent, Is.EqualTo(menuPanel),
+                "Combat HUD must be a sibling page so hiding LocationView does not hide combat UI.");
             Assert.That(logPanel.parent, Is.EqualTo(combatHud),
                 "Combat log should be contained in the combat page instead of floating over cards.");
 
@@ -469,6 +472,54 @@ namespace CardColony.Tests
             Assert.That(combatLog.objectReferenceValue,
                 Is.EqualTo(logPanel.GetComponent(FindType(
                     "CryingSnow.StackCraft.CombatLogPresenter"))));
+        }
+
+        [Test]
+        public void CombatUi_RestoresTheLocationPageToItsPreviousVisibility()
+        {
+            Type locationType = FindType(
+                "CryingSnow.StackCraft.WorldMapLocationView");
+            Type presenterType = FindType(
+                "CryingSnow.StackCraft.CombatHudPresenter");
+            var locationObject = new GameObject("LocationView");
+            var presenterObject = new GameObject("CombatHudPanel");
+            try
+            {
+                CanvasGroup locationGroup =
+                    locationObject.AddComponent<CanvasGroup>();
+                locationGroup.alpha = 0f;
+                locationGroup.interactable = false;
+                locationGroup.blocksRaycasts = false;
+                Component location = locationObject.AddComponent(locationType);
+
+                CanvasGroup presenterGroup =
+                    presenterObject.AddComponent<CanvasGroup>();
+                Component presenter = presenterObject.AddComponent(presenterType);
+                presenterType.GetField(
+                        "panel",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(presenter, presenterGroup);
+                presenterType.GetField(
+                        "locationView",
+                        BindingFlags.Instance | BindingFlags.NonPublic)
+                    .SetValue(presenter, location);
+                MethodInfo setVisible = presenterType.GetMethod(
+                    "SetVisible",
+                    BindingFlags.Instance | BindingFlags.NonPublic);
+
+                setVisible.Invoke(presenter, new object[] { true });
+                setVisible.Invoke(presenter, new object[] { false });
+
+                Assert.That(locationGroup.alpha, Is.Zero,
+                    "Closing combat must not reopen a location page that was already hidden.");
+                Assert.That(locationGroup.interactable, Is.False);
+                Assert.That(locationGroup.blocksRaycasts, Is.False);
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(presenterObject);
+                UnityEngine.Object.DestroyImmediate(locationObject);
+            }
         }
 
         [Test]

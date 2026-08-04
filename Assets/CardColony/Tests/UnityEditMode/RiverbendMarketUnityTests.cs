@@ -699,17 +699,15 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void UiRoot_PublicMarketUsesFantasyRpgSkinWithoutReplacingBindings()
+        public void UiRoot_PublicMarketUsesLightSkinWithoutReplacingBindings()
         {
             const string panelSpritePath =
-                "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-                "Sprites/Component/Frame/PanelFrame_01_Bg.png";
+                "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/" +
+                "Semi Rounded/Semi Rounded - 300ppu.png";
             const string borderSpritePath =
-                "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-                "Sprites/Component/Popup/Popup_01_Border.png";
-            const string buttonSpriteRoot =
-                "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-                "Sprites/Component/Button/";
+                "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/" +
+                "Semi Rounded/" +
+                "Semi Rounded - Outline - 6px - 300ppu.png";
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
             Assert.That(prefab, Is.Not.Null);
@@ -753,15 +751,13 @@ namespace CardColony.Tests
                         modal,
                         "PublicMarketBackpackRowTemplate")
                     .GetComponent<Image>(),
-                buttonSpriteRoot +
-                "Button_Rectangle_01_Convex_Brown.Png");
+                panelSpritePath);
             AssertSlicedSprite(
                 FindChild(
                         modal,
                         "PublicMarketMarketRowTemplate")
                     .GetComponent<Image>(),
-                buttonSpriteRoot +
-                "Button_Rectangle_01_Convex_Blue.Png");
+                panelSpritePath);
 
             foreach (string buttonName in new[]
                      {
@@ -775,9 +771,9 @@ namespace CardColony.Tests
                 Transform button = FindChild(modal, buttonName);
                 Assert.That(button, Is.Not.Null);
                 Image buttonImage = button.GetComponent<Image>();
-                Assert.That(buttonImage.sprite, Is.Not.Null);
-                Assert.That(buttonImage.type, Is.EqualTo(Image.Type.Sliced));
-                Assert.That(buttonImage.color, Is.EqualTo(Color.white),
+                AssertSlicedSprite(buttonImage, panelSpritePath);
+                Assert.That(ColorLuminance(buttonImage.color),
+                    Is.InRange(0.62f, 0.92f),
                     "彩色凸面按钮已经包含完整配色，不能再乘主题色。");
                 ColorBlock colors =
                     button.GetComponent<Button>().colors;
@@ -813,7 +809,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void UiRoot_PublicMarketFantasySkinUsesColorAndDepthLayers()
+        public void UiRoot_PublicMarketLightSkinUsesContrastAndDepth()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -831,14 +827,14 @@ namespace CardColony.Tests
                 modal,
                 "PublicMarketMarketPanel").GetComponent<Image>();
 
-            Assert.That(backpack.color.b - backpack.color.r,
-                Is.GreaterThan(0.12f),
+            Assert.That(ColorLuminance(backpack.color),
+                Is.InRange(0.62f, 0.96f),
                 "背包区需要明显的蓝色识别，而不是接近灰色。");
-            Assert.That(transaction.color.r - transaction.color.b,
-                Is.GreaterThan(0.18f),
+            Assert.That(ColorLuminance(transaction.color),
+                Is.InRange(0.62f, 0.96f),
                 "交易区需要明显的琥珀暖色识别。");
-            Assert.That(market.color.g - market.color.r,
-                Is.GreaterThan(0.16f),
+            Assert.That(ColorLuminance(market.color),
+                Is.InRange(0.62f, 0.96f),
                 "市场区需要明显的绿色识别。");
 
             TMP_Text backpackTitle = FindChild(
@@ -847,11 +843,11 @@ namespace CardColony.Tests
             TMP_Text backpackSubtitle = FindChild(
                 modal,
                 "PublicMarketBackpackPanelSubtitle").GetComponent<TMP_Text>();
-            Assert.That(backpackTitle.color.b,
-                Is.GreaterThan(backpackTitle.color.r + 0.12f),
+            Assert.That(ColorLuminance(backpackTitle.color),
+                Is.LessThan(0.52f),
                 "左栏标题需要使用青蓝色建立栏目识别。");
-            Assert.That(backpackSubtitle.color.r,
-                Is.GreaterThan(backpackSubtitle.color.b + 0.04f),
+            Assert.That(ColorLuminance(backpackSubtitle.color),
+                Is.LessThan(0.52f),
                 "左栏说明文字需要使用暖白色，与青蓝标题形成配色层次。");
 
             Assert.That(
@@ -886,34 +882,28 @@ namespace CardColony.Tests
                 AssertDepthShadow(FindChild(modal, rowName));
             }
 
-            AssertColoredConvexButton(
-                modal,
-                "PublicMarketCloseButton",
-                "Button_Rectangle_01_Convex_Red.Png");
-            AssertColoredConvexButton(
-                modal,
-                "PublicMarketDecreaseButton",
-                "Button_Rectangle_01_Convex_Blue.Png");
-            AssertColoredConvexButton(
-                modal,
-                "PublicMarketIncreaseButton",
-                "Button_Rectangle_01_Convex_Blue.Png");
-            AssertColoredConvexButton(
-                modal,
-                "PublicMarketMaximumButton",
-                "Button_Rectangle_01_Convex_Yellow.Png");
-            AssertColoredConvexButton(
-                modal,
-                "PublicMarketConfirmButton",
-                "Button_Rectangle_01_Convex_Green.Png");
+            AssertLightButton(modal, "PublicMarketCloseButton");
+            AssertLightButton(modal, "PublicMarketDecreaseButton");
+            AssertLightButton(modal, "PublicMarketIncreaseButton");
+            AssertLightButton(modal, "PublicMarketMaximumButton");
+            AssertLightButton(modal, "PublicMarketConfirmButton");
+            Color close = FindChild(modal, "PublicMarketCloseButton")
+                .GetComponent<Image>().color;
+            Color maximum = FindChild(modal, "PublicMarketMaximumButton")
+                .GetComponent<Image>().color;
+            Color confirm = FindChild(modal, "PublicMarketConfirmButton")
+                .GetComponent<Image>().color;
+            Assert.That(close.r, Is.GreaterThan(close.g + 0.05f));
+            Assert.That(maximum.r, Is.GreaterThan(maximum.b + 0.20f));
+            Assert.That(confirm.g, Is.GreaterThan(confirm.r + 0.05f));
         }
 
         [Test]
-        public void WorldMapLocationUiInstaller_MarketReplacementAppliesFantasySkin()
+        public void WorldMapLocationUiInstaller_MarketReplacementAppliesLightSkin()
         {
             const string panelSpritePath =
-                "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-                "Sprites/Component/Frame/PanelFrame_01_Bg.png";
+                "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/" +
+                "Semi Rounded/Semi Rounded - 300ppu.png";
 
             Type installerType = FindType(
                 "CryingSnow.StackCraft.EditorTools." +
@@ -1004,26 +994,31 @@ namespace CardColony.Tests
             Assert.That(shadow, Is.Not.Null,
                 $"{element.name} 缺少投影层次。");
             Assert.That(shadow.effectDistance.y, Is.LessThan(-1f));
-            Assert.That(shadow.effectColor.a, Is.GreaterThanOrEqualTo(0.45f));
+            Assert.That(shadow.effectColor.a, Is.InRange(0.12f, 0.30f));
         }
 
-        private static void AssertColoredConvexButton(
+        private static void AssertLightButton(
             Transform modal,
-            string buttonName,
-            string spriteFileName)
+            string buttonName)
         {
             string expectedPath =
-                "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
-                "Sprites/Component/Button/" +
-                spriteFileName;
+                "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/" +
+                "Semi Rounded/Semi Rounded - 300ppu.png";
             Transform button = FindChild(modal, buttonName);
             AssertSlicedSprite(
                 button.GetComponent<Image>(),
                 expectedPath);
             Assert.That(
-                button.GetComponent<Image>().color,
-                Is.EqualTo(Color.white));
+                ColorLuminance(button.GetComponent<Image>().color),
+                Is.InRange(0.62f, 0.92f));
             AssertDepthShadow(button);
+        }
+
+        private static float ColorLuminance(Color color)
+        {
+            return 0.2126f * color.r +
+                   0.7152f * color.g +
+                   0.0722f * color.b;
         }
 
         [Test]
@@ -1077,21 +1072,21 @@ namespace CardColony.Tests
                 backpackTemplate.GetComponent<Image>().color;
             Color buyColor =
                 marketTemplate.GetComponent<Image>().color;
-            Assert.That(sellColor, Is.EqualTo(Color.white),
+            Assert.That(ColorLuminance(sellColor), Is.InRange(0.62f, 0.92f),
                 "完整彩色凸面按钮不能再叠加背景染色。");
-            Assert.That(buyColor, Is.EqualTo(Color.white),
+            Assert.That(ColorLuminance(buyColor), Is.InRange(0.62f, 0.92f),
                 "完整彩色凸面按钮不能再叠加背景染色。");
             Assert.That(
                 AssetDatabase.GetAssetPath(
                     backpackTemplate.GetComponent<Image>().sprite),
                 Does.EndWith(
-                    "Button_Rectangle_01_Convex_Brown.Png"),
+                    "Semi Rounded/Semi Rounded - 300ppu.png"),
                 "背包出售条目需要使用棕色凸面按钮。");
             Assert.That(
                 AssetDatabase.GetAssetPath(
                     marketTemplate.GetComponent<Image>().sprite),
                 Does.EndWith(
-                    "Button_Rectangle_01_Convex_Blue.Png"),
+                    "Semi Rounded/Semi Rounded - 300ppu.png"),
                 "市场购买条目需要使用蓝色凸面按钮。");
 
             TMP_Text marketName = FindChild(
@@ -1109,8 +1104,8 @@ namespace CardColony.Tests
             TMP_Text marketTrend = FindChild(
                 marketTemplate,
                 "Trend").GetComponent<TMP_Text>();
-            Assert.That(marketName.color.r,
-                Is.GreaterThan(marketName.color.b + 0.03f),
+            Assert.That(ColorLuminance(marketName.color),
+                Is.LessThan(0.35f),
                 "商品名使用暖象牙白，不能与蓝色按钮同色。");
             Assert.That(marketPrice.color.r,
                 Is.GreaterThan(marketPrice.color.b + 0.20f),
@@ -1118,8 +1113,8 @@ namespace CardColony.Tests
             Assert.That(marketQuantity.color.b,
                 Is.GreaterThan(marketQuantity.color.r + 0.10f),
                 "库存需要使用浅蓝色。");
-            Assert.That(marketDetails.color.grayscale,
-                Is.GreaterThan(0.55f),
+            Assert.That(ColorLuminance(marketDetails.color),
+                Is.InRange(0.25f, 0.50f),
                 "辅助说明需要使用清晰的中性浅灰。");
             Assert.That(marketTrend.color.g,
                 Is.GreaterThan(marketTrend.color.r + 0.10f),
