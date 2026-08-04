@@ -13,7 +13,7 @@ namespace CardColony.Tests
     public sealed class BackpackDrawerUnityTests
     {
         [Test]
-        public void BackpackPrefab_UsesSidebarTabAndOccupiesTheWholeMenuPage()
+        public void BackpackPrefab_UsesSidebarTabAndInsetCommonMenuPage()
         {
             GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
                 "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
@@ -38,8 +38,8 @@ namespace CardColony.Tests
                 "背包内容应是右侧信息栏的完整页面。");
             Assert.That(drawer.anchorMin, Is.EqualTo(Vector2.zero));
             Assert.That(drawer.anchorMax, Is.EqualTo(Vector2.one));
-            Assert.That(drawer.anchoredPosition, Is.EqualTo(new Vector2(0f, -30f)));
-            Assert.That(drawer.sizeDelta, Is.EqualTo(new Vector2(0f, -60f)));
+            Assert.That(drawer.offsetMin, Is.EqualTo(new Vector2(14f, 14f)));
+            Assert.That(drawer.offsetMax, Is.EqualTo(new Vector2(-14f, -72f)));
             Assert.That(FindDescendant(prefab.transform, "BackpackButton"), Is.Null,
                 "旧的左下角背包入口必须移除。");
             Assert.That(grid.constraint, Is.EqualTo(

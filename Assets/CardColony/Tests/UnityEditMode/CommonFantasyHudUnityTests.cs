@@ -19,6 +19,20 @@ namespace CardColony.Tests
             "Sprites/Component/";
         private const string ButtonRoot =
             ComponentRoot + "Button/";
+        private const string UltimateShapeRoot =
+            "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/";
+        private const string UltimateRoundedFill =
+            UltimateShapeRoot +
+            "Semi Rounded/Semi Rounded - 300ppu.png";
+        private const string UltimateRoundedOutline =
+            UltimateShapeRoot +
+            "Semi Rounded/Semi Rounded - Outline - 6px - 300ppu.png";
+        private const string UltimateModernDarkButtonFill =
+            UltimateShapeRoot +
+            "Semi Rounded/Semi Rounded - 300ppu.png";
+        private const string UltimateModernDarkButtonOutline =
+            UltimateShapeRoot +
+            "Semi Rounded/Semi Rounded - Outline - 6px - 300ppu.png";
 
         [Test]
         public void UiRoot_CommonFantasyHudStylesLocationSidebarAndTopStatus()
@@ -31,12 +45,10 @@ namespace CardColony.Tests
             Transform stats = FindDescendant(root.transform, "CardStatsUI");
             AssertSlicedSprite(
                 day.GetComponent<Image>(),
-                ButtonRoot +
-                "Button_Rectangle_01_Convex_Dark.Png");
+                UltimateRoundedFill);
             AssertSlicedSprite(
                 stats.GetComponent<Image>(),
-                ButtonRoot +
-                "Button_Rectangle_01_Convex_Dark.Png");
+                UltimateRoundedFill);
             AssertDepthShadow(day);
             AssertDepthShadow(stats);
 
@@ -69,7 +81,7 @@ namespace CardColony.Tests
                 FindDescendant(root.transform, "LocationView");
             AssertSlicedSprite(
                 locationView.GetComponent<Image>(),
-                ComponentRoot + "Frame/PanelFrame_01_Bg.png");
+                UltimateRoundedFill);
             AssertDepthShadow(locationView);
             Transform border = FindDescendant(
                 locationView,
@@ -77,25 +89,25 @@ namespace CardColony.Tests
             Assert.That(border, Is.Not.Null);
             AssertSlicedSprite(
                 border.GetComponent<Image>(),
-                ComponentRoot + "Popup/Popup_01_Border.png");
+                UltimateRoundedOutline);
             Assert.That(border.GetComponent<Image>().raycastTarget, Is.False);
 
             AssertToggle(
                 root,
                 "LocationToggle",
-                "Button_Rectangle_01_Convex_Blue.Png");
+                UltimateModernDarkButtonFill);
             AssertToggle(
                 root,
                 "QuestsToggle",
-                "Button_Rectangle_01_Convex_Purple.Png");
+                UltimateModernDarkButtonFill);
             AssertToggle(
                 root,
                 "RecipesToggle",
-                "Button_Rectangle_01_Convex_Brown.Png");
+                UltimateModernDarkButtonFill);
             AssertButton(
                 root,
                 "EnterLocationButton",
-                "Button_Rectangle_01_Convex_Green.Png");
+                UltimateModernDarkButtonFill);
 
             TMP_Text title = FindDescendant(
                 locationView,
@@ -204,7 +216,7 @@ namespace CardColony.Tests
                 FindDescendant(root.transform, "InfoPanel");
             AssertSlicedSprite(
                 infoPanel.GetComponent<Image>(),
-                ComponentRoot + "Frame/PanelFrame_01_Bg.png");
+                UltimateRoundedFill);
             Assert.That(infoPanel.GetComponent<Image>().color.a,
                 Is.EqualTo(1f));
             AssertDepthShadow(infoPanel);
@@ -213,7 +225,7 @@ namespace CardColony.Tests
                 "InfoPanelFantasyBorder");
             AssertSlicedSprite(
                 infoBorder.GetComponent<Image>(),
-                ComponentRoot + "Popup/Popup_01_Border.png");
+                UltimateRoundedOutline);
             Assert.That(infoBorder.GetComponent<Image>().raycastTarget,
                 Is.False);
             LayoutElement infoBorderLayout =
@@ -226,7 +238,7 @@ namespace CardColony.Tests
                 FindDescendant(root.transform, "NpcTradePanel");
             AssertSlicedSprite(
                 npcPanel.GetComponent<Image>(),
-                ComponentRoot + "Frame/PanelFrame_01_Bg.png");
+                UltimateRoundedFill);
             Assert.That(npcPanel.GetComponent<Image>().color.a,
                 Is.EqualTo(1f),
                 "NPC 内容底板不应继续使用半透明黑色。");
@@ -236,7 +248,7 @@ namespace CardColony.Tests
                 "NpcTradeFantasyBorder");
             AssertSlicedSprite(
                 npcBorder.GetComponent<Image>(),
-                ComponentRoot + "Popup/Popup_01_Border.png");
+                UltimateRoundedOutline);
             Assert.That(npcBorder.GetComponent<Image>().raycastTarget,
                 Is.False);
 
@@ -244,7 +256,7 @@ namespace CardColony.Tests
                 FindDescendant(npcPanel, "NpcTradeScrollView");
             AssertSlicedSprite(
                 scroll.GetComponent<Image>(),
-                ComponentRoot + "Frame/Listframe_01~02_Bg.png");
+                UltimateRoundedFill);
             Assert.That(scroll.GetComponent<Image>().color.a,
                 Is.EqualTo(1f),
                 "NPC 列表底板不应继续透出地图。");
@@ -252,15 +264,15 @@ namespace CardColony.Tests
             AssertButton(
                 root,
                 "NpcBuyTabButton",
-                "Button_Rectangle_01_Convex_Green.Png");
+                UltimateModernDarkButtonFill);
             AssertButton(
                 root,
                 "NpcSellTabButton",
-                "Button_Rectangle_01_Convex_Brown.Png");
+                UltimateModernDarkButtonFill);
             AssertButton(
                 root,
                 "NpcActionTabButton",
-                "Button_Rectangle_01_Convex_Blue.Png");
+                UltimateModernDarkButtonFill);
 
             MonoBehaviour infoView = infoPanel
                 .GetComponents<MonoBehaviour>()
@@ -326,7 +338,7 @@ namespace CardColony.Tests
                 "WorldMapPartyStatusPanel");
             AssertSlicedSprite(
                 panel.GetComponent<Image>(),
-                ComponentRoot + "Frame/PanelFrame_01_Bg.png");
+                UltimateRoundedFill);
             Assert.That(panel.GetComponent<Image>().color.a, Is.EqualTo(1f));
             AssertDepthShadow(panel);
 
@@ -510,9 +522,7 @@ namespace CardColony.Tests
             Transform target = FindDescendant(root.transform, name);
             AssertSlicedSprite(
                 target.GetComponent<Image>(),
-                ButtonRoot + spriteFileName);
-            Assert.That(target.GetComponent<Image>().color,
-                Is.EqualTo(Color.white));
+                ResolveExpectedPath(spriteFileName));
             Toggle toggle = target.GetComponent<Toggle>();
             Assert.That(
                 toggle.navigation.mode,
@@ -527,8 +537,7 @@ namespace CardColony.Tests
                 "Toggle 的选中淡入层不能与常驻彩色按钮底图共用。");
             AssertSlicedSprite(
                 toggle.graphic as Image,
-                ButtonRoot +
-                "Button_Rectangle_01_Convex_White_Light.png");
+                UltimateModernDarkButtonOutline);
             Assert.That(toggle.graphic.raycastTarget, Is.False);
             AssertDepthShadow(target);
         }
@@ -541,9 +550,7 @@ namespace CardColony.Tests
             Transform target = FindDescendant(root.transform, name);
             AssertSlicedSprite(
                 target.GetComponent<Image>(),
-                ButtonRoot + spriteFileName);
-            Assert.That(target.GetComponent<Image>().color,
-                Is.EqualTo(Color.white));
+                ResolveExpectedPath(spriteFileName));
             Button button = target.GetComponent<Button>();
             Assert.That(
                 button.targetGraphic,
@@ -562,7 +569,7 @@ namespace CardColony.Tests
             Transform panel = FindDescendant(root.transform, panelName);
             AssertSlicedSprite(
                 panel.GetComponent<Image>(),
-                ComponentRoot + "Frame/PanelFrame_01_Bg.png");
+                UltimateRoundedFill);
             Assert.That(panel.GetComponent<Image>().color.a, Is.EqualTo(1f));
             AssertDepthShadow(panel);
             Assert.That(panel.GetComponent<ScrollRect>(), Is.Not.Null);
@@ -578,6 +585,11 @@ namespace CardColony.Tests
                 AssetDatabase.GetAssetPath(image.sprite),
                 Is.EqualTo(expectedPath));
             Assert.That(image.type, Is.EqualTo(Image.Type.Sliced));
+        }
+
+        private static string ResolveExpectedPath(string path)
+        {
+            return path.StartsWith("Assets/") ? path : ButtonRoot + path;
         }
 
         private static void AssertDepthShadow(Transform target)

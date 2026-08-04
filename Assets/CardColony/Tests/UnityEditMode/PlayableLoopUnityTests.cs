@@ -2738,9 +2738,9 @@ namespace CardColony.Tests
                 Canvas.ForceUpdateCanvases();
                 Assert.That(
                     table.rect.height,
-                    Is.EqualTo(((RectTransform)table.parent).rect.height - 60f)
+                    Is.EqualTo(((RectTransform)table.parent).rect.height - 86f)
                         .Within(1f),
-                    "右侧背包抽屉应保持固定高度，不随容量扩展");
+                    "右侧背包页应保留统一顶栏和内容边距，不随容量扩展");
                 Assert.That(slots.sizeDelta.y, Is.GreaterThan(440f),
                     "额外格子应扩展滚动内容高度，而不是扩展面板高度");
             }

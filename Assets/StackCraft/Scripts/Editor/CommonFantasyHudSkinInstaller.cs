@@ -16,44 +16,43 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string ComponentRoot =
             "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
             "Sprites/Component/";
+        private const string UltimateShapeRoot =
+            "Assets/UltimateCleanGUIPack/Common/Sprites/Shapes/";
         private const string PanelSpritePath =
-            ComponentRoot + "Frame/PanelFrame_01_Bg.png";
+            UltimateShapeRoot +
+            "Semi Rounded/Semi Rounded - 300ppu.png";
         private const string BorderSpritePath =
-            ComponentRoot + "Popup/Popup_01_Border.png";
-        private const string ListSpritePath =
-            ComponentRoot + "Frame/Listframe_01~02_Bg.png";
+            UltimateShapeRoot +
+            "Semi Rounded/" +
+            "Semi Rounded - Outline - 6px - 300ppu.png";
+        private const string ListSpritePath = PanelSpritePath;
         private const string ButtonRoot =
             ComponentRoot + "Button/";
-        private const string DarkButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Dark.Png";
-        private const string BlueButtonSpritePath =
+        private const string LocationReturnButtonSpritePath =
             ButtonRoot + "Button_Rectangle_01_Convex_Blue.Png";
-        private const string PurpleButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Purple.Png";
-        private const string BrownButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Brown.Png";
-        private const string GreenButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Green.Png";
-        private const string RedButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Red.Png";
-        private const string YellowButtonSpritePath =
-            ButtonRoot + "Button_Rectangle_01_Convex_Yellow.Png";
-        private const string SelectionLightSpritePath =
-            ButtonRoot +
-            "Button_Rectangle_01_Convex_White_Light.png";
+        private const string DarkButtonSpritePath = PanelSpritePath;
+        private const string BlueButtonSpritePath = PanelSpritePath;
+        private const string PurpleButtonSpritePath = BlueButtonSpritePath;
+        private const string BrownButtonSpritePath = BlueButtonSpritePath;
+        private const string GreenButtonSpritePath = BlueButtonSpritePath;
+        private const string RedButtonSpritePath = BlueButtonSpritePath;
+        private const string YellowButtonSpritePath = BlueButtonSpritePath;
+        private const string SelectionLightSpritePath = BorderSpritePath;
 
         private static readonly Color PanelNavy =
-            new(0.020f, 0.055f, 0.105f, 0.985f);
+            new(0.075f, 0.070f, 0.085f, 0.985f);
         private static readonly Color HeaderNavy =
-            new(0.030f, 0.070f, 0.125f, 0.985f);
+            new(0.145f, 0.125f, 0.135f, 1f);
+        private static readonly Color ModernDarkButtonNavy =
+            new(0.169f, 0.235f, 0.341f, 1f);
         private static readonly Color ContentNavy =
-            new(0.025f, 0.075f, 0.135f, 1f);
+            new(0.095f, 0.090f, 0.105f, 1f);
         private static readonly Color ListNavy =
-            new(0.040f, 0.105f, 0.175f, 1f);
+            new(0.115f, 0.108f, 0.120f, 1f);
         private static readonly Color QuestNavy =
-            new(0.085f, 0.045f, 0.155f, 1f);
+            new(0.095f, 0.090f, 0.105f, 1f);
         private static readonly Color RecipeBrown =
-            new(0.155f, 0.075f, 0.025f, 1f);
+            new(0.105f, 0.095f, 0.085f, 1f);
         private static readonly Color Cyan =
             new(0.38f, 0.82f, 0.97f, 1f);
         private static readonly Color WarmIvory =
@@ -68,6 +67,13 @@ namespace CryingSnow.StackCraft.EditorTools
         [MenuItem("Tools/StackCraft/Apply Common Fantasy HUD Skin")]
         public static void Apply()
         {
+            ApplyPrefabOnly();
+            ApplyLocationScene();
+        }
+
+        [MenuItem("Tools/StackCraft/Apply Ultimate Clean HUD Prefab")]
+        public static void ApplyPrefabOnly()
+        {
             GameObject root =
                 PrefabUtility.LoadPrefabContents(UiRootPath);
             try
@@ -81,7 +87,6 @@ namespace CryingSnow.StackCraft.EditorTools
             {
                 PrefabUtility.UnloadPrefabContents(root);
             }
-            ApplyLocationScene();
         }
 
         [MenuItem(
@@ -179,6 +184,10 @@ namespace CryingSnow.StackCraft.EditorTools
                 LoadRequiredSprite(SelectionLightSpritePath);
 
             StyleTopStatus(root.transform, darkButton);
+            StyleCommonSidebar(
+                root.transform,
+                panelSprite,
+                blueButton);
             StyleLocationSidebar(
                 root.transform,
                 panelSprite,
@@ -190,6 +199,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 selectionLight);
             StyleBackpack(
                 root.transform,
+                panelSprite,
                 borderSprite,
                 purpleButton,
                 redButton,
@@ -212,10 +222,14 @@ namespace CryingSnow.StackCraft.EditorTools
             Sprite darkButton)
         {
             Transform day = RequireDescendant(root, "DayTimeUI");
+            ConfigureTopStatusRect(
+                (RectTransform)day,
+                24f,
+                300f);
             StyleImage(
                 day.GetComponent<Image>(),
                 darkButton,
-                Color.white);
+                HeaderNavy);
             EnsureShadow(
                 day.gameObject,
                 new Color(0f, 0f, 0.01f, 0.72f),
@@ -225,10 +239,22 @@ namespace CryingSnow.StackCraft.EditorTools
             StyleGraphic(day, "TimeProgress", Gold);
 
             Transform stats = RequireDescendant(root, "CardStatsUI");
+            ConfigureTopStatusRect(
+                (RectTransform)stats,
+                324f,
+                390f);
             StyleImage(
                 stats.GetComponent<Image>(),
                 darkButton,
-                Color.white);
+                HeaderNavy);
+            HorizontalLayoutGroup statsLayout =
+                stats.GetComponent<HorizontalLayoutGroup>();
+            if (statsLayout != null)
+            {
+                statsLayout.padding = new RectOffset(14, 18, 5, 5);
+                statsLayout.spacing = 6f;
+                statsLayout.childAlignment = TextAnchor.MiddleLeft;
+            }
             EnsureShadow(
                 stats.gameObject,
                 new Color(0f, 0f, 0.01f, 0.72f),
@@ -241,6 +267,82 @@ namespace CryingSnow.StackCraft.EditorTools
             StyleGraphic(stats, "CardIcon", Cyan);
         }
 
+        private static void ConfigureTopStatusRect(
+            RectTransform rect,
+            float x,
+            float width)
+        {
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(0f, 1f);
+            rect.pivot = new Vector2(0f, 1f);
+            rect.anchoredPosition = new Vector2(x, -18f);
+            rect.sizeDelta = new Vector2(width, 64f);
+        }
+
+        private static void StyleCommonSidebar(
+            Transform root,
+            Sprite panelSprite,
+            Sprite headerSprite)
+        {
+            Transform sidebar = RequireDescendant(root, "MenuPanel");
+            RectTransform sidebarRect = (RectTransform)sidebar;
+            sidebarRect.anchorMin = new Vector2(1f, 0f);
+            sidebarRect.anchorMax = new Vector2(1f, 1f);
+            sidebarRect.pivot = new Vector2(1f, 0.5f);
+            sidebarRect.anchoredPosition = Vector2.zero;
+            sidebarRect.sizeDelta = new Vector2(380f, 0f);
+
+            Image sidebarImage = sidebar.GetComponent<Image>();
+            if (sidebarImage == null)
+                sidebarImage = sidebar.gameObject.AddComponent<Image>();
+            StyleImage(sidebarImage, panelSprite, PanelNavy);
+            sidebarImage.raycastTarget = true;
+            EnsureShadow(
+                sidebar.gameObject,
+                new Color(0f, 0f, 0.01f, 0.74f),
+                new Vector2(-7f, -6f));
+
+            Transform header = RequireDescendant(sidebar, "Header");
+            RectTransform headerRect = (RectTransform)header;
+            headerRect.anchorMin = new Vector2(0f, 1f);
+            headerRect.anchorMax = new Vector2(1f, 1f);
+            headerRect.pivot = new Vector2(0.5f, 1f);
+            headerRect.anchoredPosition = Vector2.zero;
+            headerRect.sizeDelta = new Vector2(0f, 64f);
+            StyleImage(
+                header.GetComponent<Image>(),
+                headerSprite,
+                HeaderNavy);
+
+            HorizontalLayoutGroup headerLayout =
+                header.GetComponent<HorizontalLayoutGroup>();
+            if (headerLayout != null)
+            {
+                headerLayout.padding = new RectOffset(8, 8, 6, 6);
+                headerLayout.spacing = 6f;
+            }
+
+            foreach (string pageName in new[]
+                     {
+                         "LocationView",
+                         "QuestsView",
+                         "RecipesView",
+                         "BackpackTablePanel"
+                     })
+            {
+                Transform page = FindDescendant(root, pageName);
+                if (page == null)
+                    continue;
+                RectTransform pageRect = page as RectTransform;
+                if (pageRect == null)
+                    continue;
+                pageRect.anchorMin = Vector2.zero;
+                pageRect.anchorMax = Vector2.one;
+                pageRect.offsetMin = new Vector2(14f, 14f);
+                pageRect.offsetMax = new Vector2(-14f, -72f);
+            }
+        }
+
         private static void StyleLocationSidebar(
             Transform root,
             Sprite panelSprite,
@@ -251,10 +353,11 @@ namespace CryingSnow.StackCraft.EditorTools
             Sprite greenButton,
             Sprite selectionLight)
         {
-            Transform header = RequireDescendant(root, "Header");
+            Transform sidebar = RequireDescendant(root, "MenuPanel");
+            Transform header = RequireDescendant(sidebar, "Header");
             StyleImage(
                 header.GetComponent<Image>(),
-                panelSprite,
+                blueButton,
                 HeaderNavy);
             EnsureShadow(
                 header.gameObject,
@@ -275,6 +378,11 @@ namespace CryingSnow.StackCraft.EditorTools
                 root,
                 "RecipesToggle",
                 brownButton,
+                selectionLight);
+            StyleToggle(
+                root,
+                "BackpackToggle",
+                purpleButton,
                 selectionLight);
 
             Transform view = RequireDescendant(root, "LocationView");
@@ -315,16 +423,25 @@ namespace CryingSnow.StackCraft.EditorTools
                 root,
                 "EnterLocationButton",
                 greenButton,
-                Color.white);
+                Green);
         }
 
         private static void StyleBackpack(
             Transform root,
+            Sprite panelSprite,
             Sprite borderSprite,
             Sprite purpleButton,
             Sprite redButton,
             Sprite yellowButton)
         {
+            Transform drawer = FindDescendant(root, "BackpackTablePanel");
+            if (drawer != null)
+            {
+                Image drawerImage = drawer.GetComponent<Image>();
+                if (drawerImage != null)
+                    StyleImage(drawerImage, panelSprite, ContentNavy);
+            }
+
             if (FindDescendant(root, "BackpackSidebarPageV2") != null ||
                 FindDescendant(root, "BackpackDrawerLayoutV1") != null)
                 return;
@@ -433,17 +550,17 @@ namespace CryingSnow.StackCraft.EditorTools
                 npcPanel,
                 "NpcBuyTabButton",
                 greenButton,
-                Color.white);
+                Green);
             StyleButton(
                 npcPanel,
                 "NpcSellTabButton",
                 brownButton,
-                Color.white);
+                Gold);
             StyleButton(
                 npcPanel,
                 "NpcActionTabButton",
                 blueButton,
-                Color.white);
+                WarmIvory);
         }
 
         private static void StylePartyAndJournalPanels(
@@ -505,7 +622,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     "Location return button is missing.");
             StyleButton(
                 button.transform,
-                LoadRequiredSprite(BlueButtonSpritePath),
+                LoadRequiredSprite(LocationReturnButtonSpritePath),
+                Color.white,
                 Color.white);
         }
 
@@ -517,7 +635,7 @@ namespace CryingSnow.StackCraft.EditorTools
         {
             Transform target = RequireDescendant(root, name);
             Image image = target.GetComponent<Image>();
-            StyleImage(image, sprite, Color.white);
+            StyleImage(image, sprite, ModernDarkButtonNavy);
             EnsureShadow(
                 target.gameObject,
                 new Color(0f, 0f, 0.01f, 0.65f),
@@ -553,16 +671,21 @@ namespace CryingSnow.StackCraft.EditorTools
             Color labelColor)
         {
             Transform target = RequireDescendant(root, name);
-            StyleButton(target, sprite, labelColor);
+            StyleButton(
+                target,
+                sprite,
+                ModernDarkButtonNavy,
+                labelColor);
         }
 
         private static void StyleButton(
             Transform target,
             Sprite sprite,
+            Color fillColor,
             Color labelColor)
         {
             Image image = target.GetComponent<Image>();
-            StyleImage(image, sprite, Color.white);
+            StyleImage(image, sprite, fillColor);
             EnsureShadow(
                 target.gameObject,
                 new Color(0f, 0f, 0.01f, 0.68f),
