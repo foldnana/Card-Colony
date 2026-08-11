@@ -32,6 +32,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private TMP_Text npcTradeHint;
 
         private CanvasGroup canvasGroup;
+        private MenuToggle sidebarToggle;
         private NpcTradeTab npcTradeTab;
         private string pendingSellProductId;
         private int pendingSellCount;
@@ -50,6 +51,8 @@ namespace CryingSnow.StackCraft
         private void Awake()
         {
             canvasGroup = GetComponent<CanvasGroup>();
+            sidebarToggle = transform.parent?
+                .GetComponentInChildren<MenuToggle>(true);
             locationToggle?.onValueChanged.AddListener(ToggleView);
             enterLocationButton?.onClick.AddListener(PerformLocationAction);
             npcBuyTabButton?.onClick.AddListener(ShowNpcBuyList);
@@ -270,6 +273,16 @@ namespace CryingSnow.StackCraft
         {
             if (canvasGroup == null)
                 canvasGroup = GetComponent<CanvasGroup>();
+
+            if (show)
+            {
+                if (sidebarToggle == null)
+                {
+                    sidebarToggle = transform.parent?
+                        .GetComponentInChildren<MenuToggle>(true);
+                }
+                sidebarToggle?.Open();
+            }
 
             canvasGroup.alpha = show ? 1f : 0f;
             canvasGroup.interactable = show;

@@ -279,7 +279,10 @@ namespace CardColony.Tests
                     root.transform,
                     surfaceName);
                 Assert.That(surface, Is.Not.Null, surfaceName);
-                AssertLightSurface(surface.GetComponent<Image>(), surfaceName);
+                AssertLightSurface(
+                    surface.GetComponent<Image>(),
+                    surfaceName,
+                    surfaceName == "SpeakerHeader" ? 0.56f : 0.62f);
             }
             AssertReadableOnLight(root.transform, "DialoguePanel");
         }
@@ -305,11 +308,15 @@ namespace CardColony.Tests
             }
         }
 
-        private static void AssertLightSurface(Image image, string name)
+        private static void AssertLightSurface(
+            Image image,
+            string name,
+            float minimumLuminance = 0.62f)
         {
             AssertSlicedSprite(image, LightButtonFill);
             Assert.That(ColorLuminance(image.color),
-                Is.InRange(0.62f, 0.96f), name);
+                Is.InRange(minimumLuminance, 0.96f),
+                $"{name} 应保持可读的中等明度 Light 表面，而不是被旧阈值推回泛白配色。");
             Assert.That(image.color.a, Is.GreaterThan(0.85f), name);
         }
 

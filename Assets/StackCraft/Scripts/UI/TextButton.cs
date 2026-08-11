@@ -7,6 +7,8 @@ namespace CryingSnow.StackCraft
     [RequireComponent(typeof(TextMeshProUGUI))]
     public class TextButton : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
+        private const FontStyles BaseFontStyle = FontStyles.Bold;
+
         private TextMeshProUGUI _text;
         private TextMeshProUGUI text
         {
@@ -25,6 +27,7 @@ namespace CryingSnow.StackCraft
             gameObject.SetActive(true);
             text.text = label;
             text.fontSize = fontSize;
+            text.fontStyle = BaseFontStyle;
             this.onHover = onHover;
             this.onClick = onClick;
         }
@@ -52,7 +55,7 @@ namespace CryingSnow.StackCraft
         public void Deactivate()
         {
             text.text = "";
-            text.fontStyle = FontStyles.Normal;
+            text.fontStyle = BaseFontStyle;
             onClick = null;
             gameObject.SetActive(false);
         }
@@ -68,19 +71,19 @@ namespace CryingSnow.StackCraft
 
         public void OnPointerEnter(PointerEventData eventData)
         {
-            text.fontStyle = FontStyles.Underline;
+            text.fontStyle = BaseFontStyle | FontStyles.Underline;
             onHover?.Invoke(true);
         }
 
         public void OnPointerExit(PointerEventData eventData)
         {
-            text.fontStyle = FontStyles.Normal;
+            text.fontStyle = BaseFontStyle;
             onHover?.Invoke(false);
         }
 
         private void OnDisable()
         {
-            text.fontStyle = FontStyles.Normal;
+            text.fontStyle = BaseFontStyle;
             onHover?.Invoke(false);
         }
     }

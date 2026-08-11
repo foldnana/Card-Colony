@@ -29,8 +29,12 @@ namespace CryingSnow.StackCraft
             new(0.15f, 0.44f, 0.25f, 1f);
         private static readonly Color SellPromptGold =
             new(0.60f, 0.36f, 0.08f, 1f);
-        private static readonly Color LightRow =
-            new(0.84f, 0.86f, 0.87f, 1f);
+        private static readonly Color IconInk =
+            new(0.12f, 0.16f, 0.18f, 1f);
+        private static readonly Color BuyRow =
+            new(0.63f, 0.75f, 0.68f, 1f);
+        private static readonly Color SellRow =
+            new(0.63f, 0.72f, 0.80f, 1f);
 
         public void Bind(
             CommodityDefinition commodity,
@@ -44,6 +48,7 @@ namespace CryingSnow.StackCraft
             {
                 icon.texture =
                     commodity?.CardDefinition?.ArtTexture;
+                icon.color = IconInk;
                 icon.enabled = icon.texture != null;
             }
             if (nameLabel != null)
@@ -102,7 +107,9 @@ namespace CryingSnow.StackCraft
                 {
                     background.sprite = buttonSprite;
                     background.type = Image.Type.Sliced;
-                    background.color = LightRow;
+                    background.color = playerBuys
+                        ? BuyRow
+                        : SellRow;
                 }
             }
             ColorBlock colors = ColorBlock.defaultColorBlock;

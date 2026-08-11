@@ -53,17 +53,38 @@ namespace CryingSnow.StackCraft.EditorTools
                     FindDescendant(
                         oldMarketModal,
                         "PublicMarketTransactionPanel") != null;
-                if (locationSidebarInstalled && dualInventoryInstalled)
+                bool marketUiCurrent = dualInventoryInstalled &&
+                    FindDescendant(
+                        oldMarketModal,
+                        "PublicMarketBackpackEmptyState") != null &&
+                    FindDescendant(
+                        oldMarketModal,
+                        "PublicMarketMarketEmptyState") != null;
+                if (locationSidebarInstalled && marketUiCurrent)
                 {
-                    PublicMarketFantasySkinInstaller
-                        .ApplyToPrefabContents(root);
-                    CommonFantasyHudSkinInstaller
-                        .ApplyToPrefabContents(root);
+                    UpgradeExistingPublicMarket(
+                        root,
+                        oldMarketModal,
+                        font,
+                        oldMarketScreen);
                     PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
                     AssetDatabase.SaveAssets();
                     Debug.Log(
                         "World-map location sidebar and public market UI " +
                         "are already installed.");
+                    return;
+                }
+                if (locationSidebarInstalled && dualInventoryInstalled)
+                {
+                    UpgradeExistingPublicMarket(
+                        root,
+                        oldMarketModal,
+                        font,
+                        oldMarketScreen);
+                    PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
+                    AssetDatabase.SaveAssets();
+                    Debug.Log(
+                        "Upgraded the existing public market UI in place.");
                     return;
                 }
                 if (locationSidebarInstalled)
@@ -752,7 +773,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 "PublicMarketCloseButton",
                 modal.transform,
                 font,
-                "返回",
+                "关闭市场",
                 new Color(0.30f, 0.33f, 0.38f, 1f),
                 new Vector2(0.88f, 0.915f),
                 new Vector2(0.97f, 0.97f),
@@ -805,27 +826,41 @@ namespace CryingSnow.StackCraft.EditorTools
                 new Vector2(0.05f, 0.84f),
                 new Vector2(0.95f, 0.90f));
 
+            GameObject selectionCard = CreateUiObject(
+                "PublicMarketSelectionCard",
+                transactionPanel.transform,
+                typeof(CanvasRenderer),
+                typeof(Image));
+            SetRect(
+                (RectTransform)selectionCard.transform,
+                new Vector2(0.055f, 0.39f),
+                new Vector2(0.945f, 0.81f),
+                Vector2.zero,
+                Vector2.zero);
+            selectionCard.GetComponent<Image>().color =
+                new Color(1f, 1f, 1f, 0.46f);
+
             TMP_Text selection = CreateText(
                 "PublicMarketSelectionLabel",
-                transactionPanel.transform,
+                selectionCard.transform,
                 font,
-                "请选择商品\n\n背包商品用于出售\n市场商品用于购买",
+                "请选择左侧商品出售\n或选择右侧商品购买",
                 21f,
                 Color.white,
                 TextAlignmentOptions.TopLeft,
-                new Vector2(0.07f, 0.52f),
-                new Vector2(0.93f, 0.82f));
+                new Vector2(0.06f, 0.40f),
+                new Vector2(0.94f, 0.95f));
             selection.enableWordWrapping = true;
             TMP_Text quantity = CreateText(
                 "PublicMarketQuantityLabel",
-                transactionPanel.transform,
+                selectionCard.transform,
                 font,
-                "数量 —\n总额 —\n交易后 —",
+                "数量 —\n交易总额 —",
                 20f,
                 new Color(0.94f, 0.86f, 0.64f, 1f),
                 TextAlignmentOptions.TopLeft,
-                new Vector2(0.07f, 0.35f),
-                new Vector2(0.93f, 0.51f));
+                new Vector2(0.06f, 0.05f),
+                new Vector2(0.94f, 0.36f));
             quantity.enableWordWrapping = true;
 
             Button decrease = CreateButton(
@@ -907,12 +942,20 @@ namespace CryingSnow.StackCraft.EditorTools
                 backpack.RowTemplate);
             SetReference(
                 serialized,
+                "backpackEmptyState",
+                backpack.EmptyState);
+            SetReference(
+                serialized,
                 "marketListRoot",
                 market.ListRoot);
             SetReference(
                 serialized,
                 "marketRowTemplate",
                 market.RowTemplate);
+            SetReference(
+                serialized,
+                "marketEmptyState",
+                market.EmptyState);
             SetReference(serialized, "selectionLabel", selection);
             SetReference(serialized, "quantityLabel", quantity);
             SetReference(serialized, "hintLabel", hint);
@@ -926,6 +969,156 @@ namespace CryingSnow.StackCraft.EditorTools
                 .ApplyToPrefabContents(root);
             CommonFantasyHudSkinInstaller
                 .ApplyToPrefabContents(root);
+        }
+
+        private static void UpgradeExistingPublicMarket(
+            GameObject root,
+            Transform modal,
+            TMP_FontAsset font,
+            PublicMarketTradeScreen screen)
+        {
+            modal.SetAsLastSibling();
+            TMP_Text closeLabel = FindDescendant(
+                    modal,
+                    "PublicMarketCloseButton")
+                ?.GetComponentInChildren<TMP_Text>(true);
+            if (closeLabel != null)
+                closeLabel.text = "关闭市场";
+
+            foreach (string rowName in new[]
+                     {
+                         "PublicMarketBackpackRowTemplate",
+                         "PublicMarketMarketRowTemplate"
+                     })
+            {
+                Transform row = FindDescendant(modal, rowName);
+                if (row == null)
+                    continue;
+                row.gameObject.SetActive(false);
+                LayoutElement layout = row.GetComponent<LayoutElement>();
+                if (layout != null)
+                    layout.preferredHeight = 122f;
+                TMP_Text nameLabel = FindDescendant(row, "Name")
+                    ?.GetComponent<TMP_Text>();
+                if (nameLabel != null)
+                    nameLabel.fontSize = 21f;
+            }
+
+            GameObject backpackEmpty = EnsureMarketEmptyState(
+                modal,
+                "PublicMarketBackpackPanelScrollView",
+                "PublicMarketBackpackEmptyState",
+                "背包中没有可出售的商品",
+                font);
+            GameObject marketEmpty = EnsureMarketEmptyState(
+                modal,
+                "PublicMarketMarketPanelScrollView",
+                "PublicMarketMarketEmptyState",
+                "市场暂时没有可购买的商品",
+                font);
+
+            Transform transaction = FindDescendant(
+                modal,
+                "PublicMarketTransactionPanel");
+            Transform selectionCard = FindDescendant(
+                transaction,
+                "PublicMarketSelectionCard");
+            if (transaction != null && selectionCard == null)
+            {
+                GameObject card = CreateUiObject(
+                    "PublicMarketSelectionCard",
+                    transaction,
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                SetRect(
+                    (RectTransform)card.transform,
+                    new Vector2(0.055f, 0.39f),
+                    new Vector2(0.945f, 0.81f),
+                    Vector2.zero,
+                    Vector2.zero);
+                card.GetComponent<Image>().color =
+                    new Color(1f, 1f, 1f, 0.46f);
+                selectionCard = card.transform;
+            }
+            if (selectionCard != null)
+            {
+                SetRect(
+                    (RectTransform)selectionCard,
+                    new Vector2(0.055f, 0.39f),
+                    new Vector2(0.945f, 0.81f),
+                    Vector2.zero,
+                    Vector2.zero);
+            }
+            TMP_Text selection = FindDescendant(
+                    modal,
+                    "PublicMarketSelectionLabel")
+                ?.GetComponent<TMP_Text>();
+            TMP_Text quantity = FindDescendant(
+                    modal,
+                    "PublicMarketQuantityLabel")
+                ?.GetComponent<TMP_Text>();
+            if (selectionCard != null && selection != null)
+            {
+                selection.transform.SetParent(selectionCard, false);
+                selection.text = "请选择左侧商品出售\n或选择右侧商品购买";
+                SetRect(
+                    (RectTransform)selection.transform,
+                    new Vector2(0.06f, 0.40f),
+                    new Vector2(0.94f, 0.95f),
+                    Vector2.zero,
+                    Vector2.zero);
+            }
+            if (selectionCard != null && quantity != null)
+            {
+                quantity.transform.SetParent(selectionCard, false);
+                quantity.text = "数量 —\n交易总额 —";
+                SetRect(
+                    (RectTransform)quantity.transform,
+                    new Vector2(0.06f, 0.05f),
+                    new Vector2(0.94f, 0.36f),
+                    Vector2.zero,
+                    Vector2.zero);
+            }
+
+            var serialized = new SerializedObject(screen);
+            SetReference(
+                serialized,
+                "backpackEmptyState",
+                backpackEmpty);
+            SetReference(
+                serialized,
+                "marketEmptyState",
+                marketEmpty);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            PublicMarketFantasySkinInstaller.ApplyToPrefabContents(root);
+            CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root);
+        }
+
+        private static GameObject EnsureMarketEmptyState(
+            Transform modal,
+            string scrollName,
+            string emptyStateName,
+            string message,
+            TMP_FontAsset font)
+        {
+            Transform existing = FindDescendant(modal, emptyStateName);
+            if (existing != null)
+                return existing.gameObject;
+            Transform scroll = FindDescendant(modal, scrollName);
+            if (scroll == null)
+                return null;
+            TMP_Text emptyState = CreateText(
+                emptyStateName,
+                scroll,
+                font,
+                message,
+                19f,
+                new Color(0.34f, 0.38f, 0.42f, 1f),
+                TextAlignmentOptions.Center,
+                new Vector2(0.08f, 0.38f),
+                new Vector2(0.92f, 0.62f));
+            emptyState.raycastTarget = false;
+            return emptyState.gameObject;
         }
 
         private static MarketInventoryPanelParts CreateMarketInventoryPanel(
@@ -1043,7 +1236,26 @@ namespace CryingSnow.StackCraft.EditorTools
                     content,
                     font);
             row.gameObject.SetActive(false);
-            return new MarketInventoryPanelParts(content, row);
+            bool isBackpack = panelName.Contains("Backpack");
+            TMP_Text emptyState = CreateText(
+                isBackpack
+                    ? "PublicMarketBackpackEmptyState"
+                    : "PublicMarketMarketEmptyState",
+                scrollObject.transform,
+                font,
+                isBackpack
+                    ? "背包中没有可出售的商品"
+                    : "市场暂时没有可购买的商品",
+                19f,
+                new Color(0.34f, 0.38f, 0.42f, 1f),
+                TextAlignmentOptions.Center,
+                new Vector2(0.08f, 0.38f),
+                new Vector2(0.92f, 0.62f));
+            emptyState.raycastTarget = false;
+            return new MarketInventoryPanelParts(
+                content,
+                row,
+                emptyState.gameObject);
         }
 
         private static MarketCommodityListItem CreateDualInventoryMarketRow(
@@ -1068,7 +1280,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 Selectable.Transition.ColorTint;
             LayoutElement layout =
                 rowObject.GetComponent<LayoutElement>();
-            layout.preferredHeight = 104f;
+            layout.preferredHeight = 122f;
             layout.flexibleWidth = 1f;
 
             GameObject iconObject = CreateUiObject(
@@ -1096,7 +1308,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 rowObject.transform,
                 font,
                 "商品",
-                19f,
+                21f,
                 Color.white,
                 TextAlignmentOptions.MidlineLeft,
                 new Vector2(0.21f, 0.70f),
@@ -1162,14 +1374,17 @@ namespace CryingSnow.StackCraft.EditorTools
         {
             public MarketInventoryPanelParts(
                 RectTransform listRoot,
-                MarketCommodityListItem rowTemplate)
+                MarketCommodityListItem rowTemplate,
+                GameObject emptyState)
             {
                 ListRoot = listRoot;
                 RowTemplate = rowTemplate;
+                EmptyState = emptyState;
             }
 
             public RectTransform ListRoot { get; }
             public MarketCommodityListItem RowTemplate { get; }
+            public GameObject EmptyState { get; }
         }
 
         private static GameObject CreateUiObject(

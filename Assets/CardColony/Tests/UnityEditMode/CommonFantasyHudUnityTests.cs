@@ -14,6 +14,8 @@ namespace CardColony.Tests
     {
         private const string UiRootPath =
             "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+        private const string DialoguePanelPath =
+            "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab";
         private const string ComponentRoot =
             "Assets/Layer Lab/GUI Pro-FantasyRPG/ResourcesData/" +
             "Sprites/Component/";
@@ -378,6 +380,134 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void UiRoot_CommonFantasyHudUsesBoldTextAndDarkJournalHeaders()
+        {
+            GameObject root =
+                AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
+            Assert.That(root, Is.Not.Null);
+
+            AssertAllTextIsBold(root.transform);
+
+            foreach (string panelName in new[] { "QuestsView", "RecipesView" })
+            {
+                MonoBehaviour menu = FindDescendant(root.transform, panelName)
+                    .GetComponents<MonoBehaviour>()
+                    .Single(component => component.GetType().BaseType
+                        ?.FullName == "CryingSnow.StackCraft.MenuView");
+                Color headerColor = new SerializedObject(menu)
+                    .FindProperty("headerColor").colorValue;
+                Assert.That(
+                    ColorLuminance(headerColor),
+                    Is.LessThanOrEqualTo(0.32f),
+                    $"{panelName} 的运行时分组标题必须使用高对比深色文字。");
+                Color itemColor = new SerializedObject(menu)
+                    .FindProperty("itemColor").colorValue;
+                Assert.That(
+                    ColorLuminance(itemColor),
+                    Is.LessThanOrEqualTo(0.35f),
+                    $"{panelName} 的运行时条目文字必须使用高对比深色文字。");
+            }
+
+            GameObject dialogue =
+                AssetDatabase.LoadAssetAtPath<GameObject>(DialoguePanelPath);
+            Assert.That(dialogue, Is.Not.Null);
+            AssertAllTextIsBold(dialogue.transform);
+        }
+
+        [Test]
+        public void TextButton_PreservesBoldWeightAcrossPointerStates()
+        {
+            System.Type textButtonType = System.AppDomain.CurrentDomain
+                .GetAssemblies()
+                .Select(assembly => assembly.GetType(
+                    "CryingSnow.StackCraft.TextButton"))
+                .First(type => type != null);
+            var go = new GameObject(
+                "TextButtonTest",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(TextMeshProUGUI));
+            try
+            {
+                Component button = go.AddComponent(textButtonType);
+                TMP_Text label = go.GetComponent<TMP_Text>();
+
+                textButtonType.GetMethod("Setup").Invoke(
+                    button,
+                    new object[] { "任务标题", 30f, null, null });
+                Assert.That(label.fontStyle.HasFlag(FontStyles.Bold), Is.True);
+
+                textButtonType.GetMethod("OnPointerEnter")
+                    .Invoke(button, new object[] { null });
+                Assert.That(label.fontStyle.HasFlag(FontStyles.Bold), Is.True);
+                Assert.That(label.fontStyle.HasFlag(FontStyles.Underline), Is.True);
+
+                textButtonType.GetMethod("OnPointerExit")
+                    .Invoke(button, new object[] { null });
+                Assert.That(label.fontStyle.HasFlag(FontStyles.Bold), Is.True);
+                Assert.That(label.fontStyle.HasFlag(FontStyles.Underline), Is.False);
+            }
+            finally
+            {
+                Object.DestroyImmediate(go);
+            }
+        }
+
+        [Test]
+        public void UiRoot_CommonFantasyHudAvoidsWashedOutSharedSurfaces()
+        {
+            GameObject root =
+                AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
+            Assert.That(root, Is.Not.Null);
+
+            foreach (string name in new[]
+                     {
+                         "MenuPanel",
+                         "LocationView",
+                         "InfoPanel",
+                         "NpcTradePanel",
+                         "WorldMapPartyStatusPanel",
+                         "BackpackTablePanel",
+                         "QuestsView",
+                         "RecipesView"
+                     })
+            {
+                Image surface = FindDescendant(root.transform, name)
+                    .GetComponent<Image>();
+                Assert.That(
+                    ColorLuminance(surface.color),
+                    Is.InRange(0.56f, 0.76f),
+                    $"{name} 应使用中等明度的 Light 表面，不能接近白色。");
+            }
+
+            foreach (string name in new[]
+                     {
+                         "DayTimeUI",
+                         "CardStatsUI",
+                         "LocationToggle",
+                         "QuestsToggle",
+                         "RecipesToggle",
+                         "BackpackToggle"
+                     })
+            {
+                Image surface = FindDescendant(root.transform, name)
+                    .GetComponent<Image>();
+                Assert.That(
+                    ColorLuminance(surface.color),
+                    Is.InRange(0.54f, 0.70f),
+                    $"{name} 的顶部和页签底板不能继续泛白。");
+            }
+
+            Image npcList = FindDescendant(
+                root.transform,
+                "NpcTradeScrollView").GetComponent<Image>();
+            Assert.That(
+                ColorLuminance(npcList.color),
+                Is.InRange(0.56f, 0.72f),
+                "列表底板需要比内容面板再深一级。" );
+        }
+
+        [Test]
         public void LocationScene_ReturnButtonUsesFantasyStyleAndKeepsBinding()
         {
             const string locationScenePath =
@@ -416,6 +546,7 @@ namespace CardColony.Tests
                     returnButton.navigation.mode,
                     Is.EqualTo(Navigation.Mode.Automatic));
                 AssertDepthShadow(returnTransform);
+                AssertAllTextIsBold(returnTransform);
 
                 MonoBehaviour controller = scene
                     .GetRootGameObjects()
@@ -573,6 +704,30 @@ namespace CardColony.Tests
             Assert.That(panel.GetComponent<Image>().color.a, Is.EqualTo(1f));
             AssertDepthShadow(panel);
             Assert.That(panel.GetComponent<ScrollRect>(), Is.Not.Null);
+        }
+
+        private static void AssertAllTextIsBold(Transform root)
+        {
+            TMP_Text[] labels = root.GetComponentsInChildren<TMP_Text>(true);
+            Assert.That(labels, Is.Not.Empty);
+            foreach (TMP_Text label in labels)
+            {
+                Assert.That(
+                    label.fontStyle.HasFlag(FontStyles.Bold),
+                    Is.True,
+                    $"{GetHierarchyPath(label.transform)} 仍然是细体。");
+            }
+        }
+
+        private static string GetHierarchyPath(Transform target)
+        {
+            string path = target.name;
+            while (target.parent != null)
+            {
+                target = target.parent;
+                path = target.name + "/" + path;
+            }
+            return path;
         }
 
         private static void AssertSlicedSprite(

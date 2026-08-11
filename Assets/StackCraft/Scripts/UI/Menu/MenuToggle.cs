@@ -18,6 +18,9 @@ namespace CryingSnow.StackCraft
 
         private bool isAnimating;
 
+        public bool IsOpen =>
+            targetRect != null && targetRect.anchoredPosition.x <= 0.01f;
+
         private void Awake()
         {
             button = GetComponent<Button>();
@@ -66,6 +69,24 @@ namespace CryingSnow.StackCraft
                 });
 
             AudioManager.Instance?.PlaySFX(AudioId.Click);
+        }
+
+        /// <summary>
+        /// Opens the sidebar immediately when a new selection or interaction
+        /// publishes content. This also interrupts an in-progress close tween.
+        /// </summary>
+        public void Open()
+        {
+            if (targetRect == null)
+                return;
+
+            targetRect.DOKill();
+            isAnimating = false;
+            Vector2 position = targetRect.anchoredPosition;
+            position.x = 0f;
+            targetRect.anchoredPosition = position;
+            if (labelText != null)
+                labelText.text = ">>";
         }
 
         /// <summary>

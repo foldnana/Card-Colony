@@ -699,6 +699,94 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void UiRoot_PublicMarketHidesTemplatesAndShowsEmptyStates()
+        {
+            Type screenType = FindType(
+                "CryingSnow.StackCraft.PublicMarketTradeScreen");
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+
+            Transform backpackTemplate = FindChild(
+                prefab.transform,
+                "PublicMarketBackpackRowTemplate");
+            Transform marketTemplate = FindChild(
+                prefab.transform,
+                "PublicMarketMarketRowTemplate");
+            Assert.That(backpackTemplate, Is.Not.Null);
+            Assert.That(marketTemplate, Is.Not.Null);
+            Assert.That(backpackTemplate.gameObject.activeSelf, Is.False,
+                "背包模板不能作为一条假商品显示出来。");
+            Assert.That(marketTemplate.gameObject.activeSelf, Is.False,
+                "市场模板不能作为“商品/买入价/库存”的假数据行显示出来。");
+
+            Transform backpackEmpty = FindChild(
+                prefab.transform,
+                "PublicMarketBackpackEmptyState");
+            Transform marketEmpty = FindChild(
+                prefab.transform,
+                "PublicMarketMarketEmptyState");
+            Assert.That(backpackEmpty, Is.Not.Null,
+                "背包没有可出售商品时需要明确的空状态提示。");
+            Assert.That(marketEmpty, Is.Not.Null,
+                "市场没有可购买商品时需要明确的空状态提示。");
+
+            Component screen = prefab.GetComponentInChildren(
+                screenType,
+                true);
+            var serialized = new SerializedObject(screen);
+            Assert.That(
+                serialized.FindProperty("backpackEmptyState")
+                    ?.objectReferenceValue,
+                Is.EqualTo(backpackEmpty.gameObject));
+            Assert.That(
+                serialized.FindProperty("marketEmptyState")
+                    ?.objectReferenceValue,
+                Is.EqualTo(marketEmpty.gameObject));
+        }
+
+        [Test]
+        public void UiRoot_PublicMarketModalOwnsTopLayerAndReadableRows()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+
+            Transform modal = FindChild(
+                prefab.transform,
+                "PublicMarketModal");
+            Assert.That(modal, Is.Not.Null);
+            Assert.That(
+                modal.GetSiblingIndex(),
+                Is.EqualTo(modal.parent.childCount - 1),
+                "市场模态框必须位于同级最上层，不能让地点返回按钮穿透到市场上方。");
+
+            TMP_Text closeLabel = FindChild(
+                    modal,
+                    "PublicMarketCloseButton")
+                .GetComponentInChildren<TMP_Text>(true);
+            Assert.That(closeLabel.text, Is.EqualTo("关闭市场"),
+                "右上角按钮需要说明关闭的是市场，避免与底层返回按钮混淆。");
+
+            foreach (string rowName in new[]
+                     {
+                         "PublicMarketBackpackRowTemplate",
+                         "PublicMarketMarketRowTemplate"
+                     })
+            {
+                Transform row = FindChild(modal, rowName);
+                LayoutElement layout = row.GetComponent<LayoutElement>();
+                Assert.That(layout, Is.Not.Null);
+                Assert.That(layout.preferredHeight,
+                    Is.GreaterThanOrEqualTo(118f),
+                    "商品名称、价格、库存和持有量需要足够的纵向空间。");
+                Assert.That(
+                    FindChild(row, "Name").GetComponent<TMP_Text>().fontSize,
+                    Is.GreaterThanOrEqualTo(20f));
+            }
+        }
+
+        [Test]
         public void UiRoot_PublicMarketUsesLightSkinWithoutReplacingBindings()
         {
             const string panelSpritePath =
@@ -830,12 +918,21 @@ namespace CardColony.Tests
             Assert.That(ColorLuminance(backpack.color),
                 Is.InRange(0.62f, 0.96f),
                 "背包区需要明显的蓝色识别，而不是接近灰色。");
+            Assert.That(backpack.color.b - backpack.color.r,
+                Is.GreaterThanOrEqualTo(0.055f),
+                "背包区不能只靠边框区分，需要可感知的浅蓝底色。");
             Assert.That(ColorLuminance(transaction.color),
                 Is.InRange(0.62f, 0.96f),
                 "交易区需要明显的琥珀暖色识别。");
+            Assert.That(transaction.color.r - transaction.color.b,
+                Is.GreaterThanOrEqualTo(0.075f),
+                "交易区需要可感知的暖色底，而不是与左右栏相同的灰色。");
             Assert.That(ColorLuminance(market.color),
                 Is.InRange(0.62f, 0.96f),
                 "市场区需要明显的绿色识别。");
+            Assert.That(market.color.g - market.color.r,
+                Is.GreaterThanOrEqualTo(0.035f),
+                "市场区需要可感知的浅绿色底色。");
 
             TMP_Text backpackTitle = FindChild(
                 modal,
@@ -849,6 +946,16 @@ namespace CardColony.Tests
             Assert.That(ColorLuminance(backpackSubtitle.color),
                 Is.LessThan(0.52f),
                 "左栏说明文字需要使用暖白色，与青蓝标题形成配色层次。");
+            TMP_Text transactionTitle = FindChild(
+                modal,
+                "PublicMarketTransactionTitle").GetComponent<TMP_Text>();
+            TMP_Text marketTitle = FindChild(
+                modal,
+                "PublicMarketMarketPanelTitle").GetComponent<TMP_Text>();
+            Assert.That(ColorLuminance(transactionTitle.color),
+                Is.LessThan(0.42f));
+            Assert.That(ColorLuminance(marketTitle.color),
+                Is.LessThan(0.42f));
 
             Assert.That(
                 FindChild(modal, "PublicMarketFantasyHeaderHighlight"),
@@ -896,6 +1003,62 @@ namespace CardColony.Tests
             Assert.That(close.r, Is.GreaterThan(close.g + 0.05f));
             Assert.That(maximum.r, Is.GreaterThan(maximum.b + 0.20f));
             Assert.That(confirm.g, Is.GreaterThan(confirm.r + 0.05f));
+        }
+
+        [Test]
+        public void UiRoot_PublicMarketLightSkinAvoidsWashedOutSurfaces()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform modal = FindChild(
+                prefab.transform,
+                "PublicMarketModal");
+
+            Assert.That(
+                ColorLuminance(modal.GetComponent<Image>().color),
+                Is.LessThanOrEqualTo(0.82f),
+                "市场总底板需要压低明度，不能接近纯白。" );
+            foreach (string panelName in new[]
+                     {
+                         "PublicMarketBackpackPanel",
+                         "PublicMarketTransactionPanel",
+                         "PublicMarketMarketPanel"
+                     })
+            {
+                Color panelColor = FindChild(modal, panelName)
+                    .GetComponent<Image>().color;
+                Assert.That(
+                    ColorLuminance(panelColor),
+                    Is.InRange(0.58f, 0.76f),
+                    $"{panelName} 应保留 Light 风格，但不能泛白。" );
+            }
+
+            foreach (string surfaceName in new[]
+                     {
+                         "PublicMarketBackpackPanelScrollView",
+                         "PublicMarketMarketPanelScrollView",
+                         "PublicMarketSelectionCard"
+                     })
+            {
+                Color surfaceColor = FindChild(modal, surfaceName)
+                    .GetComponent<Image>().color;
+                Assert.That(
+                    ColorLuminance(surfaceColor),
+                    Is.InRange(0.68f, 0.84f),
+                    $"{surfaceName} 不应成为大片纯白区域。" );
+            }
+
+            TMP_Text backpackTitle = FindChild(
+                modal,
+                "PublicMarketBackpackPanelTitle").GetComponent<TMP_Text>();
+            Color backpackPanel = FindChild(
+                modal,
+                "PublicMarketBackpackPanel").GetComponent<Image>().color;
+            Assert.That(
+                ColorLuminance(backpackPanel) -
+                ColorLuminance(backpackTitle.color),
+                Is.GreaterThanOrEqualTo(0.34f),
+                "栏目标题需要和底板形成足够的明暗差。" );
         }
 
         [Test]
@@ -1076,6 +1239,19 @@ namespace CardColony.Tests
                 "完整彩色凸面按钮不能再叠加背景染色。");
             Assert.That(ColorLuminance(buyColor), Is.InRange(0.62f, 0.92f),
                 "完整彩色凸面按钮不能再叠加背景染色。");
+            foreach (Transform template in new[]
+                     {
+                         backpackTemplate,
+                         marketTemplate
+                     })
+            {
+                RawImage icon = FindChild(template, "Icon")
+                    .GetComponent<RawImage>();
+                Assert.That(
+                    ColorLuminance(icon.color),
+                    Is.LessThanOrEqualTo(0.28f),
+                    "商品图标必须使用深色墨线，不能让白色线稿消失在浅色商品行上。");
+            }
             Assert.That(
                 AssetDatabase.GetAssetPath(
                     backpackTemplate.GetComponent<Image>().sprite),
@@ -1214,6 +1390,14 @@ namespace CardColony.Tests
                         component.GetType() == viewType);
                 Assert.That(view, Is.Not.Null);
 
+                RectTransform menuPanel =
+                    ((Component)view).transform.parent as RectTransform;
+                Assert.That(menuPanel?.name, Is.EqualTo("MenuPanel"));
+                menuPanel.anchoredPosition = new Vector2(
+                    menuPanel.sizeDelta.x,
+                    menuPanel.anchoredPosition.y);
+                Assert.That(menuPanel.anchoredPosition.x, Is.GreaterThan(0f));
+
                 Component cardManager = scene.GetRootGameObjects()
                     .SelectMany(root =>
                         root.GetComponentsInChildren<Component>(true))
@@ -1257,6 +1441,10 @@ namespace CardColony.Tests
                     ?.GetValue(view) as GameObject;
                 Assert.That(canvasGroup.alpha, Is.EqualTo(1f));
                 Assert.That(canvasGroup.interactable, Is.True);
+                Assert.That(
+                    menuPanel.anchoredPosition.x,
+                    Is.EqualTo(0f).Within(0.01f),
+                    "选择 NPC 或进入人物交互时必须自动展开整个右侧状态栏。");
                 Assert.That(tradePanel, Is.Not.Null);
                 Assert.That(tradePanel.activeSelf, Is.True);
 

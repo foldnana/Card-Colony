@@ -35,27 +35,37 @@ namespace CryingSnow.StackCraft.EditorTools
         private const string SelectionLightSpritePath = BorderSpritePath;
 
         private static readonly Color PanelNavy =
-            new(0.82f, 0.84f, 0.86f, 0.985f);
+            new(0.60f, 0.68f, 0.75f, 0.985f);
         private static readonly Color HeaderNavy =
-            new(0.72f, 0.77f, 0.82f, 1f);
+            new(0.52f, 0.61f, 0.70f, 1f);
         private static readonly Color LightButtonBlue =
-            new(0.67f, 0.76f, 0.86f, 1f);
+            new(0.52f, 0.64f, 0.76f, 1f);
         private static readonly Color LightDanger =
-            new(0.84f, 0.67f, 0.66f, 1f);
+            new(0.74f, 0.52f, 0.50f, 1f);
         private static readonly Color LightSuccess =
-            new(0.64f, 0.80f, 0.68f, 1f);
+            new(0.48f, 0.68f, 0.54f, 1f);
         private static readonly Color LightAmber =
-            new(0.88f, 0.76f, 0.57f, 1f);
+            new(0.78f, 0.64f, 0.39f, 1f);
         private static readonly Color ContentNavy =
-            new(0.90f, 0.91f, 0.92f, 1f);
+            new(0.67f, 0.72f, 0.77f, 1f);
         private static readonly Color ListNavy =
-            new(0.84f, 0.86f, 0.87f, 1f);
+            new(0.61f, 0.67f, 0.72f, 1f);
+        private static readonly Color MarketModalLight =
+            new(0.73f, 0.77f, 0.80f, 1f);
+        private static readonly Color MarketBackpackLight =
+            new(0.55f, 0.68f, 0.79f, 1f);
+        private static readonly Color MarketTransactionLight =
+            new(0.75f, 0.62f, 0.43f, 1f);
+        private static readonly Color MarketInventoryLight =
+            new(0.55f, 0.72f, 0.62f, 1f);
         private static readonly Color QuestNavy =
-            new(0.88f, 0.90f, 0.94f, 1f);
+            new(0.65f, 0.72f, 0.81f, 1f);
         private static readonly Color RecipeBrown =
-            new(0.92f, 0.88f, 0.82f, 1f);
+            new(0.78f, 0.67f, 0.53f, 1f);
         private static readonly Color Cyan =
             new(0.10f, 0.38f, 0.58f, 1f);
+        private static readonly Color JournalHeaderInk =
+            new(0.05f, 0.24f, 0.31f, 1f);
         private static readonly Color WarmIvory =
             new(0.14f, 0.16f, 0.19f, 1f);
         private static readonly Color Gold =
@@ -237,6 +247,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 panelSprite,
                 borderSprite,
                 listSprite);
+            EnsureBoldText(root.transform);
         }
 
         private static void WireCombatLocationView(Transform root)
@@ -286,6 +297,7 @@ namespace CryingSnow.StackCraft.EditorTools
             StyleOptionalButton(root.transform, "ReplyButton", panelSprite);
             StyleOptionalButton(root.transform, "GoodbyeButton", panelSprite);
             EnsureReadableText(root.transform);
+            EnsureBoldText(root.transform);
         }
 
         private static void StyleTopStatus(
@@ -693,6 +705,16 @@ namespace CryingSnow.StackCraft.EditorTools
                 panel.gameObject,
                 new Color(0f, 0f, 0.01f, 0.76f),
                 new Vector2(-5f, -7f));
+
+            MenuView menu = panel.GetComponent<MenuView>();
+            if (menu != null)
+            {
+                var serialized = new SerializedObject(menu);
+                serialized.FindProperty("headerColor").colorValue =
+                    JournalHeaderInk;
+                serialized.FindProperty("itemColor").colorValue = WarmIvory;
+                serialized.ApplyModifiedPropertiesWithoutUndo();
+            }
         }
 
         private static void StyleExtendedLightInterfaces(
@@ -737,7 +759,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 root,
                 "PublicMarketFantasyFrame",
                 borderSprite,
-                new Color(0.30f, 0.70f, 0.94f, 0.88f));
+                new Color(0.18f, 0.42f, 0.58f, 0.92f));
             StyleOptionalImage(
                 root,
                 "PublicMarketFantasyHeaderHighlight",
@@ -748,17 +770,17 @@ namespace CryingSnow.StackCraft.EditorTools
                 root,
                 "PublicMarketBackpackPanelFantasyBorder",
                 borderSprite,
-                new Color(0.30f, 0.62f, 0.92f, 0.72f));
+                new Color(0.20f, 0.46f, 0.66f, 0.86f));
             StyleOptionalImage(
                 root,
                 "PublicMarketTransactionPanelFantasyBorder",
                 borderSprite,
-                new Color(0.98f, 0.63f, 0.22f, 0.72f));
+                new Color(0.62f, 0.39f, 0.10f, 0.86f));
             StyleOptionalImage(
                 root,
                 "PublicMarketMarketPanelFantasyBorder",
                 borderSprite,
-                new Color(0.32f, 0.78f, 0.52f, 0.72f));
+                new Color(0.18f, 0.52f, 0.34f, 0.86f));
 
             foreach (string name in new[]
                      {
@@ -811,19 +833,31 @@ namespace CryingSnow.StackCraft.EditorTools
                 root,
                 "PublicMarketCloseButton",
                 panelSprite,
-                LightDanger,
+                new Color(0.78f, 0.60f, 0.58f, 1f),
                 new Color(0.38f, 0.10f, 0.09f, 1f));
+            StyleOptionalButton(
+                root,
+                "PublicMarketDecreaseButton",
+                panelSprite,
+                new Color(0.58f, 0.69f, 0.80f, 1f),
+                WarmIvory);
+            StyleOptionalButton(
+                root,
+                "PublicMarketIncreaseButton",
+                panelSprite,
+                new Color(0.58f, 0.69f, 0.80f, 1f),
+                WarmIvory);
             StyleOptionalButton(
                 root,
                 "PublicMarketMaximumButton",
                 panelSprite,
-                LightAmber,
+                new Color(0.78f, 0.64f, 0.40f, 1f),
                 new Color(0.42f, 0.25f, 0.05f, 1f));
             StyleOptionalButton(
                 root,
                 "PublicMarketConfirmButton",
                 panelSprite,
-                LightSuccess,
+                new Color(0.50f, 0.72f, 0.55f, 1f),
                 new Color(0.08f, 0.32f, 0.16f, 1f));
 
             foreach (string name in new[]
@@ -845,6 +879,99 @@ namespace CryingSnow.StackCraft.EditorTools
                 if (panel != null)
                     EnsureReadableText(panel);
             }
+
+            StylePublicMarketLight(root, panelSprite, listSprite);
+        }
+
+        private static void StylePublicMarketLight(
+            Transform root,
+            Sprite panelSprite,
+            Sprite listSprite)
+        {
+            StyleOptionalImage(
+                root,
+                "PublicMarketModal",
+                panelSprite,
+                MarketModalLight);
+            StyleOptionalImage(
+                root,
+                "PublicMarketFantasyHeader",
+                panelSprite,
+                new Color(0.62f, 0.69f, 0.74f, 1f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketBackpackPanel",
+                panelSprite,
+                MarketBackpackLight);
+            StyleOptionalImage(
+                root,
+                "PublicMarketTransactionPanel",
+                panelSprite,
+                MarketTransactionLight);
+            StyleOptionalImage(
+                root,
+                "PublicMarketMarketPanel",
+                panelSprite,
+                MarketInventoryLight);
+            StyleOptionalImage(
+                root,
+                "PublicMarketBackpackPanelScrollView",
+                listSprite,
+                new Color(0.69f, 0.78f, 0.84f, 1f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketMarketPanelScrollView",
+                listSprite,
+                new Color(0.69f, 0.81f, 0.73f, 1f));
+            StyleOptionalImage(
+                root,
+                "PublicMarketSelectionCard",
+                listSprite,
+                new Color(0.82f, 0.72f, 0.53f, 1f));
+
+            StyleOptionalText(
+                root,
+                "PublicMarketTitle",
+                new Color(0.08f, 0.30f, 0.24f, 1f));
+            StyleOptionalText(
+                root,
+                "PublicMarketSummary",
+                new Color(0.27f, 0.31f, 0.35f, 1f));
+            StyleOptionalText(
+                root,
+                "PublicMarketBackpackPanelTitle",
+                new Color(0.07f, 0.29f, 0.45f, 1f));
+            StyleOptionalText(
+                root,
+                "PublicMarketTransactionTitle",
+                new Color(0.38f, 0.22f, 0.05f, 1f));
+            StyleOptionalText(
+                root,
+                "PublicMarketMarketPanelTitle",
+                new Color(0.07f, 0.31f, 0.17f, 1f));
+            foreach (string name in new[]
+                     {
+                         "PublicMarketBackpackPanelSubtitle",
+                         "PublicMarketMarketPanelSubtitle",
+                         "PublicMarketTransactionGuide",
+                         "PublicMarketBackpackEmptyState",
+                         "PublicMarketMarketEmptyState",
+                         "PublicMarketHint"
+                     })
+            {
+                StyleOptionalText(
+                    root,
+                    name,
+                    new Color(0.28f, 0.31f, 0.34f, 1f));
+            }
+            StyleOptionalText(
+                root,
+                "PublicMarketSelectionLabel",
+                WarmIvory);
+            StyleOptionalText(
+                root,
+                "PublicMarketQuantityLabel",
+                Gold);
         }
 
         private static void StyleMarketRow(
@@ -931,6 +1058,17 @@ namespace CryingSnow.StackCraft.EditorTools
                 StyleImage(image, sprite, color);
         }
 
+        private static void StyleOptionalText(
+            Transform root,
+            string name,
+            Color color)
+        {
+            TMP_Text label = FindDescendant(root, name)
+                ?.GetComponent<TMP_Text>();
+            if (label != null)
+                label.color = color;
+        }
+
         private static void EnsureReadableText(Transform root)
         {
             TMP_Text[] labels =
@@ -951,6 +1089,15 @@ namespace CryingSnow.StackCraft.EditorTools
             }
         }
 
+        private static void EnsureBoldText(Transform root)
+        {
+            foreach (TMP_Text label in
+                     root.GetComponentsInChildren<TMP_Text>(true))
+            {
+                label.fontStyle |= FontStyles.Bold;
+            }
+        }
+
         private static float ColorLuminance(Color color)
         {
             return 0.2126f * color.r +
@@ -968,6 +1115,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 LoadRequiredSprite(PanelSpritePath),
                 LightButtonBlue,
                 WarmIvory);
+            EnsureBoldText(button.transform);
         }
 
         private static void StyleToggle(

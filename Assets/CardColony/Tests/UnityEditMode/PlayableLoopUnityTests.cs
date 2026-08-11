@@ -8089,6 +8089,13 @@ namespace CardColony.Tests
                     "Awake",
                     BindingFlags.Instance | BindingFlags.NonPublic)?.Invoke(locationView, null);
 
+                RectTransform menuPanel =
+                    FindDescendant(uiInstance, "MenuPanel") as RectTransform;
+                menuPanel.anchoredPosition = new Vector2(
+                    menuPanel.sizeDelta.x,
+                    menuPanel.anchoredPosition.y);
+                Assert.That(menuPanel.anchoredPosition.x, Is.GreaterThan(0f));
+
                 Object playerDefinition = AssetDatabase.LoadAssetAtPath<Object>(
                     "Assets/StackCraft/Resources/Cards/Characters/Card_Villager.asset");
                 Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
@@ -8113,6 +8120,10 @@ namespace CardColony.Tests
                     Does.Contain("建筑"));
                 Button enterButton = FindDescendant(uiInstance, "EnterLocationButton").GetComponent<Button>();
                 Assert.That(enterButton.interactable, Is.True);
+                Assert.That(
+                    menuPanel.anchoredPosition.x,
+                    Is.EqualTo(0f).Within(0.01f),
+                    "选中建筑物时必须自动展开整个右侧状态栏。");
                 Assert.That(enterButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
                     Is.EqualTo("进入旅馆"));
             }

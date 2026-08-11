@@ -12,7 +12,10 @@ namespace CryingSnow.StackCraft
         private RectTransform content;
 
         [SerializeField, Tooltip("Color for the headers (quest group or recipe category).")]
-        protected Color headerColor = new Color(0.3f, 0.8f, 1.0f, 1.0f);
+        protected Color headerColor = new Color(0.08f, 0.24f, 0.34f, 1.0f);
+
+        [SerializeField, Tooltip("Color for quest and recipe list entries.")]
+        protected Color itemColor = new Color(0.14f, 0.17f, 0.20f, 1.0f);
 
         protected const string SYMBOL_COLLAPSED = "\u25ba";
         protected const string SYMBOL_EXPANDED = "\u25bc";
@@ -124,6 +127,7 @@ namespace CryingSnow.StackCraft
                     }
                 }
             );
+            itemBtn.SetColor(itemColor);
 
             RectTransform itemRect = (RectTransform)go.transform;
             itemRect.anchorMin = new Vector2(0f, 1f);

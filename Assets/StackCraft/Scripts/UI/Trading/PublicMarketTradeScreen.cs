@@ -22,8 +22,10 @@ namespace CryingSnow.StackCraft
         [Header("Dual inventory")]
         [SerializeField] private RectTransform backpackListRoot;
         [SerializeField] private MarketCommodityListItem backpackRowTemplate;
+        [SerializeField] private GameObject backpackEmptyState;
         [SerializeField] private RectTransform marketListRoot;
         [SerializeField] private MarketCommodityListItem marketRowTemplate;
+        [SerializeField] private GameObject marketEmptyState;
 
         [Header("Selection")]
         [SerializeField] private TMP_Text selectionLabel;
@@ -66,6 +68,7 @@ namespace CryingSnow.StackCraft
                     HandleSceneDataReady;
             }
 
+            HideRowTemplates();
             if (modalRoot != null)
                 modalRoot.SetActive(false);
             RefreshAvailability();
@@ -142,7 +145,10 @@ namespace CryingSnow.StackCraft
             isSubmitting = false;
             submitGate.Reset();
             if (modalRoot != null)
+            {
+                modalRoot.transform.SetAsLastSibling();
                 modalRoot.SetActive(true);
+            }
             InputManager.Instance?.AddLock(this);
             RefreshAll();
         }
@@ -354,6 +360,8 @@ namespace CryingSnow.StackCraft
 
             ClearRows(backpackListRoot, backpackRowTemplate);
             ClearRows(marketListRoot, marketRowTemplate);
+            int backpackRowCount = 0;
+            int marketRowCount = 0;
 
             foreach (MarketQuote quote in session.GetQuotes())
             {
@@ -371,6 +379,7 @@ namespace CryingSnow.StackCraft
                     marketRowTemplate,
                     marketListRoot);
                 marketRow.gameObject.SetActive(true);
+                marketRowCount++;
                 marketRow.Bind(
                     commodity,
                     quote,
@@ -394,6 +403,7 @@ namespace CryingSnow.StackCraft
                     backpackRowTemplate,
                     backpackListRoot);
                 backpackRow.gameObject.SetActive(true);
+                backpackRowCount++;
                 backpackRow.Bind(
                     commodity,
                     quote,
@@ -404,12 +414,16 @@ namespace CryingSnow.StackCraft
                         capturedQuote,
                         MarketTradeDirection.PlayerSells));
             }
+
+            backpackEmptyState?.SetActive(backpackRowCount == 0);
+            marketEmptyState?.SetActive(marketRowCount == 0);
         }
 
         private static void ClearRows(
             RectTransform root,
             MarketCommodityListItem template)
         {
+            template.gameObject.SetActive(false);
             for (int index = root.childCount - 1;
                  index >= 0;
                  index--)
@@ -424,6 +438,12 @@ namespace CryingSnow.StackCraft
                 else
                     DestroyImmediate(child.gameObject);
             }
+        }
+
+        private void HideRowTemplates()
+        {
+            backpackRowTemplate?.gameObject.SetActive(false);
+            marketRowTemplate?.gameObject.SetActive(false);
         }
 
         private void SelectQuote(
@@ -446,9 +466,12 @@ namespace CryingSnow.StackCraft
                 catalog == null)
             {
                 if (selectionLabel != null)
-                    selectionLabel.text = "请选择一种商品";
+                {
+                    selectionLabel.text =
+                        "请选择左侧商品出售\n或选择右侧商品购买";
+                }
                 if (quantityLabel != null)
-                    quantityLabel.text = "数量 —";
+                    quantityLabel.text = "数量 —\n交易总额 —";
                 SetButtonsInteractable(false);
                 return;
             }
@@ -475,8 +498,8 @@ namespace CryingSnow.StackCraft
             {
                 selectionLabel.text =
                     $"{commodity?.DisplayName ?? selectedQuote.CommodityId}\n" +
-                    $"{(playerBuys ? "从当地市场买入" : "出售给当地市场")}\n\n" +
-                    $"{(playerBuys ? "当地卖价" : "当地收购价")} " +
+                    $"{(playerBuys ? "从当地市场买入" : "出售给当地市场")}\n" +
+                    $"{(playerBuys ? "买入单价" : "出售单价")} " +
                     $"{unitPrice} 金币/枚\n" +
                     $"市场库存 {selectedQuote.AvailableStock}    " +
                     $"背包持有 {owned}\n" +
@@ -485,9 +508,9 @@ namespace CryingSnow.StackCraft
             if (quantityLabel != null)
             {
                 quantityLabel.text =
-                    $"数量 {quantity} / 最大 {maximum}\n" +
+                    $"数量 {quantity} / {maximum}\n" +
                     $"{(playerBuys ? "总支出" : "总收入")} {total} 金币\n" +
-                    $"交易后：金币 " +
+                    $"交易后  金币 " +
                     $"{(playerBuys ? coins - total : coins + total)}    " +
                     $"持有 {Mathf.Max(0, owned + (playerBuys ? quantity : -quantity))}";
             }
