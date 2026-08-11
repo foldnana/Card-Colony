@@ -583,13 +583,15 @@ namespace CryingSnow.StackCraft
                 card.Combatant?.CurrentCombatTask != task;
             if (retreated && card.Stack == null)
             {
-                CardStack stack = new(card, card.transform.position);
+                Vector3 boardPosition =
+                    CombatRect.GetBoardReturnPosition(card);
+                CardStack stack = new(card, boardPosition);
                 CardManager.Instance?.RegisterStack(stack);
                 Vector3 position = Board.Instance != null
                     ? Board.Instance.EnforcePlacementRules(
-                        card.transform.position,
+                        boardPosition,
                         stack)
-                    : card.transform.position;
+                    : boardPosition;
                 stack.SetTargetPosition(position);
                 CardManager.Instance?.ResolveOverlaps();
             }

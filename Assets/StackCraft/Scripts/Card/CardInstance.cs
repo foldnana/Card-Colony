@@ -385,8 +385,12 @@ namespace CryingSnow.StackCraft
                 }
 
                 oldStack = Stack;
+                Vector3 logicalPosition = new Vector3(
+                    transform.position.x,
+                    oldStack.TargetPosition.y,
+                    transform.position.z);
                 Stack.RemoveCard(this);
-                Stack = new CardStack(this, transform.position);
+                Stack = new CardStack(this, logicalPosition);
                 CardManager.Instance.RegisterStack(Stack);
             }
 
@@ -425,7 +429,7 @@ namespace CryingSnow.StackCraft
             }
             else if (Stack != null)
             {
-                Stack.SetTargetPosition(transform.position);
+                Stack.SetTargetPosition(Stack.TargetPosition);
                 yield return new WaitForSecondsRealtime(0.25f);
                 CardManager.Instance.ResolveOverlaps();
             }
@@ -982,11 +986,19 @@ namespace CryingSnow.StackCraft
         /// <param name="forceGround">If true, forces the Y position of the target to 0f.</param>
         public void SetTargetAnimated(Vector3 target, bool forceGround = false)
         {
+            SetTargetAnimated(target, Settings.MoveDuration, forceGround);
+        }
+
+        public void SetTargetAnimated(
+            Vector3 target,
+            float duration,
+            bool forceGround = false)
+        {
             _isFollowingDamped = false;
 
             if (forceGround) target.y = 0f;
             KillTweens();
-            _moveTween = transform.DOMove(target, Settings.MoveDuration)
+            _moveTween = transform.DOMove(target, Mathf.Max(0f, duration))
                 .SetEase(Settings.MoveEase)
                 .SetUpdate(true);
 
@@ -994,6 +1006,23 @@ namespace CryingSnow.StackCraft
             {
                 _moveTween.OnUpdate(() => Physics.SyncTransforms());
             }
+        }
+
+        /// <summary>
+        /// Settles presentation height without cancelling combat, level-up,
+        /// or other non-layout animation channels.
+        /// </summary>
+        public void SetPresentationTargetAnimated(Vector3 target, float duration)
+        {
+            _isFollowingDamped = false;
+            _dampVelocity = Vector3.zero;
+            _moveTween?.Kill();
+            _moveTween = transform.DOMove(target, Mathf.Max(0f, duration))
+                .SetEase(Settings.MoveEase)
+                .SetUpdate(true);
+
+            if (Time.timeScale == 0f)
+                _moveTween.OnUpdate(() => Physics.SyncTransforms());
         }
 
         /// <summary>

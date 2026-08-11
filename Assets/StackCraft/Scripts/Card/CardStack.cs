@@ -12,10 +12,22 @@ namespace CryingSnow.StackCraft
 
         public List<CardInstance> Cards { get; private set; }
         public Vector3 TargetPosition { get; private set; }
+        public long PresentationOrder { get; private set; }
+        public int OverlapLayer { get; private set; }
+        public float PresentationBaseY { get; private set; }
         public bool IsLocked { get; set; }
         public bool IsAnchored => Cards != null && Cards.Exists(card =>
             card?.Definition != null &&
             !card.Definition.PlayerDraggable);
+        public bool IsBeingDragged => Cards != null && Cards.Exists(card =>
+            card != null && card.IsBeingDragged);
+        public bool InheritsPresentationFromParentCard =>
+            Cards != null && Cards.Exists(card =>
+            {
+                Transform parent = card != null ? card.transform.parent : null;
+                return parent != null &&
+                    parent.GetComponentInParent<CardInstance>() != null;
+            });
 
         public CardInstance TopCard => Cards.Count > 0 ? Cards[0] : null;
         public CardInstance BottomCard => Cards.Count > 0 ? Cards[Cards.Count - 1] : null;
@@ -50,6 +62,18 @@ namespace CryingSnow.StackCraft
             }
         }
 
+        public float PresentationTopY
+        {
+            get
+            {
+                if (Cards.Count == 0 || TopCard == null)
+                    return PresentationBaseY;
+
+                return TargetPosition.y + PresentationBaseY +
+                    (Cards.Count - 1) * Mathf.Abs(TopCard.Settings.StackStep.y);
+            }
+        }
+
         private CardStack() { }
 
         /// <summary>
@@ -62,6 +86,31 @@ namespace CryingSnow.StackCraft
             Cards = new List<CardInstance> { initialCard };
             initialCard.Stack = this;
             SetTargetPosition(position, instant: true);
+        }
+
+        public void SetPresentationOrder(long order)
+        {
+            PresentationOrder = order;
+        }
+
+        public void SetPresentationLayer(
+            int layer,
+            float baseY,
+            bool instant = false)
+        {
+            int safeLayer = Mathf.Max(0, layer);
+            float safeBaseY = Mathf.Max(0f, baseY);
+            if (OverlapLayer == safeLayer &&
+                Mathf.Approximately(PresentationBaseY, safeBaseY))
+                return;
+
+            OverlapLayer = safeLayer;
+            PresentationBaseY = safeBaseY;
+            ApplyCardLayout(
+                instant,
+                instant || TopCard?.Settings == null
+                    ? null
+                    : TopCard.Settings.LayerSettleDuration);
         }
 
         /// <summary>
@@ -88,6 +137,11 @@ namespace CryingSnow.StackCraft
                 if (Cards.Count == 0)
                 {
                     CardManager.Instance?.UnregisterStack(this);
+                }
+                else
+                {
+                    SetTargetPosition(TargetPosition);
+                    CardManager.Instance?.ResolvePresentationLayers();
                 }
             }
         }
@@ -124,6 +178,8 @@ namespace CryingSnow.StackCraft
             {
                 AddCard(card);
             }
+            if (stackToMerge.PresentationOrder > PresentationOrder)
+                PresentationOrder = stackToMerge.PresentationOrder;
             stackToMerge.Cards.Clear();
         }
 
@@ -138,7 +194,11 @@ namespace CryingSnow.StackCraft
             int splitIndex = Cards.IndexOf(card);
             if (splitIndex < 0 || splitIndex == 0) return null;
 
-            var newStack = new CardStack(card, card.transform.position);
+            Vector3 logicalPosition = new Vector3(
+                card.transform.position.x,
+                TargetPosition.y,
+                card.transform.position.z);
+            var newStack = new CardStack(card, logicalPosition);
 
             int originalCount = Cards.Count;
             for (int i = splitIndex + 1; i < originalCount; i++)
@@ -184,6 +244,7 @@ namespace CryingSnow.StackCraft
                 else
                 {
                     SetTargetPosition(TargetPosition);
+                    CardManager.Instance?.ResolvePresentationLayers();
                 }
             }
         }
@@ -246,6 +307,7 @@ namespace CryingSnow.StackCraft
             try
             {
                 SetTargetPosition(TargetPosition);
+                CardManager.Instance?.ResolvePresentationLayers();
             }
             catch (System.Exception exception)
             {
@@ -287,15 +349,31 @@ namespace CryingSnow.StackCraft
         public void SetTargetPosition(Vector3 newPosition, bool instant = false)
         {
             TargetPosition = newPosition;
+            ApplyCardLayout(instant);
+        }
+
+        private void ApplyCardLayout(
+            bool instant,
+            float? animationDuration = null)
+        {
+            Vector3 displayedBasePosition =
+                TargetPosition + Vector3.up * PresentationBaseY;
 
             for (int i = 0; i < Cards.Count; i++)
             {
                 var card = Cards[i];
-                var cardTargetPos = TargetPosition + card.Settings.StackStep * i;
+                var cardTargetPos =
+                    displayedBasePosition + card.Settings.StackStep * i;
 
                 if (instant)
                 {
                     card.SetTargetInstant(cardTargetPos);
+                }
+                else if (animationDuration.HasValue)
+                {
+                    card.SetPresentationTargetAnimated(
+                        cardTargetPos,
+                        animationDuration.Value);
                 }
                 else
                 {

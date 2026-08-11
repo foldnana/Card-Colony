@@ -121,6 +121,8 @@ namespace CryingSnow.StackCraft
 
             if (!CanBeDragged) return;
 
+            CaptureLogicalDragStart();
+
             foreach (ICardDragStartHandler handler in GetComponents<ICardDragStartHandler>())
                 handler.HandleDragStarted(_card);
 
@@ -148,7 +150,9 @@ namespace CryingSnow.StackCraft
                     _card.Definition.Faction == CardFaction.Player &&
                     !_combatant.IsAttacking)
                 {
-                    _card.Stack = new CardStack(_card, transform.position);
+                    _card.Stack = new CardStack(
+                        _card,
+                        transform.position.Flatten());
                     _card.IsBeingDragged = true;
                     _dragOffset = transform.position - GetMouseWorldPosition();
                     CaptureDragScreenOffset();
@@ -197,7 +201,7 @@ namespace CryingSnow.StackCraft
         private void BeginStandardDrag()
         {
             _card.IsBeingDragged = true;
-            _dragStartPosition = transform.position;
+            CaptureLogicalDragStart();
 
             var oldStack = _card.Stack;
             var newStack = oldStack.SplitAt(_card);
@@ -225,6 +229,8 @@ namespace CryingSnow.StackCraft
                 }
             }
 
+            if (_card.Settings.BringToFrontOnClick)
+                CardManager.Instance?.BringStackToFront(_card.Stack);
             _card.Stack.KillAllTweens();
             _dragOffset = transform.position - GetMouseWorldPosition();
             CaptureDragScreenOffset();
@@ -271,7 +277,11 @@ namespace CryingSnow.StackCraft
             {
                 dragHeight = Mathf.Max(dragHeight, storageHeight);
             }
-            return dragHeight;
+            return CardManager.Instance != null
+                ? CardManager.Instance.GetSafeDragHeight(
+                    _card.Stack,
+                    dragHeight)
+                : dragHeight;
         }
 
         private bool ShouldRegisterSplitStackWithWorld()
@@ -301,7 +311,9 @@ namespace CryingSnow.StackCraft
 
             Vector3 dropPosition = ResolveFinalDropPosition();
             _backpackBridgeActive = false;
-            float dragDistance = Vector3.Distance(dropPosition, _dragStartPosition);
+            float dragDistance = CalculatePlanarDragDistance(
+                dropPosition,
+                _dragStartPosition);
 
             if (dragDistance < _card.Settings.ClickThreshold)
             {
@@ -363,6 +375,7 @@ namespace CryingSnow.StackCraft
             {
                 if (handler.HandleDrop(_card, dropPosition))
                 {
+                    PromoteSurvivingStack();
                     _card.OriginalCraftingStack = null;
                     return;
                 }
@@ -386,6 +399,7 @@ namespace CryingSnow.StackCraft
                 {
                     if (_card.OriginalCraftingStack != null)
                         CraftingManager.Instance.StopCraftingTask(_card.OriginalCraftingStack);
+                    PromoteSurvivingStack();
                     _card.OriginalCraftingStack = null;
                     return;
                 }
@@ -419,8 +433,17 @@ namespace CryingSnow.StackCraft
                 CraftingManager.Instance.CheckForRecipe(_card.Stack);
             }
 
-            CardManager.Instance?.ResolveOverlaps();
+            CardManager.Instance?.ResolveOverlapsWithStackOnTop(
+                attachedToStack ?? _card.Stack);
             _card.OriginalCraftingStack = null;
+        }
+
+        private void PromoteSurvivingStack()
+        {
+            if (_card.Stack != null && _card.Stack.Cards.Count > 0)
+                CardManager.Instance?.ResolveOverlapsWithStackOnTop(_card.Stack);
+            else
+                CardManager.Instance?.ResolvePresentationLayers();
         }
 
         private bool TryDockAtNearbyBuilding()
@@ -569,6 +592,20 @@ namespace CryingSnow.StackCraft
 
             return (_card.Stack?.TargetPosition ?? transform.position)
                 .Flatten();
+        }
+
+        private void CaptureLogicalDragStart()
+        {
+            _dragStartPosition =
+                (_card.Stack?.TargetPosition ?? transform.position)
+                .Flatten();
+        }
+
+        private static float CalculatePlanarDragDistance(
+            Vector3 first,
+            Vector3 second)
+        {
+            return Vector3.Distance(first.Flatten(), second.Flatten());
         }
 
         private bool TryTradeWithNearbyZone()

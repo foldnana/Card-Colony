@@ -43,7 +43,8 @@ namespace CryingSnow.StackCraft
         {
             if (isReturningToSlot && Occupant != null)
             {
-                Vector3 destination = GetWorldAttachPosition(baseLocalPosition);
+                Vector3 destination = GetWorldAttachPosition(
+                    GetDisplayedLocalPosition(baseLocalPosition));
                 if ((Occupant.transform.position - destination).sqrMagnitude <= 0.0001f)
                     HideCards();
             }
@@ -116,15 +117,24 @@ namespace CryingSnow.StackCraft
 
             if (personCard.Stack != null)
             {
-                personCard.Stack.SetTargetPosition(
-                    GetWorldAttachPosition(localAttachPosition),
-                    instant);
+                personCard.Stack.SetPresentationLayer(0, 0f, instant: true);
+                personCard.Stack.SynchronizeTargetWithParentMotion(
+                    GetLogicalWorldAttachPosition(localAttachPosition));
                 if (instant)
-                    personCard.transform.localPosition = localAttachPosition;
+                {
+                    personCard.transform.localPosition =
+                        GetDisplayedLocalPosition(localAttachPosition);
+                }
+                else
+                {
+                    personCard.SetTargetAnimated(GetWorldAttachPosition(
+                        GetDisplayedLocalPosition(localAttachPosition)));
+                }
             }
             else
             {
-                personCard.transform.localPosition = localAttachPosition;
+                personCard.transform.localPosition =
+                    GetDisplayedLocalPosition(localAttachPosition);
             }
 
             if (instant)
@@ -144,7 +154,9 @@ namespace CryingSnow.StackCraft
             if (personCard == null || personCard != Occupant)
                 return;
 
-            Vector3 worldPosition = personCard.transform.position;
+            Vector3 logicalWorldPosition = personCard.Stack != null
+                ? personCard.Stack.TargetPosition
+                : personCard.transform.position.Flatten();
             personCard.KillTweens();
             personCard.transform.SetParent(occupantOriginalParent, true);
             personCard.transform.localRotation = occupantOriginalRotation;
@@ -159,7 +171,7 @@ namespace CryingSnow.StackCraft
             occupantOriginalRotation = Quaternion.identity;
             baseLocalPosition = Vector3.zero;
 
-            personCard.Stack?.SetTargetPosition(worldPosition, instant: true);
+            personCard.Stack?.SetTargetPosition(logicalWorldPosition, instant: true);
         }
 
         public void ToggleVisibility()
@@ -193,7 +205,9 @@ namespace CryingSnow.StackCraft
             if (Occupant == null)
                 return;
 
-            Occupant.transform.localPosition = baseLocalPosition;
+            Occupant.transform.localPosition =
+                GetDisplayedLocalPosition(baseLocalPosition);
+            SynchronizeOccupantLogicalAnchor();
             Occupant.SetVisible(false);
         }
 
@@ -202,7 +216,38 @@ namespace CryingSnow.StackCraft
             float time = Time.time * animationSpeed;
             float x = (Mathf.PerlinNoise(time + noiseOffsetX, 0f) * 2f - 1f) * animationRadius;
             float z = (Mathf.PerlinNoise(0f, time + noiseOffsetZ) * 2f - 1f) * animationRadius;
-            Occupant.transform.localPosition = baseLocalPosition + new Vector3(x, 0f, z);
+            Occupant.transform.localPosition = GetDisplayedLocalPosition(
+                baseLocalPosition + new Vector3(x, 0f, z));
+            SynchronizeOccupantLogicalAnchor();
+        }
+
+        private Vector3 GetLogicalWorldAttachPosition(
+            Vector3 logicalLocalPosition)
+        {
+            Vector3 displayedPosition = GetWorldAttachPosition(
+                logicalLocalPosition);
+            if (ownerCard?.Stack == null)
+                return displayedPosition.Flatten();
+
+            Vector3 ownerDisplayOffset =
+                ownerCard.transform.position - ownerCard.Stack.TargetPosition;
+            return displayedPosition - ownerDisplayOffset;
+        }
+
+        private void SynchronizeOccupantLogicalAnchor()
+        {
+            Occupant?.Stack?.SynchronizeTargetWithParentMotion(
+                GetLogicalWorldAttachPosition(baseLocalPosition));
+        }
+
+        private Vector3 GetDisplayedLocalPosition(Vector3 logicalLocalPosition)
+        {
+            float presentationY = Occupant?.Stack?.PresentationBaseY ?? 0f;
+            Transform parent = Occupant != null ? Occupant.transform.parent : null;
+            Vector3 localPresentationOffset = parent != null
+                ? parent.InverseTransformVector(Vector3.up * presentationY)
+                : Vector3.up * presentationY;
+            return logicalLocalPosition + localPresentationOffset;
         }
 
     }

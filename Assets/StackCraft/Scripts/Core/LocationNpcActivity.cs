@@ -161,7 +161,8 @@ namespace CryingSnow.StackCraft
             if (Vector3.SqrMagnitude(nextPosition - Destination) <= 0.0001f)
             {
                 EnterIdle();
-                CardManager.Instance?.ResolveOverlaps();
+                CardManager.Instance?.ResolveOverlapsWithStackOnTop(
+                    card.Stack);
             }
         }
 

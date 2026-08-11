@@ -34,6 +34,22 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Per-card visual offset within a stack.")]
         private Vector3 stackStep = new Vector3(0f, 0.002f, -0.18f);
 
+        [Header("Independent Stack Presentation")]
+        [SerializeField, Min(0f), Tooltip("Physical Y gap between independent stacks that still overlap after planar separation.")]
+        private float independentStackGap = 0.006f;
+
+        [SerializeField, Min(1), Tooltip("Maximum physical presentation layers in one local overlap group.")]
+        private int maxOverlapLayers = 12;
+
+        [SerializeField, Range(0f, 1f), Tooltip("Minimum planar overlap ratio required before independent stacks receive physical layers.")]
+        private float minimumResidualOverlapRatio = 0.02f;
+
+        [SerializeField, Min(0f), Tooltip("Duration used when an independent stack settles into a new physical layer.")]
+        private float layerSettleDuration = 0.08f;
+
+        [SerializeField, Tooltip("Whether a clicked or dropped stack should become the top stack in its local overlap group.")]
+        private bool bringToFrontOnClick = true;
+
         [SerializeField, Tooltip("How long it takes to tween into the resolved position.")]
         private float moveDuration = 0.1f;
 
@@ -70,6 +86,11 @@ namespace CryingSnow.StackCraft
         public int MaxIterations => maxIterations;
 
         public Vector3 StackStep => stackStep;
+        public float IndependentStackGap => independentStackGap;
+        public int MaxOverlapLayers => maxOverlapLayers;
+        public float MinimumResidualOverlapRatio => minimumResidualOverlapRatio;
+        public float LayerSettleDuration => layerSettleDuration;
+        public bool BringToFrontOnClick => bringToFrontOnClick;
         public float MoveDuration => moveDuration;
         public Ease MoveEase => moveEase;
         public float SwaySharpness => swaySharpness;

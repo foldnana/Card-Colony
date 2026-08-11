@@ -20,6 +20,11 @@ MonoBehaviour:
   margin: {x: 0.1, y: 0.1}
   maxIterations: 8
   stackStep: {x: 0, y: 0.002, z: -0.18}
+  independentStackGap: 0.006
+  maxOverlapLayers: 12
+  minimumResidualOverlapRatio: 0.02
+  layerSettleDuration: 0.08
+  bringToFrontOnClick: 1
   moveDuration: 0.1
   moveEase: 6
   swaySharpness: 100

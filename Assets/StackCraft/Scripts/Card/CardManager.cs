@@ -59,6 +59,7 @@ namespace CryingSnow.StackCraft
         #endregion
 
         private readonly List<CardStack> stacks = new();
+        private long presentationSequence;
 
         public IEnumerable<CardInstance> AllCards
         {
@@ -759,7 +760,72 @@ namespace CryingSnow.StackCraft
         public void RegisterStack(CardStack stack)
         {
             if (stack != null && !stacks.Contains(stack))
+            {
                 stacks.Add(stack);
+                stack.SetPresentationOrder(++presentationSequence);
+            }
+        }
+
+        /// <summary>
+        /// Promotes a stack above older stacks when the player most recently
+        /// interacted with it and immediately refreshes its local physical
+        /// overlap group.
+        /// </summary>
+        public void BringStackToFront(CardStack stack)
+        {
+            if (stack == null)
+                return;
+
+            stack.SetPresentationOrder(++presentationSequence);
+            ResolvePresentationLayers();
+        }
+
+        public void ResolvePresentationLayers(bool instant = false)
+        {
+            if (cardSettings == null)
+                return;
+
+            CardPresentationLayerResolver.Resolve(
+                stacks,
+                cardSettings,
+                instant);
+        }
+
+        public float GetSafeDragHeight(
+            CardStack draggedStack,
+            float requestedHeight)
+        {
+            float highestOtherStack = stacks
+                .Where(stack =>
+                    stack?.TopCard != null &&
+                    stack != draggedStack)
+                .Select(stack => Mathf.Max(
+                    stack.PresentationTopY,
+                    stack.Cards
+                        .Where(card => card != null)
+                        .Select(card => card.transform.position.y)
+                        .DefaultIfEmpty(stack.PresentationTopY)
+                        .Max()))
+                .DefaultIfEmpty(0f)
+                .Max();
+            float safetyGap = cardSettings != null
+                ? Mathf.Max(0f, cardSettings.IndependentStackGap)
+                : 0f;
+            return Mathf.Max(
+                requestedHeight,
+                highestOtherStack + safetyGap);
+        }
+
+        /// <summary>
+        /// Promotes the stack that just completed a semantic move, then runs
+        /// one planar solve followed by one final presentation layer solve.
+        /// </summary>
+        public void ResolveOverlapsWithStackOnTop(CardStack stack)
+        {
+            if (stack != null)
+                stack.SetPresentationOrder(++presentationSequence);
+
+            ResolveOverlaps();
         }
 
         /// <summary>
@@ -769,7 +835,8 @@ namespace CryingSnow.StackCraft
         /// <param name="stack">The <see cref="CardStack"/> to unregister.</param>
         public void UnregisterStack(CardStack stack)
         {
-            if (stack != null) stacks.Remove(stack);
+            if (stack != null && stacks.Remove(stack))
+                ResolvePresentationLayers();
         }
 
         /// <summary>
@@ -851,6 +918,7 @@ namespace CryingSnow.StackCraft
                 combatRects,
                 cardSettings.MaxIterations
             );
+            ResolvePresentationLayers();
         }
 
         /// <summary>
@@ -883,6 +951,7 @@ namespace CryingSnow.StackCraft
                 combatRects,
                 cardSettings.MaxIterations
             );
+            ResolvePresentationLayers();
         }
 
         /// <summary>

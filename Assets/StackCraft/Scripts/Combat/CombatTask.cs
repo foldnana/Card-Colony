@@ -826,11 +826,13 @@ namespace CryingSnow.StackCraft
                          .Where(card => card != null).Distinct().ToList())
             {
                 card.Combatant.LeaveCombat();
-                CardStack stack = new(card, card.transform.position);
+                Vector3 boardPosition =
+                    CombatRect.GetBoardReturnPosition(card);
+                CardStack stack = new(card, boardPosition);
                 CardManager.Instance?.RegisterStack(stack);
                 Vector3 position = Board.Instance != null
-                    ? Board.Instance.EnforcePlacementRules(card.transform.position, stack)
-                    : card.transform.position;
+                    ? Board.Instance.EnforcePlacementRules(boardPosition, stack)
+                    : boardPosition;
                 stack.SetTargetPosition(position);
             }
             Phase = CombatPhase.Finished;

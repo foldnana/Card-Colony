@@ -20,6 +20,7 @@ namespace CryingSnow.StackCraft
         private List<CardInstance> _attackers;
         private List<CardInstance> _defenders;
         private readonly Dictionary<CardInstance, Vector3> _cardPositions = new();
+        private bool useElevatedCardPresentation = true;
 
         /// <summary>
         /// Sets up the combat area by defining the participating units, calculating the required size,
@@ -29,6 +30,7 @@ namespace CryingSnow.StackCraft
         /// <param name="defenders">The list of CardInstances that will occupy the defending row.</param>
         public void Initialize(List<CardInstance> attackers, List<CardInstance> defenders)
         {
+            useElevatedCardPresentation = true;
             _attackers = attackers;
             _defenders = defenders;
 
@@ -55,6 +57,7 @@ namespace CryingSnow.StackCraft
             List<CardInstance> targets,
             Vector3 targetAnchor)
         {
+            useElevatedCardPresentation = false;
             _attackers = initiators;
             _defenders = targets;
 
@@ -154,20 +157,32 @@ namespace CryingSnow.StackCraft
         private void ArrangeCards(bool animateAttackers = false)
         {
             _cardPositions.Clear();
+            float presentationHeight = useElevatedCardPresentation
+                ? ResolveCombatPresentationHeight()
+                : 0f;
+            if (useElevatedCardPresentation)
+            {
+                Vector3 rectPosition = transform.position;
+                rectPosition.y = Mathf.Max(0f, presentationHeight - 0.001f);
+                transform.position = rectPosition;
+            }
             ArrangeRow(
                 _attackers,
                 -cellSize.y * 0.5f,
-                animateAttackers);
+                animateAttackers,
+                presentationHeight);
             ArrangeRow(
                 _defenders,
                 +cellSize.y * 0.5f,
-                animate: false);
+                animate: false,
+                presentationHeight);
         }
 
         private void ArrangeRow(
             List<CardInstance> rowCards,
             float rowY,
-            bool animate)
+            bool animate,
+            float presentationHeight)
         {
             if (rowCards.Count == 0) return;
 
@@ -178,13 +193,32 @@ namespace CryingSnow.StackCraft
             {
                 Vector3 localSlot = new Vector3(offset + i * cellSize.x, rowY, 0);
                 Vector3 worldSlot = Rect.TransformPoint(localSlot);
-                worldSlot.y = 0f;
+                worldSlot.y = presentationHeight;
                 _cardPositions[rowCards[i]] = worldSlot;
                 if (animate)
-                    rowCards[i].SetTargetAnimated(worldSlot, forceGround: true);
+                    rowCards[i].SetTargetAnimated(worldSlot);
                 else
-                    rowCards[i].SetTargetInstant(worldSlot, forceGround: true);
+                    rowCards[i].SetTargetInstant(worldSlot);
             }
+        }
+
+        private float ResolveCombatPresentationHeight()
+        {
+            CardInstance firstCard = _attackers?.FirstOrDefault() ??
+                _defenders?.FirstOrDefault();
+            float minimumHeight = firstCard?.Settings != null
+                ? firstCard.Settings.DragHeight
+                : 0.1f;
+            return CardManager.Instance != null
+                ? CardManager.Instance.GetSafeDragHeight(null, minimumHeight)
+                : minimumHeight;
+        }
+
+        public static Vector3 GetBoardReturnPosition(CardInstance card)
+        {
+            return card != null
+                ? card.transform.position.Flatten()
+                : Vector3.zero;
         }
 
         /// <summary>

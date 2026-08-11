@@ -153,7 +153,9 @@ namespace CryingSnow.StackCraft
 
             if (closestCombat == null || closestCombat.Rect == null) return false;
 
-            float distanceToCombat = Vector3.Distance(transform.position, closestCombat.Rect.transform.position);
+            float distanceToCombat = Vector3.Distance(
+                GetLogicalPosition(_card),
+                closestCombat.Rect.transform.position.Flatten());
 
             if (distanceToCombat <= _card.Definition.AttackRadius * 1.5f)
             {
@@ -174,7 +176,9 @@ namespace CryingSnow.StackCraft
             if (target == null || target.Stack == null || _card.Stack == null)
                 return false;
 
-            float distanceToTarget = Vector3.Distance(transform.position, target.transform.position);
+            float distanceToTarget = Vector3.Distance(
+                GetLogicalPosition(_card),
+                GetLogicalPosition(target));
 
             if (distanceToTarget <= _card.Definition.AttackRadius)
             {
@@ -202,7 +206,7 @@ namespace CryingSnow.StackCraft
 
             CombatTask bestTask = null;
             float bestDistSq = GetSquaredAggroRadius(radius);
-            Vector3 myPos = transform.position;
+            Vector3 myPos = GetLogicalPosition(_card);
 
             foreach (var task in CombatManager.Instance.ActiveCombats)
             {
@@ -213,7 +217,7 @@ namespace CryingSnow.StackCraft
 
                 if (!hasPlayerInvolvement) continue;
 
-                float distSq = (task.Rect.transform.position - myPos).sqrMagnitude;
+                float distSq = (task.Rect.transform.position.Flatten() - myPos).sqrMagnitude;
                 if (distSq <= bestDistSq)
                 {
                     bestDistSq = distSq;
@@ -229,7 +233,7 @@ namespace CryingSnow.StackCraft
             if (CardManager.Instance == null) return null;
 
             float radiusSq = GetSquaredAggroRadius(radius);
-            Vector3 myPosition = transform.position;
+            Vector3 myPosition = GetLogicalPosition(_card);
 
             return CardManager.Instance.AllCards
                 .Where(c => c != null &&
@@ -240,8 +244,8 @@ namespace CryingSnow.StackCraft
                             !c.Combatant.IsInCombat &&
                             c.Combatant.ReaggroProtectionRemaining <= 0f &&
                             !(DialogueManager.Instance?.IsCardInDialogue(c) ?? false) &&
-                            (c.transform.position - myPosition).sqrMagnitude <= radiusSq)
-                .OrderBy(c => (c.transform.position - myPosition).sqrMagnitude)
+                            (GetLogicalPosition(c) - myPosition).sqrMagnitude <= radiusSq)
+                .OrderBy(c => (GetLogicalPosition(c) - myPosition).sqrMagnitude)
                 .FirstOrDefault();
         }
 
@@ -253,13 +257,15 @@ namespace CryingSnow.StackCraft
 
         private void MoveTowards(Vector3 targetPos)
         {
-            Vector3 direction = (targetPos - transform.position).normalized;
-            Vector3 movePosition = transform.position + direction * _card.Settings.MoveRadius;
+            Vector3 currentPosition = _card.Stack.TargetPosition;
+            Vector3 direction = (targetPos.Flatten() - currentPosition.Flatten()).normalized;
+            Vector3 movePosition = currentPosition + direction * _card.Settings.MoveRadius;
 
             if (Board.Instance.IsPointValid(movePosition, _card.Stack))
             {
                 _card.Stack.SetTargetPosition(movePosition);
-                CardManager.Instance?.ResolveOverlaps();
+                CardManager.Instance?.ResolveOverlapsWithStackOnTop(
+                    _card.Stack);
             }
         }
 
@@ -269,7 +275,11 @@ namespace CryingSnow.StackCraft
 
             if (!oldStack.Cards.Remove(_card)) return;
 
-            var newStack = new CardStack(_card, transform.position);
+            Vector3 logicalPosition = new Vector3(
+                transform.position.x,
+                oldStack.TargetPosition.y,
+                transform.position.z);
+            var newStack = new CardStack(_card, logicalPosition);
             CardManager.Instance.RegisterStack(newStack);
 
             if (oldStack.Cards.Count == 0)
@@ -279,6 +289,7 @@ namespace CryingSnow.StackCraft
             else
             {
                 oldStack.SetTargetPosition(oldStack.TargetPosition);
+                CardManager.Instance?.ResolvePresentationLayers();
                 if (oldStack.IsCrafting)
                 {
                     CraftingManager.Instance.StopCraftingTask(oldStack);
@@ -288,6 +299,15 @@ namespace CryingSnow.StackCraft
                     CraftingManager.Instance.CheckForRecipe(oldStack);
                 }
             }
+        }
+
+        private static Vector3 GetLogicalPosition(CardInstance card)
+        {
+            return card?.Stack != null
+                ? card.Stack.TargetPosition.Flatten()
+                : card != null
+                    ? card.transform.position.Flatten()
+                    : Vector3.zero;
         }
 
         private void MoveRandomly()
@@ -308,7 +328,8 @@ namespace CryingSnow.StackCraft
             }
 
             _card.Stack.SetTargetPosition(targetPosition);
-            CardManager.Instance?.ResolveOverlaps();
+            CardManager.Instance?.ResolveOverlapsWithStackOnTop(
+                _card.Stack);
         }
         #endregion
 
@@ -337,7 +358,9 @@ namespace CryingSnow.StackCraft
 
             CardManager.Instance.CreateCardInstance(
                 produceCard,
-                transform.position
+                _card.Stack != null
+                    ? _card.Stack.TargetPosition
+                    : transform.position.Flatten()
             );
 
             _card.PlayPuffParticle();
