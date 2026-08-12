@@ -162,7 +162,7 @@ namespace CryingSnow.StackCraft
                 return false;
             if (interactions.Count > 1)
             {
-                ShowWorldQuestSelection(interactions, 0);
+                ShowWorldQuestSelection(interactions);
                 return true;
             }
 
@@ -170,27 +170,22 @@ namespace CryingSnow.StackCraft
         }
 
         private void ShowWorldQuestSelection(
-            IReadOnlyList<WorldQuestViewModel> interactions,
-            int index)
+            IReadOnlyList<WorldQuestViewModel> interactions)
         {
-            int safeIndex = Mathf.Clamp(index, 0, interactions.Count - 1);
-            string titles = "这里有多项事务与你有关：\n\n" +
-                string.Join("\n", interactions.Select((item, itemIndex) =>
-                    $"{(itemIndex == safeIndex ? "▶" : "•")} " +
-                    item.Title));
-            WorldQuestViewModel selected = interactions[safeIndex];
-            bool hasNext = safeIndex + 1 < interactions.Count;
-            dialoguePanel.ShowQuest(
+            var options = interactions
+                .Select(quest => new DialogueChoiceOption(
+                    quest.Title,
+                    () => ShowWorldQuestInteraction(quest)))
+                .Concat(new[]
+                {
+                    new DialogueChoiceOption("告辞", EndDialogue)
+                })
+                .ToList();
+            dialoguePanel.ShowChoices(
                 npc.Definition,
-                titles,
-                $"查看：{selected.Title}",
-                () => ShowWorldQuestInteraction(selected),
-                hasNext ? "下一个" : "告辞",
-                hasNext
-                    ? () => ShowWorldQuestSelection(
-                        interactions,
-                        safeIndex + 1)
-                    : EndDialogue);
+                "这里有多项事务与你有关。",
+                "选择要谈的事情",
+                options);
         }
 
         private bool ShowWorldQuestInteraction(WorldQuestViewModel quest)
@@ -216,7 +211,7 @@ namespace CryingSnow.StackCraft
                     IReadOnlyList<WorldQuestOutcomeDefinition> outcomes =
                         runtime.GetEligibleOutcomes(quest.QuestId);
                     if (outcomes.Count > 1)
-                        ShowWorldQuestOutcomeSelection(quest, outcomes, 0);
+                        ShowWorldQuestOutcomeSelection(quest, outcomes);
                     else
                         ShowWorldQuestOutcomeConfirmation(
                             quest,
@@ -275,28 +270,24 @@ namespace CryingSnow.StackCraft
 
         private void ShowWorldQuestOutcomeSelection(
             WorldQuestViewModel quest,
-            IReadOnlyList<WorldQuestOutcomeDefinition> outcomes,
-            int index)
+            IReadOnlyList<WorldQuestOutcomeDefinition> outcomes)
         {
-            int safeIndex = Mathf.Clamp(index, 0, outcomes.Count - 1);
-            string choices = "请选择这次任务的处理方式：\n\n" +
-                string.Join("\n", outcomes.Select((outcome, itemIndex) =>
-                    $"{(itemIndex == safeIndex ? "▶" : "•")} " +
-                    outcome.ChoiceLabel));
-            WorldQuestOutcomeDefinition selected = outcomes[safeIndex];
-            bool hasNext = safeIndex + 1 < outcomes.Count;
-            dialoguePanel.ShowQuest(
-                npc.Definition,
-                choices,
-                selected.ChoiceLabel,
-                () => ShowWorldQuestOutcomeConfirmation(quest, selected),
-                hasNext ? "下一个" : "暂不决定",
-                hasNext
-                    ? () => ShowWorldQuestOutcomeSelection(
+            var options = outcomes
+                .Select(outcome => new DialogueChoiceOption(
+                    outcome.ChoiceLabel,
+                    () => ShowWorldQuestOutcomeConfirmation(
                         quest,
-                        outcomes,
-                        safeIndex + 1)
-                    : EndDialogue);
+                        outcome)))
+                .Concat(new[]
+                {
+                    new DialogueChoiceOption("暂不决定", EndDialogue)
+                })
+                .ToList();
+            dialoguePanel.ShowChoices(
+                npc.Definition,
+                "请选择这次任务的处理方式。",
+                "你的决定",
+                options);
         }
 
         private void ShowWorldQuestOutcomeConfirmation(

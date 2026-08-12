@@ -294,8 +294,16 @@ namespace CryingSnow.StackCraft.EditorTools
                 ContentNavy);
             StyleOptionalImage(root.transform, "SpeakerHeader", panelSprite,
                 HeaderNavy);
+            StyleOptionalImage(root.transform, "DialogueChoiceTray", panelSprite,
+                ContentNavy);
+            StyleOptionalImage(root.transform, "ChoiceScrollView", panelSprite,
+                ListNavy);
             StyleOptionalButton(root.transform, "ReplyButton", panelSprite);
             StyleOptionalButton(root.transform, "GoodbyeButton", panelSprite);
+            StyleOptionalButton(
+                root.transform,
+                "ChoiceButtonTemplate",
+                panelSprite);
             EnsureReadableText(root.transform);
             EnsureBoldText(root.transform);
         }

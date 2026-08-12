@@ -35,6 +35,14 @@ namespace CryingSnow.StackCraft.EditorTools
             AssetDatabase.Refresh();
         }
 
+        [MenuItem("Tools/Card Colony/Rebuild Basic Dialogue Prefab")]
+        public static void RebuildPrefab()
+        {
+            BuildPanelPrefab();
+            AssetDatabase.SaveAssets();
+            AssetDatabase.Refresh();
+        }
+
         public static void InstallIntoScene(Scene locationScene, GameObject panelPrefab = null)
         {
             panelPrefab ??= BuildPanelPrefab();
@@ -140,22 +148,135 @@ namespace CryingSnow.StackCraft.EditorTools
             SetBottomLeft(dialogueText.rectTransform, new Vector2(198f, 76f), new Vector2(492f, 80f));
             dialogueText.enableWordWrapping = true;
 
+            var inlineActions = new GameObject(
+                "InlineActions",
+                typeof(RectTransform));
+            inlineActions.transform.SetParent(root.transform, false);
+            SetBottomLeft(
+                inlineActions.GetComponent<RectTransform>(),
+                new Vector2(188f, 0f),
+                new Vector2(512f, 76f));
+
             Button replyButton = CreateButton(
                 "ReplyButton",
-                root.transform,
+                inlineActions.transform,
                 font,
                 "我该去哪里？",
-                new Vector2(206f, 20f),
+                new Vector2(18f, 20f),
                 new Vector2(268f, 48f),
                 new Color(0.08f, 0.55f, 0.78f, 1f));
             Button goodbyeButton = CreateButton(
                 "GoodbyeButton",
-                root.transform,
+                inlineActions.transform,
                 font,
                 "告辞",
-                new Vector2(494f, 20f),
+                new Vector2(306f, 20f),
                 new Vector2(150f, 48f),
                 new Color(0.42f, 0.42f, 0.40f, 1f));
+
+            Image choiceTray = CreateImage(
+                "DialogueChoiceTray",
+                root.transform,
+                new Vector2(188f, 236f),
+                new Vector2(512f, 272f),
+                new Color(0.67f, 0.72f, 0.77f, 0.99f));
+            Outline trayOutline = choiceTray.gameObject.AddComponent<Outline>();
+            trayOutline.effectColor = new Color(0.08f, 0.16f, 0.22f, 0.7f);
+            trayOutline.effectDistance = new Vector2(2f, -2f);
+
+            TMP_Text choiceTitle = CreateText(
+                "ChoiceTitle",
+                choiceTray.transform,
+                font,
+                21f,
+                FontStyles.Bold,
+                new Color(0.14f, 0.16f, 0.19f, 1f),
+                TextAlignmentOptions.MidlineLeft);
+            choiceTitle.text = "你的选择";
+            SetBottomLeft(
+                choiceTitle.rectTransform,
+                new Vector2(20f, 224f),
+                new Vector2(472f, 32f));
+
+            var scrollObject = new GameObject(
+                "ChoiceScrollView",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(ScrollRect));
+            scrollObject.transform.SetParent(choiceTray.transform, false);
+            RectTransform scrollRect = scrollObject.GetComponent<RectTransform>();
+            SetBottomLeft(
+                scrollRect,
+                new Vector2(14f, 14f),
+                new Vector2(484f, 204f));
+            scrollObject.GetComponent<Image>().color =
+                new Color(0.54f, 0.61f, 0.68f, 0.72f);
+
+            var viewportObject = new GameObject(
+                "Viewport",
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Mask));
+            viewportObject.transform.SetParent(scrollObject.transform, false);
+            RectTransform viewport = viewportObject.GetComponent<RectTransform>();
+            Stretch(viewport);
+            viewport.offsetMin = new Vector2(8f, 8f);
+            viewport.offsetMax = new Vector2(-8f, -8f);
+            Image viewportImage = viewportObject.GetComponent<Image>();
+            viewportImage.color = new Color(1f, 1f, 1f, 0.01f);
+            viewportObject.GetComponent<Mask>().showMaskGraphic = false;
+
+            var contentObject = new GameObject(
+                "ChoiceContent",
+                typeof(RectTransform),
+                typeof(VerticalLayoutGroup),
+                typeof(ContentSizeFitter));
+            contentObject.transform.SetParent(viewportObject.transform, false);
+            RectTransform choiceContent =
+                contentObject.GetComponent<RectTransform>();
+            choiceContent.anchorMin = new Vector2(0f, 1f);
+            choiceContent.anchorMax = new Vector2(1f, 1f);
+            choiceContent.pivot = new Vector2(0.5f, 1f);
+            choiceContent.anchoredPosition = Vector2.zero;
+            choiceContent.sizeDelta = Vector2.zero;
+            VerticalLayoutGroup layout =
+                contentObject.GetComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(2, 2, 2, 2);
+            layout.spacing = 8f;
+            layout.childAlignment = TextAnchor.UpperCenter;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            ContentSizeFitter fitter =
+                contentObject.GetComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            Button choiceButtonTemplate = CreateButton(
+                "ChoiceButtonTemplate",
+                contentObject.transform,
+                font,
+                "选择",
+                Vector2.zero,
+                new Vector2(0f, 48f),
+                new Color(0.52f, 0.64f, 0.76f, 1f));
+            LayoutElement choiceLayout =
+                choiceButtonTemplate.gameObject.AddComponent<LayoutElement>();
+            choiceLayout.minHeight = 48f;
+            choiceLayout.preferredHeight = 48f;
+            choiceButtonTemplate.gameObject.SetActive(false);
+
+            ScrollRect scroll = scrollObject.GetComponent<ScrollRect>();
+            scroll.viewport = viewport;
+            scroll.content = choiceContent;
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 24f;
+            choiceTray.gameObject.SetActive(false);
 
             var view = root.GetComponent<DialoguePanelView>();
             var serializedView = new SerializedObject(view);
@@ -167,6 +288,11 @@ namespace CryingSnow.StackCraft.EditorTools
             serializedView.FindProperty("replyButtonLabel").objectReferenceValue =
                 replyButton.GetComponentInChildren<TMP_Text>(true);
             serializedView.FindProperty("goodbyeButton").objectReferenceValue = goodbyeButton;
+            serializedView.FindProperty("inlineActions").objectReferenceValue = inlineActions;
+            serializedView.FindProperty("choiceTray").objectReferenceValue = choiceTray.gameObject;
+            serializedView.FindProperty("choiceTitleLabel").objectReferenceValue = choiceTitle;
+            serializedView.FindProperty("choiceContent").objectReferenceValue = choiceContent;
+            serializedView.FindProperty("choiceButtonTemplate").objectReferenceValue = choiceButtonTemplate;
             serializedView.ApplyModifiedPropertiesWithoutUndo();
 
             root.SetActive(false);

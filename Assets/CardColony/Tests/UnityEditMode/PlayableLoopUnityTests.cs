@@ -4093,6 +4093,190 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void DialogueChoiceTray_ShowsAllOptionsAndClosesAfterSelection()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab");
+            Object speaker = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/" +
+                "Card_Riverbend_VillageChief.asset");
+            Assert.That(prefab, Is.Not.Null);
+            Assert.That(speaker, Is.Not.Null);
+
+            System.Type viewType = FindType(
+                "CryingSnow.StackCraft.DialoguePanelView");
+            System.Type optionType = FindType(
+                "CryingSnow.StackCraft.DialogueChoiceOption");
+            MethodInfo showChoices = viewType.GetMethod("ShowChoices");
+            Assert.That(showChoices, Is.Not.Null,
+                "对话视图需要一次接收完整选项列表，不能继续靠‘下一个’翻页。");
+
+            GameObject instance = Object.Instantiate(prefab);
+            try
+            {
+                Component view = instance.GetComponent(viewType);
+                int selected = -1;
+                System.Array options = System.Array.CreateInstance(
+                    optionType,
+                    5);
+                for (int i = 0; i < options.Length; i++)
+                {
+                    int captured = i;
+                    options.SetValue(
+                        System.Activator.CreateInstance(
+                            optionType,
+                            $"选择 {i + 1}",
+                            (System.Action)(() => selected = captured)),
+                        i);
+                }
+
+                showChoices.Invoke(
+                    view,
+                    new object[]
+                    {
+                        speaker,
+                        "请选择这次任务的处理方式。",
+                        "你的决定",
+                        options
+                    });
+
+                Transform tray = FindDescendant(instance, "DialogueChoiceTray");
+                Transform content = FindDescendant(instance, "ChoiceContent");
+                Assert.That(tray.gameObject.activeSelf, Is.True);
+                Button[] visibleChoices = content
+                    .GetComponentsInChildren<Button>(false);
+                Assert.That(visibleChoices.Length, Is.EqualTo(5),
+                    "所有有效选项应同时出现，超过四项则由滚动区承载。");
+
+                visibleChoices[2].onClick.Invoke();
+
+                Assert.That(selected, Is.EqualTo(2));
+                Assert.That(tray.gameObject.activeSelf, Is.False,
+                    "完成选择后托盘应收起，让 NPC 回应继续显示在原对话框。");
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
+        public void DialogueBasicConversation_UsesChoiceTrayForReplyAndGoodbye()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab");
+            Object speaker = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/" +
+                "Card_Riverbend_Apothecary.asset");
+            Assert.That(prefab, Is.Not.Null);
+            Assert.That(speaker, Is.Not.Null);
+
+            System.Type viewType = FindType(
+                "CryingSnow.StackCraft.DialoguePanelView");
+            GameObject instance = Object.Instantiate(prefab);
+            try
+            {
+                Component view = instance.GetComponent(viewType);
+                int replied = 0;
+                int left = 0;
+                viewType.GetMethod("Show").Invoke(
+                    view,
+                    new object[]
+                    {
+                        speaker,
+                        (System.Action)(() => replied++),
+                        (System.Action)(() => left++)
+                    });
+
+                Transform tray = FindDescendant(instance, "DialogueChoiceTray");
+                Transform content = FindDescendant(instance, "ChoiceContent");
+                Transform inline = FindDescendant(instance, "InlineActions");
+                Button[] openingChoices = content
+                    .GetComponentsInChildren<Button>(false);
+                Assert.That(tray.gameObject.activeSelf, Is.True,
+                    "普通 NPC 的回复和告辞也必须进入独立选择托盘。");
+                Assert.That(inline.gameObject.activeSelf, Is.False,
+                    "旧的底部行内按钮不能继续显示。");
+                Assert.That(openingChoices.Length, Is.EqualTo(2));
+
+                openingChoices[0].onClick.Invoke();
+                Assert.That(replied, Is.EqualTo(1));
+                viewType.GetMethod("ShowResponse").Invoke(
+                    view,
+                    new object[] { "这些药草需要慢慢辨认。" });
+
+                Button[] responseChoices = content
+                    .GetComponentsInChildren<Button>(false);
+                Assert.That(tray.gameObject.activeSelf, Is.True,
+                    "NPC 回应显示后仍应在选择托盘提供离开操作。");
+                Assert.That(responseChoices.Length, Is.EqualTo(1));
+                responseChoices[0].onClick.Invoke();
+                Assert.That(left, Is.EqualTo(1));
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
+        public void DialogueQuest_TwoMeaningfulActionsUseChoiceTray()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/DialoguePanel.prefab");
+            Object speaker = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/" +
+                "Card_Riverbend_VillageChief.asset");
+            System.Type viewType = FindType(
+                "CryingSnow.StackCraft.DialoguePanelView");
+            GameObject instance = Object.Instantiate(prefab);
+            try
+            {
+                Component view = instance.GetComponent(viewType);
+                int primaryInvoked = 0;
+                int secondaryInvoked = 0;
+                viewType.GetMethod("ShowQuest").Invoke(
+                    view,
+                    new object[]
+                    {
+                        speaker,
+                        "你愿意接受委托吗？",
+                        "接受委托",
+                        (System.Action)(() => primaryInvoked++),
+                        "暂不接受",
+                        (System.Action)(() => secondaryInvoked++)
+                    });
+
+                Transform tray = FindDescendant(instance, "DialogueChoiceTray");
+                Transform content = FindDescendant(instance, "ChoiceContent");
+                Assert.That(tray.gameObject.activeSelf, Is.True,
+                    "接受/拒绝属于玩家决策，应与 NPC 台词分离。");
+                Assert.That(
+                    content.GetComponentsInChildren<Button>(false).Length,
+                    Is.EqualTo(2));
+
+                content.GetComponentsInChildren<Button>(false)[0]
+                    .onClick.Invoke();
+                viewType.GetMethod("ShowResponse").Invoke(
+                    view,
+                    new object[] { "委托已经登记。" });
+                Button[] responseChoices = content
+                    .GetComponentsInChildren<Button>(false);
+                Assert.That(responseChoices.Length, Is.EqualTo(1),
+                    "NPC 回应后的告辞也应继续显示在独立选择托盘中。");
+                responseChoices[0].onClick.Invoke();
+
+                Assert.That(primaryInvoked, Is.EqualTo(1));
+                Assert.That(secondaryInvoked, Is.EqualTo(1),
+                    "作出选择并显示 NPC 回应后，告辞按钮仍必须能结束对话。");
+            }
+            finally
+            {
+                Object.DestroyImmediate(instance);
+            }
+        }
+
+        [Test]
         public void DialogueManager_AcceptsPlayerAndNeutralDialogueNpcButNotBuildings()
         {
             System.Type managerType = FindType("CryingSnow.StackCraft.DialogueManager");

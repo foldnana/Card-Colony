@@ -353,6 +353,49 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void DialoguePanel_SeparatesConversationFromScrollableChoiceTray()
+        {
+            GameObject root = AssetDatabase.LoadAssetAtPath<GameObject>(
+                DialoguePanelPath);
+            Assert.That(root, Is.Not.Null);
+
+            Transform choiceTray = FindDirectChild(
+                root.transform,
+                "DialogueChoiceTray");
+            Transform inlineActions = FindDirectChild(
+                root.transform,
+                "InlineActions");
+            Assert.That(choiceTray, Is.Not.Null,
+                "重要选择需要使用独立托盘，不能继续和 NPC 台词挤在同一个框内。");
+            Assert.That(inlineActions, Is.Not.Null,
+                "普通回应和告辞仍需保留独立的行内操作区。");
+            Assert.That(choiceTray.gameObject.activeSelf, Is.False,
+                "没有可选分支时选择托盘必须隐藏。");
+
+            ScrollRect scroll = choiceTray.GetComponentInChildren<ScrollRect>(
+                true);
+            Assert.That(scroll, Is.Not.Null,
+                "选择托盘需要支持超过四项时滚动浏览。");
+            Transform content = FindDescendant(choiceTray, "ChoiceContent");
+            Transform template = FindDescendant(
+                choiceTray,
+                "ChoiceButtonTemplate");
+            Assert.That(content, Is.Not.Null);
+            Assert.That(content.GetComponent<VerticalLayoutGroup>(), Is.Not.Null);
+            Assert.That(template, Is.Not.Null);
+            Assert.That(template.GetComponent<Button>(), Is.Not.Null);
+            Assert.That(template.gameObject.activeSelf, Is.False,
+                "按钮模板自身不能显示为一个空选项。");
+
+            RectTransform panelRect = root.GetComponent<RectTransform>();
+            RectTransform trayRect = (RectTransform)choiceTray;
+            Assert.That(
+                trayRect.anchoredPosition.y,
+                Is.GreaterThan(panelRect.sizeDelta.y),
+                "选择托盘应弹在台词框上方，不能覆盖正文。");
+        }
+
+        [Test]
         public void LegacyUiInstallersFinishWithTheLightSkin()
         {
             foreach (string path in new[]
