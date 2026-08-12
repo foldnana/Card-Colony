@@ -190,6 +190,71 @@ namespace CardColony.Tests
         }
 
         [Test]
+        public void UiRoot_WorldMapPartyPanelIsCompactFourMemberRoster()
+        {
+            GameObject root =
+                AssetDatabase.LoadAssetAtPath<GameObject>(UiRootPath);
+            Assert.That(root, Is.Not.Null);
+
+            Transform panel = FindDescendant(
+                root.transform,
+                "WorldMapPartyStatusPanel");
+            Assert.That(panel, Is.Not.Null);
+
+            RectTransform panelRect = (RectTransform)panel;
+            Assert.That(panelRect.anchorMin, Is.EqualTo(new Vector2(0f, 0.5f)));
+            Assert.That(panelRect.anchorMax, Is.EqualTo(new Vector2(0f, 0.5f)));
+            Assert.That(panelRect.anchoredPosition.y, Is.InRange(44f, 52f));
+            Assert.That(panelRect.sizeDelta.x, Is.InRange(265f, 275f));
+            Assert.That(panelRect.sizeDelta.y, Is.InRange(350f, 365f));
+            Assert.That(FindDescendant(panel, "PartyRosterCollapseButton"), Is.Not.Null);
+
+            for (int index = 1; index <= 4; index++)
+            {
+                Transform slot = FindDescendant(
+                    panel,
+                    $"PartyMemberSlot{index}");
+                Assert.That(slot, Is.Not.Null, $"missing party slot {index}");
+                Assert.That(slot.GetComponent<Button>(), Is.Not.Null);
+                Assert.That(FindDescendant(slot, "Portrait"), Is.Not.Null);
+                Assert.That(FindDescendant(slot, "HealthFill"), Is.Not.Null);
+                Assert.That(FindDescendant(slot, "SelectionOutline"), Is.Not.Null);
+                Assert.That(((RectTransform)slot).sizeDelta.y,
+                    Is.InRange(67f, 71f));
+            }
+        }
+
+        [Test]
+        public void PartySelectionService_TracksPersistentMemberIdentity()
+        {
+            System.Type serviceType = System.AppDomain.CurrentDomain
+                .GetAssemblies()
+                .Select(assembly => assembly.GetType(
+                    "CryingSnow.StackCraft.PartySelectionService"))
+                .FirstOrDefault(type => type != null);
+            Assert.That(serviceType, Is.Not.Null);
+            System.Reflection.MethodInfo select = serviceType.GetMethod("Select");
+            System.Reflection.PropertyInfo selected = serviceType.GetProperty(
+                "SelectedPersistentId");
+            try
+            {
+                select.Invoke(null, new object[] { "member-a" });
+                Assert.That(
+                    selected.GetValue(null),
+                    Is.EqualTo("member-a"));
+
+                select.Invoke(null, new object[] { "member-b" });
+                Assert.That(
+                    selected.GetValue(null),
+                    Is.EqualTo("member-b"));
+            }
+            finally
+            {
+                select.Invoke(null, new object[] { null });
+            }
+        }
+
+        [Test]
         public void CombatHud_SuppressesLocationPageAndKeepsActionsInsideSidebar()
         {
             GameObject root =

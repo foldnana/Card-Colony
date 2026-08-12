@@ -344,21 +344,19 @@ namespace CardColony.Tests
             Assert.That(panel.GetComponent<Image>().color.a, Is.EqualTo(1f));
             AssertDepthShadow(panel);
 
-            TMP_Text partyName = FindDescendant(
+            TMP_Text partyTitle = FindDescendant(
                 panel,
-                "PartyName").GetComponent<TMP_Text>();
-            TMP_Text partyState = FindDescendant(
+                "PanelTitle").GetComponent<TMP_Text>();
+            TMP_Text memberName = FindDescendant(
                 panel,
-                "PartyStateText").GetComponent<TMP_Text>();
+                "MemberName")
+                .GetComponent<TMP_Text>();
             Image healthFill = FindDescendant(
                 panel,
-                "PartyHealthFill").GetComponent<Image>();
-            Assert.That(
-                partyName.color.b,
-                Is.GreaterThan(partyName.color.r + 0.10f));
-            Assert.That(
-                partyState.color.r,
-                Is.GreaterThan(partyState.color.b + 0.18f));
+                "HealthFill")
+                .GetComponent<Image>();
+            Assert.That(partyTitle.color.a, Is.EqualTo(1f));
+            Assert.That(memberName.color.a, Is.EqualTo(1f));
             Assert.That(
                 healthFill.color.g,
                 Is.GreaterThan(healthFill.color.r + 0.08f));

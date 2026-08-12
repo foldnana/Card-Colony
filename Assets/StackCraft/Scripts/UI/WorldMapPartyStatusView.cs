@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -8,21 +10,25 @@ namespace CryingSnow.StackCraft
     [RequireComponent(typeof(CanvasGroup))]
     public sealed class WorldMapPartyStatusView : MonoBehaviour
     {
+        private const float ExpandedWidth = 270f;
+        private const float CollapsedWidth = 82f;
+
         public static WorldMapPartyStatusView Instance { get; private set; }
 
-        [SerializeField] private RawImage portraitImage;
-        [SerializeField] private TMP_Text partyNameLabel;
-        [SerializeField] private TMP_Text healthLabel;
-        [SerializeField] private Image healthFill;
-        [SerializeField] private TMP_Text locationLabel;
-        [SerializeField] private TMP_Text membersLabel;
-        [SerializeField] private TMP_Text stateLabel;
+        [SerializeField] private RectTransform panelRect;
+        [SerializeField] private TMP_Text titleLabel;
+        [SerializeField] private TMP_Text memberCountLabel;
+        [SerializeField] private Button collapseButton;
+        [SerializeField] private TMP_Text collapseGlyph;
+        [SerializeField] private PartyRosterSlotView[] memberSlots;
 
+        private readonly List<CardData> displayedMembers = new();
         private CanvasGroup canvasGroup;
-        private CardInstance displayedParty;
-        private CardData displayedProtagonistData;
-        private int displayedCurrentHealth = -1;
-        private int displayedMaxHealth = -1;
+        private string displayedLocation;
+        private string displayedState;
+        private bool isCollapsed;
+
+        public bool IsCollapsed => isCollapsed;
 
         private void Awake()
         {
@@ -34,18 +40,26 @@ namespace CryingSnow.StackCraft
 
             Instance = this;
             canvasGroup = GetComponent<CanvasGroup>();
+            if (panelRect == null)
+                panelRect = (RectTransform)transform;
+            collapseButton.onClick.AddListener(ToggleCollapsed);
+            PartySelectionService.SelectionChanged += OnSelectionChanged;
             Hide();
         }
 
         private void OnDestroy()
         {
+            PartySelectionService.SelectionChanged -= OnSelectionChanged;
+            if (collapseButton != null)
+                collapseButton.onClick.RemoveListener(ToggleCollapsed);
             if (Instance == this)
                 Instance = null;
         }
 
         private void LateUpdate()
         {
-            RefreshHealth();
+            foreach (PartyRosterSlotView slot in memberSlots)
+                slot?.RefreshVitals();
         }
 
         public void ShowParty(
@@ -61,73 +75,134 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            displayedParty = partyCard;
-            displayedProtagonistData = protagonistData;
-            displayedCurrentHealth = -1;
-            displayedMaxHealth = -1;
-            CardDefinition definition = partyCard.Definition;
+            IEnumerable<CardData> savedMembers =
+                GameDirector.Instance?.GameData?.PartyMembers;
+            List<CardData> members = savedMembers?
+                .Where(member => member != null)
+                .Take(GameData.MaximumPartySize)
+                .ToList() ?? new List<CardData>();
+            if (members.Count == 0 && protagonistData != null)
+                members.Add(protagonistData);
+            if (members.Count == 0 && partyCard.Definition != null)
+                members.Add(new CardData(partyCard));
 
-            partyNameLabel.text = definition != null &&
-                !string.IsNullOrWhiteSpace(definition.DisplayName)
-                ? definition.DisplayName
-                : "旅行小队";
-            portraitImage.texture = definition?.ArtTexture;
-            portraitImage.enabled = portraitImage.texture != null;
-            locationLabel.text = $"所在地点：{locationName}";
-            membersLabel.text = $"成员：{Mathf.Max(0, memberCount)}";
-            stateLabel.text = $"状态：{state}";
+            ShowMembers(
+                members,
+                locationName,
+                state,
+                protagonistData?.PersistentId,
+                memberCount);
+        }
 
-            int level = protagonistData?.Level ?? partyCard.Level;
-            int experience = protagonistData?.Experience ??
-                partyCard.Experience;
-            int currentEnergy = protagonistData?.CurrentEnergy ??
-                partyCard.CurrentEnergy;
-            int maxEnergy = protagonistData?.MaxEnergy ??
-                partyCard.MaxEnergy;
-            bool isDowned = protagonistData?.IsDowned ??
-                partyCard.IsDowned;
-            int requiredExperience = CharacterProgressionService
-                .GetExperienceRequiredForNextLevel(level);
-            partyNameLabel.text =
-                $"主角小队  Lv.{level}";
-            membersLabel.text =
-                $"成员：{Mathf.Max(0, memberCount)}  经验：{experience}/{requiredExperience}";
-            stateLabel.text = isDowned
-                ? "状态：倒地，等待救援"
-                : $"状态：{state}  体力：{currentEnergy}/{maxEnergy}";
+        public void ShowMembers(
+            IEnumerable<CardData> members,
+            string locationName,
+            string state,
+            string preferredPersistentId = null,
+            int reportedMemberCount = -1)
+        {
+            displayedMembers.Clear();
+            displayedMembers.AddRange(members?
+                .Where(member => member != null)
+                .Take(GameData.MaximumPartySize) ??
+                Enumerable.Empty<CardData>());
+            displayedLocation = string.IsNullOrWhiteSpace(locationName)
+                ? "未知地点"
+                : locationName;
+            displayedState = string.IsNullOrWhiteSpace(state)
+                ? "待命"
+                : state;
 
-            RefreshHealth();
+            PartySelectionService.EnsureValidSelection(
+                displayedMembers,
+                preferredPersistentId);
+            titleLabel.text = "当前小队";
+            int count = reportedMemberCount >= 0
+                ? Mathf.Clamp(reportedMemberCount, 0, GameData.MaximumPartySize)
+                : displayedMembers.Count;
+            memberCountLabel.text = $"{count}/{GameData.MaximumPartySize}";
+            RefreshSlots();
             SetVisible(true);
         }
 
         public void Hide()
         {
-            displayedParty = null;
-            displayedProtagonistData = null;
+            displayedMembers.Clear();
             SetVisible(false);
         }
 
-        private void RefreshHealth()
+        public void ToggleCollapsed()
         {
-            if (displayedParty == null)
-                return;
+            SetCollapsed(!isCollapsed);
+        }
 
-            int currentHealth = Mathf.Max(
-                0,
-                displayedProtagonistData?.CurrentHealth ??
-                    displayedParty.CurrentHealth);
-            int maxHealth = displayedProtagonistData?.MaximumHealth > 0
-                ? displayedProtagonistData.MaximumHealth
-                : displayedParty.Stats != null
-                    ? Mathf.Max(1, displayedParty.Stats.MaxHealth.Value)
-                    : Mathf.Max(1, currentHealth);
-            if (currentHealth == displayedCurrentHealth && maxHealth == displayedMaxHealth)
-                return;
+        public void SetCollapsed(bool collapsed)
+        {
+            isCollapsed = collapsed;
+            panelRect.sizeDelta = new Vector2(
+                collapsed ? CollapsedWidth : ExpandedWidth,
+                panelRect.sizeDelta.y);
+            titleLabel.gameObject.SetActive(!collapsed);
+            memberCountLabel.gameObject.SetActive(!collapsed);
+            collapseGlyph.text = collapsed ? ">" : "<";
+            foreach (PartyRosterSlotView slot in memberSlots)
+                slot?.SetCollapsed(collapsed);
+        }
 
-            displayedCurrentHealth = currentHealth;
-            displayedMaxHealth = maxHealth;
-            healthLabel.text = $"生命  {currentHealth}/{maxHealth}";
-            healthFill.fillAmount = Mathf.Clamp01((float)currentHealth / maxHealth);
+        private void RefreshSlots()
+        {
+            string selectedId = PartySelectionService.SelectedPersistentId;
+            for (int index = 0; index < memberSlots.Length; index++)
+            {
+                PartyRosterSlotView slot = memberSlots[index];
+                if (slot == null)
+                    continue;
+
+                CardData member = index < displayedMembers.Count
+                    ? displayedMembers[index]
+                    : null;
+                CardDefinition definition = member == null
+                    ? null
+                    : ResolveDefinition(member.Id);
+                CardInstance liveCard = member == null
+                    ? null
+                    : ResolveLiveCard(member.PersistentId);
+                slot.Bind(
+                    member,
+                    definition,
+                    liveCard,
+                    displayedLocation,
+                    displayedState,
+                    member?.PersistentId == selectedId);
+                slot.SetCollapsed(isCollapsed);
+            }
+        }
+
+        private void OnSelectionChanged(string persistentId)
+        {
+            foreach (PartyRosterSlotView slot in memberSlots)
+                slot?.SetSelected(slot.PersistentId == persistentId);
+        }
+
+        private static CardDefinition ResolveDefinition(string cardId)
+        {
+            CardDefinition definition =
+                CardManager.Instance?.GetDefinitionById(cardId);
+            if (definition != null)
+                return definition;
+
+            return Resources.LoadAll<CardDefinition>(string.Empty)
+                .FirstOrDefault(candidate => candidate != null &&
+                    candidate.Id == cardId);
+        }
+
+        private static CardInstance ResolveLiveCard(string persistentId)
+        {
+            if (string.IsNullOrWhiteSpace(persistentId))
+                return null;
+
+            return CardManager.Instance?.AllCards.FirstOrDefault(card =>
+                card != null && card.PersistentId == persistentId);
         }
 
         private void SetVisible(bool visible)
@@ -136,8 +211,8 @@ namespace CryingSnow.StackCraft
                 canvasGroup = GetComponent<CanvasGroup>();
 
             canvasGroup.alpha = visible ? 1f : 0f;
-            canvasGroup.interactable = false;
-            canvasGroup.blocksRaycasts = false;
+            canvasGroup.interactable = visible;
+            canvasGroup.blocksRaycasts = visible;
         }
     }
 }

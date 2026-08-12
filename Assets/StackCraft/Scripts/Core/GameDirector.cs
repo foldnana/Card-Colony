@@ -177,7 +177,13 @@ namespace CryingSnow.StackCraft
 
             GameData.ActiveLocationId = locationId;
             if (!enteringFromLocation)
+            {
+                // 世界地图上的队伍始终作为一个整体移动。进入新的聚落时，
+                // 任何旧的建筑驻留记录都必须失效，不能把成员留在别处。
+                GameData.ClearAllBuildingPersonSlots();
+                GameData.ActiveBuildingEntry = null;
                 GameData.UpdatePartyMembers(partyMembers);
+            }
             GameData.MarkLocationTransitionPending(
                 enteringFromLocation
                     ? LocationTransitionReason.ChildLocationEntry
@@ -186,25 +192,45 @@ namespace CryingSnow.StackCraft
             return true;
         }
 
+        public bool EnterBuilding(BuildingEntryContext context)
+        {
+            if (GameData == null || context == null ||
+                string.IsNullOrWhiteSpace(context.InteriorLocationId))
+            {
+                return false;
+            }
+
+            GameData.ActiveBuildingEntry = context;
+            if (EnterLocation(context.InteriorLocationId, null))
+                return true;
+
+            GameData.ActiveBuildingEntry = null;
+            return false;
+        }
+
         public bool ReturnFromLocation(IEnumerable<CardData> partyMembers)
         {
             if (GameData == null)
                 return false;
 
             if (partyMembers != null)
-                GameData.UpdatePartyMembers(partyMembers);
+                GameData.MergePartyMemberStates(partyMembers);
 
             SaveGameAtStableCombatBoundary();
+            string departingLocationId = GameData.ActiveLocationId;
             if (GameData.TryPopLocation(out string parentLocationId))
             {
                 GameData.ActiveLocationId = parentLocationId;
+                GameData.ActiveBuildingEntry = null;
                 GameData.MarkLocationTransitionPending(
                     LocationTransitionReason.ReturnToParent);
                 StartCoroutine(TravelSequence(locationScene, null));
                 return true;
             }
 
+            GameData.ClearBuildingSlotsForSettlement(departingLocationId);
             GameData.ActiveLocationId = null;
+            GameData.ActiveBuildingEntry = null;
             StartCoroutine(TravelSequence(defaultScene, null));
             return true;
         }
@@ -215,9 +241,14 @@ namespace CryingSnow.StackCraft
                 return false;
 
             if (partyMembers != null)
-                GameData.UpdatePartyMembers(partyMembers);
+                GameData.MergePartyMemberStates(partyMembers);
 
             SaveGameAtStableCombatBoundary();
+            string settlementId = GameData.ActiveLocationId;
+            while (GameData.TryPopLocation(out string parentLocationId))
+                settlementId = parentLocationId;
+            GameData.ClearBuildingSlotsForSettlement(settlementId);
+            GameData.ActiveBuildingEntry = null;
             GameData.LocationHistory?.Clear();
             GameData.ActiveLocationId = null;
             StartCoroutine(TravelSequence(defaultScene, null));
@@ -493,7 +524,7 @@ namespace CryingSnow.StackCraft
                 .Select(card => new CardData(card))
                 .ToList();
             if (activeParty.Count > 0)
-                GameData.UpdatePartyMembers(activeParty);
+                GameData.MergePartyMemberStates(activeParty);
         }
 
         private static CardData EnsureProtagonistState(GameData gameData)

@@ -25,8 +25,8 @@ namespace CryingSnow.StackCraft
         public string DestinationLocationId { get; private set; }
         public CardInstance Card => buildingCard;
         public CardInstance Occupant => personSlot != null ? personSlot.Occupant : null;
-        public bool CanEnter => Occupant != null &&
-            !string.IsNullOrWhiteSpace(DestinationLocationId);
+        public bool CanEnter => !string.IsNullOrWhiteSpace(DestinationLocationId);
+        public string EntranceInstanceId => GetEntranceInstanceId();
         public bool IsSelected { get; private set; }
 
         public void Configure(string destinationLocationId)
@@ -43,6 +43,7 @@ namespace CryingSnow.StackCraft
 
             EnsurePersonSlot();
             CardInstance person = droppedStack.Cards.Single();
+            PersistOccupant(person);
             personSlot.Attach(person, personSlotOffset, personSlotScale, instant: false);
 
             LocationEntranceOccupant dragHandler =
@@ -65,9 +66,22 @@ namespace CryingSnow.StackCraft
             if (!CanEnter || GameDirector.Instance == null)
                 return false;
 
-            return GameDirector.Instance.EnterLocation(
-                DestinationLocationId,
-                new[] { new CardData(Occupant) });
+            string parentLocationId =
+                GameDirector.Instance.GameData?.ActiveLocationId;
+            var context = new BuildingEntryContext
+            {
+                ParentLocationId = parentLocationId,
+                EntranceInstanceId = GetEntranceInstanceId(),
+                InteriorLocationId = DestinationLocationId
+            };
+            if (Occupant != null &&
+                !string.IsNullOrWhiteSpace(Occupant.PersistentId))
+            {
+                context.ParticipantPersistentIds.Add(Occupant.PersistentId);
+                PersistOccupant(Occupant);
+            }
+
+            return GameDirector.Instance.EnterBuilding(context);
         }
 
         public void Detach(CardInstance person)
@@ -77,6 +91,7 @@ namespace CryingSnow.StackCraft
 
             personSlot.Detach(person);
             person.GetComponent<LocationEntranceOccupant>()?.Configure(null);
+            ClearPersistedOccupant();
             RefreshOutline();
             if (IsSelected)
                 SelectionChanged?.Invoke(this);
@@ -171,6 +186,83 @@ namespace CryingSnow.StackCraft
                 personSlot = gameObject.AddComponent<WorldMapPersonSlot>();
 
             personSlot.Initialize(buildingCard);
+        }
+
+        private string GetEntranceInstanceId()
+        {
+            if (buildingCard != null &&
+                !string.IsNullOrWhiteSpace(buildingCard.PersistentId))
+            {
+                return buildingCard.PersistentId;
+            }
+
+            return buildingCard?.Definition?.Id ?? gameObject.name;
+        }
+
+        private void PersistOccupant(CardInstance person)
+        {
+            GameData gameData = GameDirector.Instance?.GameData;
+            string settlementId = gameData?.ActiveLocationId;
+            if (gameData == null || person == null ||
+                string.IsNullOrWhiteSpace(settlementId) ||
+                string.IsNullOrWhiteSpace(person.PersistentId))
+            {
+                return;
+            }
+
+            gameData.AssignMemberToBuildingSlot(
+                settlementId,
+                GetEntranceInstanceId(),
+                DestinationLocationId,
+                person.PersistentId);
+        }
+
+        private void ClearPersistedOccupant()
+        {
+            GameData gameData = GameDirector.Instance?.GameData;
+            if (gameData == null)
+                return;
+
+            gameData.ClearBuildingPersonSlot(
+                gameData.ActiveLocationId,
+                GetEntranceInstanceId());
+        }
+
+        public bool RestorePersistedOccupant()
+        {
+            if (Occupant != null || CardManager.Instance == null)
+                return Occupant != null;
+
+            GameData gameData = GameDirector.Instance?.GameData;
+            BuildingPersonSlotData assignment =
+                gameData?.FindBuildingPersonSlot(
+                    gameData.ActiveLocationId,
+                    GetEntranceInstanceId());
+            if (assignment == null ||
+                string.IsNullOrWhiteSpace(assignment.OccupantPersistentId))
+            {
+                return false;
+            }
+
+            CardInstance person = CardManager.Instance.AllCards.FirstOrDefault(
+                card => card != null &&
+                    card.PersistentId == assignment.OccupantPersistentId);
+            if (person == null)
+                return false;
+
+            EnsurePersonSlot();
+            personSlot.Attach(
+                person,
+                personSlotOffset,
+                personSlotScale,
+                instant: true);
+            LocationEntranceOccupant dragHandler =
+                person.GetComponent<LocationEntranceOccupant>();
+            if (dragHandler == null)
+                dragHandler = person.gameObject.AddComponent<LocationEntranceOccupant>();
+            dragHandler.Configure(this);
+            RefreshOutline();
+            return true;
         }
 
         private void RefreshOutline()

@@ -669,14 +669,34 @@ namespace CryingSnow.StackCraft.EditorTools
                 partyPanel.gameObject,
                 new Color(0f, 0f, 0.01f, 0.78f),
                 new Vector2(0f, -7f));
-            StyleText(partyPanel, "PanelTitle", Cyan);
-            StyleText(partyPanel, "PartyName", Cyan);
-            StyleText(partyPanel, "PartyHealthText", WarmIvory);
-            StyleText(partyPanel, "PartyLocationText", Silver);
-            StyleText(partyPanel, "PartyMembersText", WarmIvory);
-            StyleText(partyPanel, "PartyStateText", Gold);
-            StyleGraphic(partyPanel, "PartyHealthFill", Green);
-            StyleGraphic(partyPanel, "PartyDivider", Silver);
+            if (FindDescendant(partyPanel, "PartyMemberSlot1") != null)
+            {
+                StyleText(partyPanel, "PanelTitle", JournalHeaderInk);
+                StyleText(partyPanel, "PartyMemberCount", Silver);
+                StyleText(partyPanel, "CollapseGlyph", JournalHeaderInk);
+                for (int index = 1; index <= GameData.MaximumPartySize; index++)
+                {
+                    Transform slot = RequireDescendant(
+                        partyPanel,
+                        $"PartyMemberSlot{index}");
+                    StyleImage(slot.GetComponent<Image>(), panelSprite, ListNavy);
+                    StyleText(slot, "MemberName", JournalHeaderInk);
+                    StyleText(slot, "HealthText", WarmIvory);
+                    StyleText(slot, "LocationStateText", Silver);
+                    StyleGraphic(slot, "HealthFill", Green);
+                }
+            }
+            else
+            {
+                StyleText(partyPanel, "PanelTitle", Cyan);
+                StyleText(partyPanel, "PartyName", Cyan);
+                StyleText(partyPanel, "PartyHealthText", WarmIvory);
+                StyleText(partyPanel, "PartyLocationText", Silver);
+                StyleText(partyPanel, "PartyMembersText", WarmIvory);
+                StyleText(partyPanel, "PartyStateText", Gold);
+                StyleGraphic(partyPanel, "PartyHealthFill", Green);
+                StyleGraphic(partyPanel, "PartyDivider", Silver);
+            }
 
             StyleJournalPanel(
                 root,

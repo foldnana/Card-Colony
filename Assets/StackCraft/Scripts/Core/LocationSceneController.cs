@@ -125,7 +125,7 @@ namespace CryingSnow.StackCraft
 
             ApplyBackground(activeDefinition.BackgroundTexture);
             InfoPanel.Instance?.SetWorldMapSuppressed(false);
-            WorldMapPartyStatusView.Instance?.Hide();
+            ShowLocalPartyRoster();
 
             LocationTransitionReason transitionReason = GameDirector.Instance.GameData
                 .ConsumeLocationTransitionReason();
@@ -150,7 +150,10 @@ namespace CryingSnow.StackCraft
             if (!wasLoaded)
             {
                 SpawnInitialLocationCards();
-                SpawnExpandedPartyMembers(GameDirector.Instance.GameData.PartyMembers);
+                SpawnExpandedPartyMembers(ResolvePartyMembersForLocation(
+                    GameDirector.Instance.GameData,
+                    activeDefinition.Id));
+                RestoreBuildingSlotOccupants();
                 if (shouldRandomize)
                     SpawnRandomLocationCards();
             }
@@ -160,6 +163,24 @@ namespace CryingSnow.StackCraft
                     hasIncomingParty,
                     shouldRandomize));
             }
+        }
+
+        private void ShowLocalPartyRoster()
+        {
+            GameData gameData = GameDirector.Instance?.GameData;
+            if (gameData?.PartyMembers == null || activeDefinition == null)
+            {
+                WorldMapPartyStatusView.Instance?.Hide();
+                return;
+            }
+
+            CardData protagonist = gameData.GetProtagonistData();
+            WorldMapPartyStatusView.Instance?.ShowMembers(
+                gameData.PartyMembers,
+                activeDefinition.DisplayName,
+                "驻扎中",
+                protagonist?.PersistentId,
+                gameData.PartyMembers.Count);
         }
 
         public static bool ShouldRandomizeLocationCards(
@@ -561,7 +582,12 @@ namespace CryingSnow.StackCraft
             if (randomizeLocationCards)
                 RemoveRandomLocationCards();
             if (replacePlayerParty)
-                ReplacePlayerParty(GameDirector.Instance.GameData.PartyMembers);
+            {
+                ReplacePlayerParty(ResolvePartyMembersForLocation(
+                    GameDirector.Instance.GameData,
+                    activeDefinition?.Id));
+            }
+            RestoreBuildingSlotOccupants();
             if (randomizeLocationCards)
                 SpawnRandomLocationCards();
         }
@@ -588,7 +614,11 @@ namespace CryingSnow.StackCraft
                 return System.Array.Empty<CardInstance>();
 
             List<CardData> members = memberData?.Where(data => data != null).ToList() ?? new();
-            if (activeDefinition.ExpandedPartyMemberDefinition != null)
+            bool isBuildingInterior = IsActiveBuildingInterior(
+                GameDirector.Instance?.GameData,
+                activeDefinition.Id);
+            if (!isBuildingInterior &&
+                activeDefinition.ExpandedPartyMemberDefinition != null)
             {
                 CardDefinition fallback = activeDefinition.ExpandedPartyMemberDefinition;
                 CardData protagonist = GameDirector.Instance?.GameData
@@ -618,6 +648,128 @@ namespace CryingSnow.StackCraft
 
             CardManager.Instance.NotifyStatsChanged();
             return spawnedMembers;
+        }
+
+        public static IReadOnlyList<CardData> ResolvePartyMembersForLocation(
+            GameData gameData,
+            string locationId)
+        {
+            if (gameData?.PartyMembers == null)
+                return System.Array.Empty<CardData>();
+
+            BuildingEntryContext context = gameData.ActiveBuildingEntry;
+            if (context == null ||
+                context.InteriorLocationId != locationId)
+            {
+                return gameData.PartyMembers
+                    .Where(member => member != null)
+                    .Take(GameData.MaximumPartySize)
+                    .ToList();
+            }
+
+            var participantIds = new HashSet<string>(
+                context.ParticipantPersistentIds?.Where(id =>
+                    !string.IsNullOrWhiteSpace(id)) ??
+                Enumerable.Empty<string>());
+            return gameData.PartyMembers
+                .Where(member => member != null &&
+                    participantIds.Contains(member.PersistentId))
+                .ToList();
+        }
+
+        private static bool IsActiveBuildingInterior(
+            GameData gameData,
+            string locationId)
+        {
+            return gameData?.ActiveBuildingEntry != null &&
+                gameData.ActiveBuildingEntry.InteriorLocationId == locationId;
+        }
+
+        private void RestoreBuildingSlotOccupants()
+        {
+            if (CardManager.Instance == null)
+                return;
+
+            foreach (LocationEntrance entrance in CardManager.Instance.AllCards
+                         .Where(card => card != null)
+                         .Select(card => card.GetComponent<LocationEntrance>())
+                         .Where(entrance => entrance != null))
+            {
+                entrance.RestorePersistedOccupant();
+            }
+        }
+
+        public bool TryBringSelectedPartyMemberToActiveBuilding(
+            out CardInstance member,
+            out string reason)
+        {
+            member = null;
+            reason = null;
+            GameData gameData = GameDirector.Instance?.GameData;
+            BuildingEntryContext context = gameData?.ActiveBuildingEntry;
+            if (context == null || activeDefinition == null ||
+                context.InteriorLocationId != activeDefinition.Id)
+            {
+                reason = "当前不在建筑内部。";
+                return false;
+            }
+
+            if (context.ParticipantPersistentIds?.Any(id =>
+                    !string.IsNullOrWhiteSpace(id)) == true)
+            {
+                reason = "建筑人物槽已有驻留人物，但该人物当前无法互动。";
+                return false;
+            }
+
+            string selectedId = PartySelectionService.SelectedPersistentId;
+            CardData selected = gameData.PartyMembers?.FirstOrDefault(data =>
+                data != null && data.PersistentId == selectedId);
+            if (selected == null)
+            {
+                reason = "请先从左侧小队栏选择一名人物。";
+                return false;
+            }
+
+            if (selected.IsDowned)
+            {
+                reason = "倒地人物无法前来互动。";
+                return false;
+            }
+
+            BuildingPersonSlotData previousAssignment =
+                gameData.BuildingPersonSlots?.FirstOrDefault(slot =>
+                    slot != null &&
+                    slot.OccupantPersistentId == selected.PersistentId);
+            gameData.AssignMemberToBuildingSlot(
+                context.ParentLocationId,
+                context.EntranceInstanceId,
+                context.InteriorLocationId,
+                selected.PersistentId);
+            context.ParticipantPersistentIds ??= new List<string>();
+            context.ParticipantPersistentIds.Clear();
+            context.ParticipantPersistentIds.Add(selected.PersistentId);
+            member = SpawnExpandedPartyMembers(new[] { selected })
+                .FirstOrDefault();
+            if (member == null)
+            {
+                gameData.ClearBuildingPersonSlot(
+                    context.ParentLocationId,
+                    context.EntranceInstanceId);
+                if (previousAssignment != null)
+                {
+                    gameData.AssignMemberToBuildingSlot(
+                        previousAssignment.SettlementLocationId,
+                        previousAssignment.EntranceInstanceId,
+                        previousAssignment.InteriorLocationId,
+                        previousAssignment.OccupantPersistentId);
+                }
+                context.ParticipantPersistentIds.Clear();
+                reason = "人物进入建筑失败。";
+                return false;
+            }
+
+            ShowLocalPartyRoster();
+            return true;
         }
 
         public IReadOnlyList<CardInstance> ReplacePlayerParty(IEnumerable<CardData> memberData)
@@ -681,7 +833,8 @@ namespace CryingSnow.StackCraft
                         card.Definition.Faction == CardFaction.Player)
                     .Select(card => new CardData(card))
                     .ToList();
-            GameDirector.Instance.ReturnFromLocation(partyMembers);
+            GameDirector.Instance.GameData.MergePartyMemberStates(partyMembers);
+            GameDirector.Instance.ReturnFromLocation(null);
         }
 
         private void ApplyBackground(Texture2D texture)

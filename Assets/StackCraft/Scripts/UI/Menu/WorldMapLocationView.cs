@@ -385,20 +385,40 @@ namespace CryingSnow.StackCraft
                 NpcInteractionManager.Instance ??
                 NpcInteractionManager.Ensure(
                     DialogueManager.Instance?.gameObject);
+            if (interaction == null)
+            {
+                npcTradeHint.text = "当前无法创建人物互动。";
+                return;
+            }
+
             CardInstance player = CardManager.Instance?.AllCards
                 .Where(card =>
                     NpcInteractionManager.CanStartInteraction(
                         card,
                         SelectedNpcTrader.Card))
-                .OrderBy(card =>
+                .OrderByDescending(card =>
+                    card.PersistentId ==
+                    PartySelectionService.SelectedPersistentId)
+                .ThenBy(card =>
                     (card.transform.position -
                      SelectedNpcTrader.Card.transform.position)
                     .sqrMagnitude)
                 .FirstOrDefault();
-            if (interaction == null || player == null)
+            string summonReason = null;
+            if (player == null &&
+                LocationSceneController.Instance != null &&
+                LocationSceneController.Instance
+                    .TryBringSelectedPartyMemberToActiveBuilding(
+                        out CardInstance summoned,
+                        out summonReason))
             {
-                npcTradeHint.text =
-                    "当前场景中没有可用于互动的玩家人物。";
+                player = summoned;
+            }
+            if (player == null)
+            {
+                npcTradeHint.text = !string.IsNullOrWhiteSpace(summonReason)
+                    ? summonReason
+                    : "当前场景中没有可用于互动的玩家人物。";
                 return;
             }
 
@@ -699,7 +719,7 @@ namespace CryingSnow.StackCraft
                 {
                     actionLabel.text = SelectedBuilding.CanEnter
                         ? $"进入{buildingName}"
-                        : "请先放入人物";
+                        : "该建筑暂未开放";
                 }
 
                 enterLocationButton.interactable = SelectedBuilding.CanEnter;

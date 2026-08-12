@@ -37,6 +37,8 @@ namespace CryingSnow.StackCraft
         public string TrackedWorldQuestId;
         public List<string> LocationHistory = new();
         public List<CardData> PartyMembers = new();
+        public List<BuildingPersonSlotData> BuildingPersonSlots = new();
+        public BuildingEntryContext ActiveBuildingEntry;
         public BackpackData Backpack = new();
         public GameplayPrefs GameplayPrefs;
         public Dictionary<string, SceneData> SavedScenes = new();
@@ -121,6 +123,90 @@ namespace CryingSnow.StackCraft
             }
             if (WorldElapsedHours <= 0 && WorldDay > 1)
                 WorldElapsedHours = (long)(WorldDay - 1) * 24L;
+        }
+
+        public BuildingPersonSlotData AssignMemberToBuildingSlot(
+            string settlementLocationId,
+            string entranceInstanceId,
+            string interiorLocationId,
+            string occupantPersistentId)
+        {
+            BuildingPersonSlots ??= new List<BuildingPersonSlotData>();
+            if (string.IsNullOrWhiteSpace(settlementLocationId) ||
+                string.IsNullOrWhiteSpace(entranceInstanceId) ||
+                string.IsNullOrWhiteSpace(interiorLocationId) ||
+                string.IsNullOrWhiteSpace(occupantPersistentId))
+            {
+                return null;
+            }
+
+            BuildingPersonSlots.RemoveAll(slot =>
+                slot == null ||
+                slot.OccupantPersistentId == occupantPersistentId ||
+                slot.SettlementLocationId == settlementLocationId &&
+                slot.EntranceInstanceId == entranceInstanceId);
+            var assignment = new BuildingPersonSlotData
+            {
+                SettlementLocationId = settlementLocationId,
+                EntranceInstanceId = entranceInstanceId,
+                InteriorLocationId = interiorLocationId,
+                OccupantPersistentId = occupantPersistentId
+            };
+            BuildingPersonSlots.Add(assignment);
+            return assignment;
+        }
+
+        public BuildingPersonSlotData FindBuildingPersonSlot(
+            string settlementLocationId,
+            string entranceInstanceId)
+        {
+            return BuildingPersonSlots?.FirstOrDefault(slot =>
+                slot != null &&
+                slot.SettlementLocationId == settlementLocationId &&
+                slot.EntranceInstanceId == entranceInstanceId);
+        }
+
+        public void ClearBuildingPersonSlot(
+            string settlementLocationId,
+            string entranceInstanceId)
+        {
+            BuildingPersonSlots?.RemoveAll(slot =>
+                slot == null ||
+                slot.SettlementLocationId == settlementLocationId &&
+                slot.EntranceInstanceId == entranceInstanceId);
+        }
+
+        public void ClearBuildingSlotsForSettlement(string settlementLocationId)
+        {
+            if (string.IsNullOrWhiteSpace(settlementLocationId))
+                return;
+
+            BuildingPersonSlots?.RemoveAll(slot =>
+                slot == null ||
+                slot.SettlementLocationId == settlementLocationId);
+        }
+
+        public void ClearAllBuildingPersonSlots()
+        {
+            BuildingPersonSlots ??= new List<BuildingPersonSlotData>();
+            BuildingPersonSlots.Clear();
+        }
+
+        public void MergePartyMemberStates(IEnumerable<CardData> changedMembers)
+        {
+            PartyMembers ??= new List<CardData>();
+            if (changedMembers == null)
+                return;
+
+            foreach (CardData changed in changedMembers.Where(member =>
+                         member != null &&
+                         !string.IsNullOrWhiteSpace(member.PersistentId)))
+            {
+                int index = PartyMembers.FindIndex(member =>
+                    member?.PersistentId == changed.PersistentId);
+                if (index >= 0)
+                    PartyMembers[index] = changed;
+            }
         }
 
         public void PushLocation(string locationId)
@@ -411,6 +497,28 @@ namespace CryingSnow.StackCraft
                 Position[2]     // Z
             );
         }
+    }
+
+    [System.Serializable]
+    public sealed class BuildingPersonSlotData
+    {
+        public string SettlementLocationId;
+        public string EntranceInstanceId;
+        public string InteriorLocationId;
+        public string OccupantPersistentId;
+    }
+
+    [System.Serializable]
+    public sealed class BuildingEntryContext
+    {
+        public string ParentLocationId;
+        public string EntranceInstanceId;
+        public string InteriorLocationId;
+        public List<string> ParticipantPersistentIds = new();
+
+        public bool ObserverOnly =>
+            ParticipantPersistentIds == null ||
+            ParticipantPersistentIds.Count == 0;
     }
 
     [System.Serializable]

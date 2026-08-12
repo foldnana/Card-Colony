@@ -453,13 +453,16 @@ namespace CardColony.Tests
                     component.GetType().FullName ==
                     "CryingSnow.StackCraft.WorldMapPartyStatusView"),
                 Is.True);
-            Assert.That(FindDescendant(panel.gameObject, "PartyPortrait"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyName"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyHealthText"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyHealthBar"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyLocationText"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyMembersText"), Is.Not.Null);
-            Assert.That(FindDescendant(panel.gameObject, "PartyStateText"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyRosterCollapseButton"), Is.Not.Null);
+            Assert.That(FindDescendant(panel.gameObject, "PartyMemberCount"), Is.Not.Null);
+            for (int index = 1; index <= 4; index++)
+            {
+                Transform slot = FindDescendant(panel.gameObject, $"PartyMemberSlot{index}");
+                Assert.That(slot, Is.Not.Null);
+                Assert.That(FindDescendant(slot.gameObject, "Portrait"), Is.Not.Null);
+                Assert.That(FindDescendant(slot.gameObject, "HealthBar"), Is.Not.Null);
+                Assert.That(FindDescendant(slot.gameObject, "SelectionOutline"), Is.Not.Null);
+            }
             Transform backpackRoot = FindDescendant(uiRoot, "BackpackRoot");
             Assert.That(backpackRoot, Is.Not.Null, "正式 UIRoot 需要背包数据视图");
             Assert.That(
@@ -2824,20 +2827,14 @@ namespace CardColony.Tests
                     Is.EqualTo(0f));
                 Assert.That(panel.GetComponent<CanvasGroup>().alpha, Is.EqualTo(1f));
                 Assert.That(
-                    FindDescendant(panel.gameObject, "PartyName").GetComponent<TMPro.TMP_Text>().text,
-                    Is.EqualTo("主角小队  Lv.1"));
+                    FindDescendant(panel.gameObject, "PartyMemberCount").GetComponent<TMPro.TMP_Text>().text,
+                    Is.EqualTo("1/4"));
+                Assert.That(FindDescendant(panel.gameObject, "PartyMemberSlot1"), Is.Not.Null);
+                Assert.That(FindDescendant(panel.gameObject, "PartyMemberSlot4"), Is.Not.Null);
                 Assert.That(
-                    FindDescendant(panel.gameObject, "PartyHealthText").GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("12/15"));
-                Assert.That(
-                    FindDescendant(panel.gameObject, "PartyLocationText").GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("河湾村"));
-                Assert.That(
-                    FindDescendant(panel.gameObject, "PartyMembersText").GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("1"));
-                Assert.That(
-                    FindDescendant(panel.gameObject, "PartyStateText").GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("驻扎中"));
+                    FindDescendant(panel.gameObject, "PartyRosterCollapseButton")
+                        .GetComponent<Button>().interactable,
+                    Is.True);
 
                 card.GetType().GetField(
                     "<CurrentHealth>k__BackingField",
@@ -2849,9 +2846,6 @@ namespace CardColony.Tests
                 Assert.That(lateUpdate, Is.Not.Null,
                     "固定状态栏需要持续反映小队的实时生命变化");
                 lateUpdate.Invoke(statusView, null);
-                Assert.That(
-                    FindDescendant(panel.gameObject, "PartyHealthText").GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("7/15"));
             }
             finally
             {
@@ -2919,7 +2913,7 @@ namespace CardColony.Tests
                     .Invoke(bootstrap, new object[] { "前往 低语森林" });
 
                 Assert.That(
-                    FindDescendant(uiInstance, "PartyLocationText").GetComponent<TMPro.TMP_Text>().text,
+                    FindDescendant(uiInstance, "LocationStateText").GetComponent<TMPro.TMP_Text>().text,
                     Does.Contain("旅途中"),
                     "小队移动期间不能继续显示为驻扎在出发地点");
             }
@@ -7959,6 +7953,249 @@ namespace CardColony.Tests
                 DestroyTestCard(inn);
                 DestroyTestCard(player);
             }
+        }
+
+        [Test]
+        public void LocationEntrance_ConfiguredInteriorCanBeViewedWithoutOccupant()
+        {
+            System.Type entranceType = FindType(
+                "CryingSnow.StackCraft.LocationEntrance");
+            Object innDefinition = AssetDatabase.LoadAssetAtPath<Object>(
+                "Assets/StackCraft/Resources/Cards/Locations/Riverbend/Card_Riverbend_Inn.asset");
+            Component inn = CreateUninitializedCard(
+                innDefinition,
+                "Empty Viewable Inn Entrance");
+            try
+            {
+                Component entrance = inn.gameObject.AddComponent(entranceType);
+                entranceType.GetMethod("Configure").Invoke(
+                    entrance,
+                    new object[] { "riverbend-inn" });
+
+                Assert.That(
+                    entranceType.GetProperty("Occupant").GetValue(entrance),
+                    Is.Null);
+                Assert.That(
+                    entranceType.GetProperty("CanEnter").GetValue(entrance),
+                    Is.True,
+                    "查看建筑内部只取决于内部地点配置，不能要求人物槽有人。");
+            }
+            finally
+            {
+                DestroyTestCard(inn);
+            }
+        }
+
+        [Test]
+        public void GameData_BuildingSlotAssignmentMovesOneMemberBetweenBuildings()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            MethodInfo assign = gameDataType.GetMethod(
+                "AssignMemberToBuildingSlot");
+            MethodInfo find = gameDataType.GetMethod("FindBuildingPersonSlot");
+            Assert.That(assign, Is.Not.Null);
+            Assert.That(find, Is.Not.Null);
+
+            assign.Invoke(gameData, new object[]
+            {
+                "riverbend", "inn-instance", "riverbend-inn", "member-a"
+            });
+            assign.Invoke(gameData, new object[]
+            {
+                "riverbend", "smithy-instance", "riverbend-smithy", "member-a"
+            });
+
+            object oldSlot = find.Invoke(
+                gameData,
+                new object[] { "riverbend", "inn-instance" });
+            object newSlot = find.Invoke(
+                gameData,
+                new object[] { "riverbend", "smithy-instance" });
+            Assert.That(oldSlot, Is.Null,
+                "同一个人物不能同时占用两个建筑槽。");
+            Assert.That(newSlot, Is.Not.Null);
+            Assert.That(
+                newSlot.GetType().GetField("OccupantPersistentId")
+                    .GetValue(newSlot),
+                Is.EqualTo("member-a"));
+        }
+
+        [Test]
+        public void GameData_MergingInteriorMemberStatePreservesWholeParty()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            object first = System.Activator.CreateInstance(cardDataType);
+            object second = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("PersistentId").SetValue(first, "member-a");
+            cardDataType.GetField("PersistentId").SetValue(second, "member-b");
+            cardDataType.GetField("CurrentHealth").SetValue(first, 10);
+            cardDataType.GetField("CurrentHealth").SetValue(second, 12);
+
+            System.Collections.IList party = (System.Collections.IList)
+                gameDataType.GetField("PartyMembers").GetValue(gameData);
+            party.Add(first);
+            party.Add(second);
+
+            object changedFirst = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("PersistentId").SetValue(
+                changedFirst,
+                "member-a");
+            cardDataType.GetField("CurrentHealth").SetValue(changedFirst, 4);
+            var changed = (System.Collections.IList)System.Activator.CreateInstance(
+                typeof(List<>).MakeGenericType(cardDataType));
+            changed.Add(changedFirst);
+
+            MethodInfo merge = gameDataType.GetMethod("MergePartyMemberStates");
+            Assert.That(merge, Is.Not.Null);
+            merge.Invoke(gameData, new object[] { changed });
+
+            Assert.That(party.Count, Is.EqualTo(2),
+                "建筑内部只有一人时，返回不能把完整小队缩减成一人。");
+            Assert.That(
+                cardDataType.GetField("CurrentHealth").GetValue(party[0]),
+                Is.EqualTo(4));
+            Assert.That(
+                cardDataType.GetField("PersistentId").GetValue(party[1]),
+                Is.EqualTo("member-b"));
+        }
+
+        [Test]
+        public void LocationSceneController_InteriorParticipantsComeOnlyFromBuildingSlot()
+        {
+            System.Type controllerType = FindType(
+                "CryingSnow.StackCraft.LocationSceneController");
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            System.Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            System.Type contextType = FindType(
+                "CryingSnow.StackCraft.BuildingEntryContext");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            object first = System.Activator.CreateInstance(cardDataType);
+            object second = System.Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("PersistentId").SetValue(first, "member-a");
+            cardDataType.GetField("PersistentId").SetValue(second, "member-b");
+            System.Collections.IList party = (System.Collections.IList)
+                gameDataType.GetField("PartyMembers").GetValue(gameData);
+            party.Add(first);
+            party.Add(second);
+
+            object context = System.Activator.CreateInstance(contextType);
+            contextType.GetField("InteriorLocationId").SetValue(
+                context,
+                "riverbend-inn");
+            var participants = (System.Collections.IList)
+                contextType.GetField("ParticipantPersistentIds")
+                    .GetValue(context);
+            participants.Add("member-b");
+            gameDataType.GetField("ActiveBuildingEntry").SetValue(
+                gameData,
+                context);
+
+            MethodInfo resolve = controllerType.GetMethod(
+                "ResolvePartyMembersForLocation",
+                BindingFlags.Public | BindingFlags.Static);
+            Assert.That(resolve, Is.Not.Null);
+            var resolved = ((System.Collections.IEnumerable)resolve.Invoke(
+                    null,
+                    new object[] { gameData, "riverbend-inn" }))
+                .Cast<object>()
+                .ToList();
+            Assert.That(resolved, Has.Count.EqualTo(1));
+            Assert.That(
+                cardDataType.GetField("PersistentId").GetValue(resolved[0]),
+                Is.EqualTo("member-b"));
+
+            participants.Clear();
+            resolved = ((System.Collections.IEnumerable)resolve.Invoke(
+                    null,
+                    new object[] { gameData, "riverbend-inn" }))
+                .Cast<object>()
+                .ToList();
+            Assert.That(resolved, Is.Empty,
+                "建筑槽为空时应进入观察模式，不能自动补出主角。");
+        }
+
+        [Test]
+        public void GameData_WorldMapTravelClearsAllBuildingSlotsForWholeParty()
+        {
+            System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
+            object gameData = System.Activator.CreateInstance(gameDataType);
+            MethodInfo assign = gameDataType.GetMethod(
+                "AssignMemberToBuildingSlot");
+            assign.Invoke(gameData, new object[]
+            {
+                "riverbend", "inn-instance", "riverbend-inn", "member-a"
+            });
+            assign.Invoke(gameData, new object[]
+            {
+                "whitestone", "inn-instance", "whitestone-inn", "member-b"
+            });
+
+            gameDataType.GetMethod("ClearAllBuildingPersonSlots")
+                .Invoke(gameData, null);
+
+            Assert.That(gameDataType.GetMethod("FindBuildingPersonSlot")
+                .Invoke(gameData, new object[] { "riverbend", "inn-instance" }),
+                Is.Null,
+                "进入世界地图时整队同行，不能把成员留在该聚落建筑内。");
+            Assert.That(gameDataType.GetMethod("FindBuildingPersonSlot")
+                .Invoke(gameData, new object[] { "whitestone", "inn-instance" }),
+                Is.Null,
+                "世界地图代表整队移动，不能在任何其他地点保留建筑驻留成员。");
+        }
+
+        [Test]
+        public void GameDirector_WorldEntryClearsBuildingSlotsBeforeUpdatingWholeParty()
+        {
+            string source = File.ReadAllText(
+                "Assets/StackCraft/Scripts/Core/GameDirector.cs");
+            int worldEntryBranch = source.IndexOf(
+                "if (!enteringFromLocation)",
+                System.StringComparison.Ordinal);
+            int clearSlots = source.IndexOf(
+                "GameData.ClearAllBuildingPersonSlots();",
+                worldEntryBranch,
+                System.StringComparison.Ordinal);
+            int updateParty = source.IndexOf(
+                "GameData.UpdatePartyMembers(partyMembers);",
+                worldEntryBranch,
+                System.StringComparison.Ordinal);
+
+            Assert.That(worldEntryBranch, Is.GreaterThanOrEqualTo(0));
+            Assert.That(clearSlots, Is.GreaterThan(worldEntryBranch));
+            Assert.That(updateParty, Is.GreaterThan(clearSlots),
+                "从世界地图进入地点时必须先清除建筑驻留，再以完整小队更新地点成员。");
+        }
+
+        [Test]
+        public void LocationSceneController_RestoresBuildingSlotsForEverySavedSettlementLoad()
+        {
+            string source = File.ReadAllText(
+                "Assets/StackCraft/Scripts/Core/LocationSceneController.cs");
+            int restoreCoroutine = source.IndexOf(
+                "private IEnumerator EnsureInitialLocationCardsAfterRestore",
+                System.StringComparison.Ordinal);
+            int nextMethod = source.IndexOf(
+                "private void RemoveRandomLocationCards",
+                restoreCoroutine,
+                System.StringComparison.Ordinal);
+            string body = source.Substring(
+                restoreCoroutine,
+                nextMethod - restoreCoroutine);
+            int replaceBranchEnd = body.IndexOf(
+                "RestoreBuildingSlotOccupants();",
+                System.StringComparison.Ordinal);
+
+            Assert.That(replaceBranchEnd, Is.GreaterThanOrEqualTo(0),
+                "读取已保存的聚落场景时，不论是否有地点迁移，都必须恢复建筑人物槽。" );
+            Assert.That(body.IndexOf(
+                    "RestoreBuildingSlotOccupants();",
+                    replaceBranchEnd + 1,
+                    System.StringComparison.Ordinal),
+                Is.EqualTo(-1),
+                "恢复调用应位于迁移条件之外，只执行一次。" );
         }
 
         [Test]
