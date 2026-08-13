@@ -427,7 +427,7 @@ namespace CardColony.Tests
                 "当前版本不应显示查看路线按钮");
             Assert.That(
                 locationToggle.GetComponentInChildren<TMPro.TMP_Text>(true).text,
-                Is.EqualTo("地点"));
+                Is.EqualTo("详情"));
             Assert.That(
                 enterButton.GetComponentInChildren<TMPro.TMP_Text>(true).text,
                 Is.EqualTo("进入地点"));

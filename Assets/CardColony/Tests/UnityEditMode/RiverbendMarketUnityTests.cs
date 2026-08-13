@@ -570,6 +570,20 @@ namespace CardColony.Tests
                 "人物侧栏需要统一的行动页签，交谈不再作为拖拽后的默认动作。");
             Assert.That(FindChild(prefab.transform, "NpcTradeScrollView"), Is.Not.Null);
             Assert.That(FindChild(prefab.transform, "NpcTradeRowTemplate"), Is.Not.Null);
+            Assert.That(FindChild(prefab.transform, "NpcActionListHeader"), Is.Not.Null,
+                "人物详情需要明确标出可用行动区域。");
+            Assert.That(FindChild(prefab.transform, "NpcActionRowTemplate"), Is.Not.Null,
+                "人物行动必须使用独立模板，不能继续和商品交易行共用布局。");
+            Assert.That(FindChild(prefab.transform, "NpcEndInteractionButton"), Is.Not.Null,
+                "结束互动应固定在滚动列表外，不能与普通行动混在一起。");
+
+            ScrollRect scroll = FindChild(prefab.transform, "NpcTradeScrollView")
+                .GetComponent<ScrollRect>();
+            Assert.That(scroll.verticalScrollbar, Is.Not.Null,
+                "行动数量增加后，列表需要可见的纵向滚动提示。");
+            Assert.That(
+                scroll.verticalScrollbarVisibility,
+                Is.EqualTo(ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport));
 
             Type viewType =
                 FindType("CryingSnow.StackCraft.WorldMapLocationView");
@@ -696,6 +710,69 @@ namespace CardColony.Tests
                 serializedScreen.FindProperty("marketRowTemplate")
                     ?.objectReferenceValue,
                 Is.Not.Null);
+        }
+
+        [Test]
+        public void UiRoot_NpcActionRowsAreWholeRowButtonsWithCardDetailsHeader()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform actionRow = FindChild(
+                prefab.transform,
+                "NpcActionRowTemplate");
+            Assert.That(actionRow, Is.Not.Null);
+            Assert.That(actionRow.GetComponent<Button>(), Is.Not.Null,
+                "人物行动应整行可点击，而不是右侧再放一个小按钮。");
+            Assert.That(FindChild(actionRow, "ActionTitle"), Is.Not.Null);
+            Assert.That(FindChild(actionRow, "ActionDescription"), Is.Not.Null);
+            Assert.That(FindChild(actionRow, "ActionArrow"), Is.Not.Null);
+            Assert.That(FindChild(prefab.transform, "LocationTypeAndDanger"), Is.Not.Null,
+                "详情头部需要继续承担卡牌类型标签展示。");
+
+            Type viewType = FindType(
+                "CryingSnow.StackCraft.WorldMapLocationView");
+            Assert.That(
+                viewType.GetField(
+                    "npcActionRowTemplate",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null);
+            Assert.That(
+                viewType.GetField(
+                    "npcEndInteractionButton",
+                    BindingFlags.Instance | BindingFlags.NonPublic),
+                Is.Not.Null);
+
+            GameObject instance = UnityEngine.Object.Instantiate(prefab);
+            try
+            {
+                Transform runtimeRow = FindChild(
+                    instance.transform,
+                    "NpcActionRowTemplate");
+                Component rowView = runtimeRow.GetComponents<MonoBehaviour>()
+                    .First(component => component.GetType().FullName ==
+                        "CryingSnow.StackCraft.NpcActionRowView");
+                int invoked = 0;
+                rowView.GetType().GetMethod("Bind")?.Invoke(
+                    rowView,
+                    new object[]
+                    {
+                        "●",
+                        "交谈",
+                        "了解人物和当地信息",
+                        new UnityEngine.Events.UnityAction(() => invoked++)
+                    });
+                runtimeRow.GetComponent<Button>().onClick.Invoke();
+                Assert.That(invoked, Is.EqualTo(1),
+                    "点击行动卡任意位置都应执行对应行动。");
+                Assert.That(
+                    FindChild(runtimeRow, "ActionTitle")
+                        .GetComponent<TMP_Text>().text,
+                    Is.EqualTo("交谈"));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(instance);
+            }
         }
 
         [Test]

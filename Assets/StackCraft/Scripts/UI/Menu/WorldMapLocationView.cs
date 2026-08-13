@@ -29,6 +29,10 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Button npcActionTabButton;
         [SerializeField] private RectTransform npcTradeListRoot;
         [SerializeField] private NpcTradeListRowView npcTradeRowTemplate;
+        [SerializeField] private NpcActionRowView npcActionRowTemplate;
+        [SerializeField] private GameObject npcActionListHeader;
+        [SerializeField] private TMP_Text npcActionCountLabel;
+        [SerializeField] private Button npcEndInteractionButton;
         [SerializeField] private TMP_Text npcTradeHint;
 
         private CanvasGroup canvasGroup;
@@ -58,6 +62,8 @@ namespace CryingSnow.StackCraft
             npcBuyTabButton?.onClick.AddListener(ShowNpcBuyList);
             npcSellTabButton?.onClick.AddListener(ShowNpcSellList);
             npcActionTabButton?.onClick.AddListener(ShowNpcActions);
+            npcEndInteractionButton?.onClick.AddListener(
+                EndSelectedNpcInteraction);
             WorldMapLocation.SelectionChanged += HandleSelectionChanged;
             LocationEntrance.SelectionChanged += HandleBuildingSelectionChanged;
             MarketProductVendor.SelectionChanged +=
@@ -113,6 +119,8 @@ namespace CryingSnow.StackCraft
             npcBuyTabButton?.onClick.RemoveListener(ShowNpcBuyList);
             npcSellTabButton?.onClick.RemoveListener(ShowNpcSellList);
             npcActionTabButton?.onClick.RemoveListener(ShowNpcActions);
+            npcEndInteractionButton?.onClick.RemoveListener(
+                EndSelectedNpcInteraction);
         }
 
         public void ShowLocation(WorldMapLocation location)
@@ -126,7 +134,7 @@ namespace CryingSnow.StackCraft
             SelectedMarketBuyer = null;
             SelectedNpcTrader = null;
             SetNpcTradePanelVisible(false);
-            SetLocationTabLabel("地点");
+            SetLocationTabLabel("详情");
             WorldMapLocationDetails details = location.Details ??
                 WorldMapLocationDetails.CreateFallback(location.Card.Definition);
 
@@ -135,7 +143,8 @@ namespace CryingSnow.StackCraft
                 : location.Card.gameObject.name;
             artImage.texture = location.Card.Definition?.ArtTexture;
             artImage.enabled = artImage.texture != null;
-            typeAndDangerLabel.text = $"{details.locationType} · 危险 {details.dangerLevel}";
+            typeAndDangerLabel.text =
+                $"地点卡 · {details.locationType} · 危险 {details.dangerLevel}";
             discoveryLabel.text = "● 已发现";
             travelTimeLabel.text = $"旅行时间    {details.travelTime}";
             resourcesLabel.text = "可能资源\n" + string.Join(
@@ -167,7 +176,7 @@ namespace CryingSnow.StackCraft
             SelectedMarketBuyer = null;
             SelectedNpcTrader = null;
             SetNpcTradePanelVisible(false);
-            SetLocationTabLabel("建筑");
+            SetLocationTabLabel("详情");
 
             CardDefinition definition = building.Card.Definition;
             string displayName = definition != null
@@ -176,7 +185,7 @@ namespace CryingSnow.StackCraft
             titleLabel.text = displayName;
             artImage.texture = definition?.ArtTexture;
             artImage.enabled = artImage.texture != null;
-            typeAndDangerLabel.text = "建筑 · 可进入";
+            typeAndDangerLabel.text = "建筑卡 · 可进入";
             discoveryLabel.text = "● 已开放";
             travelTimeLabel.text = building.Occupant == null
                 ? "人物槽    空"
@@ -204,14 +213,14 @@ namespace CryingSnow.StackCraft
             SelectedBuilding = null;
             SelectedNpcTrader = null;
             SetNpcTradePanelVisible(false);
-            SetLocationTabLabel("商品");
+            SetLocationTabLabel("详情");
 
             CardDefinition product = vendor.Product;
             titleLabel.text = product.DisplayName;
             artImage.texture = product.ArtTexture;
             artImage.enabled = artImage.texture != null;
             typeAndDangerLabel.text =
-                $"市场商品 · {GetCategoryLabel(product.Category)}";
+                $"商品卡 · 市场商品 · {GetCategoryLabel(product.Category)}";
             discoveryLabel.text = vendor.StockRemaining > 0
                 ? $"● 今日库存 {vendor.StockRemaining}"
                 : "● 今日售罄";
@@ -240,14 +249,14 @@ namespace CryingSnow.StackCraft
             SelectedBuilding = null;
             SelectedNpcTrader = null;
             SetNpcTradePanelVisible(false);
-            SetLocationTabLabel("收购");
+            SetLocationTabLabel("详情");
 
             CardDefinition definition =
                 buyer.GetComponent<CardInstance>()?.Definition;
             titleLabel.text = definition?.DisplayName ?? "收购柜台";
             artImage.texture = definition?.ArtTexture;
             artImage.enabled = artImage.texture != null;
-            typeAndDangerLabel.text = "市场服务 · 物品收购";
+            typeAndDangerLabel.text = "服务卡 · 市场收购";
             discoveryLabel.text = buyer.PendingStack == null
                 ? "● 等待物品"
                 : $"● 待售 {buyer.PendingStack.Cards.Count} 张";
@@ -303,23 +312,16 @@ namespace CryingSnow.StackCraft
             pendingSellCount = 0;
             hasPendingSellMarketQuote = false;
             pendingWorldSale = trader.PendingWorldSale != null;
-            SetLocationTabLabel("人物");
+            SetLocationTabLabel("详情");
 
             CardDefinition definition = trader.Card.Definition;
             titleLabel.text = definition.DisplayName;
             artImage.texture = definition.ArtTexture;
             artImage.enabled = artImage.texture != null;
-            typeAndDangerLabel.text =
-                IsSelectedNpcApproaching()
-                    ? "正在接近 · 请稍候"
-                    : HasActiveInteractionWithSelectedNpc()
-                    ? "互动中 · 请选择行动"
-                    : "可互动 · 拖入人物卡开始";
+            typeAndDangerLabel.text = "人物卡 · NPC · 可互动";
             discoveryLabel.text =
                 $"● 可用资金 {trader.AvailableFunds} 金币";
-            travelTimeLabel.text = HasActiveInteractionWithSelectedNpc()
-                ? "双方已进入人物交互框"
-                : "拖动玩家人物卡到 NPC 身边开始互动";
+            travelTimeLabel.text = string.Empty;
             resourcesLabel.text = string.Empty;
             descriptionLabel.text = definition.Description ?? string.Empty;
             SetNpcTradePanelVisible(true);
@@ -785,7 +787,9 @@ namespace CryingSnow.StackCraft
                  index--)
             {
                 Transform child = npcTradeListRoot.GetChild(index);
-                if (child != npcTradeRowTemplate.transform)
+                if (child != npcTradeRowTemplate.transform &&
+                    (npcActionRowTemplate == null ||
+                     child != npcActionRowTemplate.transform))
                 {
                     child.gameObject.SetActive(false);
                     if (Application.isPlaying)
@@ -801,6 +805,7 @@ namespace CryingSnow.StackCraft
                 IsSelectedNpcTradeState() &&
                 npcTradeTab != NpcTradeTab.Actions;
             SetNpcTradeNavigationVisible(isTradePage);
+            SetNpcActionPresentationVisible(!isTradePage);
             if (npcBuyTabButton != null)
             {
                 npcBuyTabButton.interactable =
@@ -1037,6 +1042,23 @@ namespace CryingSnow.StackCraft
             return row;
         }
 
+        private NpcActionRowView CreateNpcActionRow(
+            string icon,
+            string title,
+            string description,
+            UnityEngine.Events.UnityAction action)
+        {
+            if (npcActionRowTemplate == null)
+                return null;
+
+            NpcActionRowView row = Instantiate(
+                npcActionRowTemplate,
+                npcTradeListRoot);
+            row.gameObject.SetActive(true);
+            row.Bind(icon, title, description, action);
+            return row;
+        }
+
         private void SelectNpcSale(
             string productId,
             int count,
@@ -1070,59 +1092,47 @@ namespace CryingSnow.StackCraft
 
             if (IsSelectedNpcApproaching())
             {
-                NpcTradeListRowView approachRow =
-                    CreateNpcTradeRow();
-                approachRow.BindAction(
-                    "正在接近\n人物抵达后即可选择行动",
-                    null,
-                    null);
-                npcTradeHint.text =
-                    "玩家人物正在前往 NPC 所在位置。";
+                SetNpcActionCount(0);
+                npcTradeHint.text = string.Empty;
                 return;
             }
 
             if (!HasActiveInteractionWithSelectedNpc())
             {
-                NpcTradeListRowView startRow = CreateNpcTradeRow();
-                startRow.BindAction(
-                    "开始互动\n选择一名玩家人物参与",
+                CreateNpcActionRow(
+                    "◎",
                     "开始互动",
+                    "使用当前小队人物与该 NPC 建立互动",
                     StartSelectedNpcInteraction);
-                npcTradeHint.text =
-                    "拖动玩家人物卡到 NPC 身边，或点击“开始互动”。";
+                SetNpcActionCount(1);
+                npcTradeHint.text = string.Empty;
                 return;
             }
 
-            CardInstance actor = NpcInteractionManager.Instance.Player;
+            int actionCount = 0;
             if (definition.DialogueEnabled)
             {
-                NpcTradeListRowView talkRow = CreateNpcTradeRow();
-                talkRow.BindAction(
-                    "交谈\n了解人物和当前地点的信息",
+                CreateNpcActionRow(
+                    "●",
                     "交谈",
+                    "了解人物和当前地点的信息",
                     StartNpcDialogue);
+                actionCount++;
             }
 
             bool canTrade = NpcTradeService.CanTradeNow(
                 SelectedNpcTrader,
                 out string tradeReason);
-            NpcTradeListRowView tradeRow = CreateNpcTradeRow();
-            tradeRow.BindAction(
+            CreateNpcActionRow(
+                "◆",
+                "交易",
                 canTrade
-                    ? "交易\n查看对方的购买与出售列表"
-                    : $"交易\n{tradeReason}",
-                canTrade ? "交易" : null,
+                    ? "查看对方的购买与出售列表"
+                    : tradeReason,
                 canTrade ? BeginSelectedNpcTradeFromActions : null);
-
-            NpcTradeListRowView endRow = CreateNpcTradeRow();
-            endRow.BindAction(
-                "结束互动\n双方人物卡将返回原来的位置",
-                "结束",
-                EndSelectedNpcInteraction);
-
-            npcTradeHint.text =
-                $"当前参与者：{actor?.Definition?.DisplayName ?? "玩家人物"}。" +
-                "选择一项行动继续。";
+            actionCount++;
+            SetNpcActionCount(actionCount);
+            npcTradeHint.text = string.Empty;
         }
 
         private void StartNpcDialogue()
@@ -1276,6 +1286,37 @@ namespace CryingSnow.StackCraft
                 anchorMax.y = visible ? 0.84f : 0.98f;
                 scrollRect.anchorMax = anchorMax;
             }
+        }
+
+        private void SetNpcActionPresentationVisible(bool visible)
+        {
+            if (npcActionListHeader != null)
+                npcActionListHeader.SetActive(visible);
+            if (npcEndInteractionButton != null)
+            {
+                bool canEnd = visible &&
+                    HasActiveInteractionWithSelectedNpc() &&
+                    !IsSelectedNpcApproaching();
+                npcEndInteractionButton.gameObject.SetActive(canEnd);
+            }
+            if (npcTradeHint != null)
+                npcTradeHint.gameObject.SetActive(!visible);
+
+            RectTransform scrollRect =
+                npcTradeListRoot?.parent?.parent as RectTransform;
+            if (scrollRect != null && visible)
+            {
+                scrollRect.anchorMin = new Vector2(0.02f, 0.16f);
+                scrollRect.anchorMax = new Vector2(0.98f, 0.84f);
+                scrollRect.anchoredPosition = Vector2.zero;
+                scrollRect.sizeDelta = Vector2.zero;
+            }
+        }
+
+        private void SetNpcActionCount(int count)
+        {
+            if (npcActionCountLabel != null)
+                npcActionCountLabel.text = $"{Mathf.Max(0, count)} 项";
         }
 
         private void ApplyNpcPresentationLayout(bool npcMode)

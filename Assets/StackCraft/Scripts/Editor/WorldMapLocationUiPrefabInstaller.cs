@@ -9,6 +9,13 @@ namespace CryingSnow.StackCraft.EditorTools
     public static class WorldMapLocationUiPrefabInstaller
     {
         private const string UiRootPath = "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
+        private const string MinimalistActionButtonPath =
+            "Assets/UltimateCleanGUIPack/Themes/Minimalist/Prefabs/" +
+            "UI Elements/Button With Icon And Text/Left Icon - Filled/" +
+            "IconButton - Filled With Text - Light.prefab";
+        private const string MinimalistScrollbarPath =
+            "Assets/UltimateCleanGUIPack/Themes/Minimalist/Prefabs/" +
+            "UI Elements/Scrollbar/Scrollbar - Vertical.prefab";
 
         [MenuItem("Tools/StackCraft/Install World Map Location Sidebar")]
         public static void Install()
@@ -25,6 +32,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 Transform recipesView =
                     FindDescendant(menuPanel, "RecipesView");
                 TMP_FontAsset font = questsToggle.GetComponentInChildren<TMP_Text>(true).font;
+
+                UpgradeNpcActionPanel(root, font);
 
                 Transform oldLocationToggle = FindDescendant(header, "LocationToggle");
                 Transform oldLocationView = FindDescendant(menuPanel, "LocationView");
@@ -693,6 +702,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 SetReference(serializedView, "npcTradeHint", npcTradeHint);
                 serializedView.ApplyModifiedPropertiesWithoutUndo();
                 npcTradePanel.SetActive(false);
+
+                UpgradeNpcActionPanel(root, font);
 
                 CanvasGroup canvasGroup = locationViewObject.GetComponent<CanvasGroup>();
                 canvasGroup.alpha = 0f;
@@ -1548,6 +1559,319 @@ namespace CryingSnow.StackCraft.EditorTools
                 secondary.GetComponentInChildren<TMP_Text>(true));
             serializedRow.ApplyModifiedPropertiesWithoutUndo();
             return rowObject.GetComponent<NpcTradeListRowView>();
+        }
+
+        private static void UpgradeNpcActionPanel(
+            GameObject root,
+            TMP_FontAsset font)
+        {
+            Transform locationView =
+                FindDescendant(root.transform, "LocationView");
+            Transform panel =
+                FindDescendant(locationView, "NpcTradePanel");
+            Transform content =
+                FindDescendant(panel, "NpcTradeListContent");
+            Transform scrollTransform =
+                FindDescendant(panel, "NpcTradeScrollView");
+            if (locationView == null || panel == null ||
+                content == null || scrollTransform == null)
+            {
+                return;
+            }
+
+            Transform locationToggle =
+                FindDescendant(root.transform, "LocationToggle");
+            TMP_Text locationToggleLabel = locationToggle?
+                .GetComponentInChildren<TMP_Text>(true);
+            if (locationToggleLabel != null)
+                locationToggleLabel.text = "详情";
+
+            Transform header =
+                FindDescendant(panel, "NpcActionListHeader");
+            TMP_Text countLabel;
+            if (header == null)
+            {
+                GameObject headerObject = CreateUiObject(
+                    "NpcActionListHeader",
+                    panel,
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                SetRect(
+                    (RectTransform)headerObject.transform,
+                    new Vector2(0.02f, 0.86f),
+                    new Vector2(0.98f, 0.98f),
+                    Vector2.zero,
+                    Vector2.zero);
+                headerObject.GetComponent<Image>().color =
+                    new Color(0.68f, 0.75f, 0.81f, 1f);
+                TMP_Text title = CreateText(
+                    "NpcActionListTitle",
+                    headerObject.transform,
+                    font,
+                    "可用行动",
+                    21f,
+                    new Color(0.12f, 0.20f, 0.27f, 1f),
+                    TextAlignmentOptions.MidlineLeft,
+                    new Vector2(0.06f, 0f),
+                    new Vector2(0.72f, 1f));
+                title.fontStyle = FontStyles.Bold;
+                countLabel = CreateText(
+                    "NpcActionCount",
+                    headerObject.transform,
+                    font,
+                    "0 项",
+                    18f,
+                    new Color(0.30f, 0.39f, 0.46f, 1f),
+                    TextAlignmentOptions.MidlineRight,
+                    new Vector2(0.72f, 0f),
+                    new Vector2(0.94f, 1f));
+                header = headerObject.transform;
+            }
+            else
+            {
+                countLabel = FindDescendant(
+                        header,
+                        "NpcActionCount")
+                    ?.GetComponent<TMP_Text>();
+            }
+
+            Transform actionTemplateTransform =
+                FindDescendant(content, "NpcActionRowTemplate");
+            NpcActionRowView actionTemplate =
+                actionTemplateTransform != null
+                    ? actionTemplateTransform.GetComponent<NpcActionRowView>()
+                    : CreateNpcActionRowTemplate(content, font);
+            ApplyMinimalistButtonVisual(
+                actionTemplate.GetComponent<Image>(),
+                actionTemplate.GetComponent<Button>());
+            actionTemplate.gameObject.SetActive(false);
+
+            Transform endTransform =
+                FindDescendant(panel, "NpcEndInteractionButton");
+            Button endButton = endTransform != null
+                ? endTransform.GetComponent<Button>()
+                : CreateButton(
+                    "NpcEndInteractionButton",
+                    panel,
+                    font,
+                    "结束当前互动",
+                    new Color(0.56f, 0.63f, 0.69f, 1f),
+                    new Vector2(0.05f, 0.025f),
+                    new Vector2(0.95f, 0.14f),
+                    19f);
+
+            ScrollRect scroll = scrollTransform.GetComponent<ScrollRect>();
+            Transform scrollbarTransform =
+                FindDescendant(scrollTransform, "NpcActionScrollbar");
+            if (scrollbarTransform != null)
+                Object.DestroyImmediate(scrollbarTransform.gameObject);
+            Scrollbar scrollbar = CreateNpcActionScrollbar(scrollTransform);
+            scroll.verticalScrollbar = scrollbar;
+            scroll.verticalScrollbarVisibility =
+                ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            scroll.verticalScrollbarSpacing = 4f;
+            scroll.scrollSensitivity = 24f;
+
+            var serializedView = new SerializedObject(
+                locationView.GetComponent<WorldMapLocationView>());
+            SetReference(
+                serializedView,
+                "npcActionRowTemplate",
+                actionTemplate);
+            SetReference(
+                serializedView,
+                "npcActionListHeader",
+                header.gameObject);
+            SetReference(
+                serializedView,
+                "npcActionCountLabel",
+                countLabel);
+            SetReference(
+                serializedView,
+                "npcEndInteractionButton",
+                endButton);
+            serializedView.ApplyModifiedPropertiesWithoutUndo();
+        }
+
+        private static NpcActionRowView CreateNpcActionRowTemplate(
+            Transform parent,
+            TMP_FontAsset font)
+        {
+            GameObject rowObject = CreateUiObject(
+                "NpcActionRowTemplate",
+                parent,
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Button),
+                typeof(LayoutElement),
+                typeof(NpcActionRowView));
+            Image background = rowObject.GetComponent<Image>();
+            background.color = new Color(0.71f, 0.78f, 0.83f, 1f);
+            Button button = rowObject.GetComponent<Button>();
+            button.targetGraphic = background;
+            ApplyMinimalistButtonVisual(background, button);
+            ColorBlock colors = button.colors;
+            colors.normalColor = Color.white;
+            colors.highlightedColor = new Color(0.92f, 0.98f, 1f, 1f);
+            colors.pressedColor = new Color(0.82f, 0.91f, 0.97f, 1f);
+            colors.disabledColor = new Color(1f, 1f, 1f, 0.48f);
+            button.colors = colors;
+            LayoutElement layout = rowObject.GetComponent<LayoutElement>();
+            layout.preferredHeight = 90f;
+            layout.flexibleWidth = 1f;
+
+            TMP_Text icon = CreateText(
+                "ActionIcon",
+                rowObject.transform,
+                font,
+                "●",
+                25f,
+                new Color(0.10f, 0.45f, 0.60f, 1f),
+                TextAlignmentOptions.Center,
+                new Vector2(0.03f, 0.18f),
+                new Vector2(0.20f, 0.82f));
+            TMP_Text title = CreateText(
+                "ActionTitle",
+                rowObject.transform,
+                font,
+                "行动",
+                20f,
+                new Color(0.11f, 0.18f, 0.24f, 1f),
+                TextAlignmentOptions.BottomLeft,
+                new Vector2(0.21f, 0.48f),
+                new Vector2(0.84f, 0.90f));
+            title.fontStyle = FontStyles.Bold;
+            TMP_Text description = CreateText(
+                "ActionDescription",
+                rowObject.transform,
+                font,
+                "行动说明",
+                16f,
+                new Color(0.28f, 0.35f, 0.41f, 1f),
+                TextAlignmentOptions.TopLeft,
+                new Vector2(0.21f, 0.10f),
+                new Vector2(0.88f, 0.48f));
+            description.enableAutoSizing = true;
+            description.fontSizeMin = 13f;
+            description.fontSizeMax = 16f;
+            TMP_Text arrow = CreateText(
+                "ActionArrow",
+                rowObject.transform,
+                font,
+                "›",
+                30f,
+                new Color(0.18f, 0.35f, 0.47f, 1f),
+                TextAlignmentOptions.Center,
+                new Vector2(0.88f, 0.16f),
+                new Vector2(0.98f, 0.84f));
+
+            var serialized = new SerializedObject(
+                rowObject.GetComponent<NpcActionRowView>());
+            SetReference(serialized, "rowButton", button);
+            SetReference(serialized, "iconLabel", icon);
+            SetReference(serialized, "titleLabel", title);
+            SetReference(serialized, "descriptionLabel", description);
+            SetReference(serialized, "arrowLabel", arrow);
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            return rowObject.GetComponent<NpcActionRowView>();
+        }
+
+        private static Scrollbar CreateNpcActionScrollbar(Transform parent)
+        {
+            GameObject scrollbarAsset =
+                AssetDatabase.LoadAssetAtPath<GameObject>(
+                    MinimalistScrollbarPath);
+            if (scrollbarAsset != null)
+            {
+                GameObject instance = PrefabUtility.InstantiatePrefab(
+                    scrollbarAsset,
+                    parent) as GameObject;
+                if (instance != null)
+                {
+                    instance.name = "NpcActionScrollbar";
+                    SetRect(
+                        (RectTransform)instance.transform,
+                        new Vector2(0.965f, 0.025f),
+                        new Vector2(0.995f, 0.975f),
+                        Vector2.zero,
+                        Vector2.zero);
+                    Scrollbar assetScrollbar =
+                        instance.GetComponent<Scrollbar>();
+                    if (assetScrollbar != null)
+                    {
+                        assetScrollbar.direction =
+                            Scrollbar.Direction.BottomToTop;
+                        return assetScrollbar;
+                    }
+                    Object.DestroyImmediate(instance);
+                }
+            }
+
+            GameObject scrollbarObject = CreateUiObject(
+                "NpcActionScrollbar",
+                parent,
+                typeof(CanvasRenderer),
+                typeof(Image),
+                typeof(Scrollbar));
+            SetRect(
+                (RectTransform)scrollbarObject.transform,
+                new Vector2(0.965f, 0.025f),
+                new Vector2(0.995f, 0.975f),
+                Vector2.zero,
+                Vector2.zero);
+            scrollbarObject.GetComponent<Image>().color =
+                new Color(0.34f, 0.43f, 0.50f, 0.24f);
+
+            GameObject slidingArea = CreateUiObject(
+                "SlidingArea",
+                scrollbarObject.transform);
+            SetRect(
+                (RectTransform)slidingArea.transform,
+                Vector2.zero,
+                Vector2.one,
+                new Vector2(2f, 2f),
+                new Vector2(-2f, -2f));
+            GameObject handleObject = CreateUiObject(
+                "Handle",
+                slidingArea.transform,
+                typeof(CanvasRenderer),
+                typeof(Image));
+            SetRect(
+                (RectTransform)handleObject.transform,
+                Vector2.zero,
+                Vector2.one,
+                Vector2.zero,
+                Vector2.zero);
+            Image handle = handleObject.GetComponent<Image>();
+            handle.color = new Color(0.22f, 0.48f, 0.63f, 0.92f);
+            Scrollbar scrollbar = scrollbarObject.GetComponent<Scrollbar>();
+            scrollbar.handleRect = (RectTransform)handleObject.transform;
+            scrollbar.targetGraphic = handle;
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            return scrollbar;
+        }
+
+        private static void ApplyMinimalistButtonVisual(
+            Image targetImage,
+            Button targetButton)
+        {
+            GameObject sourceObject =
+                AssetDatabase.LoadAssetAtPath<GameObject>(
+                    MinimalistActionButtonPath);
+            Image sourceImage = sourceObject?.GetComponent<Image>();
+            Button sourceButton = sourceObject?.GetComponent<Button>();
+            if (sourceImage != null && targetImage != null)
+            {
+                targetImage.sprite = sourceImage.sprite;
+                targetImage.type = sourceImage.type;
+                targetImage.pixelsPerUnitMultiplier =
+                    sourceImage.pixelsPerUnitMultiplier;
+            }
+            if (sourceButton != null && targetButton != null)
+            {
+                targetButton.transition = sourceButton.transition;
+                targetButton.colors = sourceButton.colors;
+            }
         }
 
         private static void CreateMarketColumnHeader(
