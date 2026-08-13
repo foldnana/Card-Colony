@@ -428,7 +428,7 @@ namespace CryingSnow.StackCraft
 
                 // Perform the Equip
                 // Because we set OriginalDefinition above, this won't accidentally double-transform the class.
-                character.EquipperComponent.Equip(itemCard);
+                character.EquipperComponent.Equip(itemCard, notifyStats);
             }
         }
 

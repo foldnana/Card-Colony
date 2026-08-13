@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>背包与横向装备栏布局</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; min-height: 100vh; background: light-dark(#e6ebef, #17232d); }
+    #card-colony-backpack-mockup {
+      color: light-dark(#253746, #e7edf4);
+      font-family: "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      padding: 24px 0;
+    }
+    #card-colony-backpack-mockup * { box-sizing: border-box; }
+    .cc-panel {
+      width: min(100% - 24px, 390px);
+      background: light-dark(#aebfd0, #263645);
+      border: 2px solid light-dark(#7895ad, #55748d);
+      border-radius: 16px;
+      box-shadow: 0 10px 26px light-dark(rgba(31,55,73,.18), rgba(0,0,0,.34));
+      padding: 10px;
+    }
+    .cc-header, .cc-person, .cc-section-head, .cc-equip-row,
+    .cc-detail-head, .cc-detail-actions { display: flex; align-items: center; }
+    .cc-header { justify-content: space-between; padding: 3px 4px 10px; border-bottom: 1px solid light-dark(#7993a9, #4b6479); }
+    .cc-header strong { font-size: 17px; font-weight: 600; }
+    .cc-capacity, .cc-section-head span { color: light-dark(#526f87, #b8cbdc); }
+    .cc-person { gap: 9px; padding: 9px; margin-top: 9px; background: light-dark(#c6d3df, #32485b); border-radius: 11px; }
+    .cc-avatar { width: 44px; height: 44px; flex: 0 0 44px; display: grid; place-items: center; font-size: 25px; background: light-dark(#e9eef3, #1c2b38); border: 2px solid light-dark(#6fa7ce, #70acd6); border-radius: 10px; }
+    .cc-person-copy { flex: 1; min-width: 0; }
+    .cc-person-copy strong { display: block; font-weight: 600; }
+    .cc-person-copy span { color: light-dark(#5c7284, #bdcddd); font-size: 12px; }
+    button { font: inherit; color: inherit; cursor: pointer; }
+    .cc-arrow { width: 31px; height: 31px; border: 1px solid light-dark(#86a0b5, #58758b); background: light-dark(#d9e2ea, #3b5265); border-radius: 8px; }
+    .cc-section { margin-top: 11px; }
+    .cc-section-head { justify-content: space-between; margin: 0 3px 7px; }
+    .cc-section-head strong { font-weight: 600; }
+    .cc-equip-strip { position: relative; overflow: hidden; background: light-dark(#8fa5b7, #1d2b37); border-radius: 11px; padding: 9px 34px; }
+    .cc-equip-row { gap: 7px; transition: transform .2s ease; }
+    .cc-equip-nav { position: absolute; top: 9px; bottom: 9px; width: 27px; border: 0; background: light-dark(#bfccd7, #32495b); z-index: 2; }
+    .cc-equip-nav.prev { left: 4px; border-radius: 8px 2px 2px 8px; }
+    .cc-equip-nav.next { right: 4px; border-radius: 2px 8px 8px 2px; }
+    .cc-equip-slot { width: 92px; min-width: 92px; height: 82px; border: 2px solid transparent; background: light-dark(#dce5ec, #344a5c); border-radius: 9px; padding: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+    .cc-equip-slot.is-selected, .cc-item.is-selected { border-color: light-dark(#cd8b19, #e8b449); background: light-dark(#edf1f4, #40586b); }
+    .cc-equip-slot span { font-size: 12px; }
+    .cc-equip-slot small { color: light-dark(#60778a, #bdcede); }
+    .cc-icon { font-size: 23px; line-height: 1; }
+    .cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; max-height: 236px; overflow-y: auto; padding-right: 6px; }
+    .cc-item { min-width: 0; height: 72px; border: 2px solid transparent; background: light-dark(#d7e1e9, #2f4354); border-radius: 9px; display: grid; grid-template-columns: 32px 1fr; align-items: center; padding: 6px; text-align: left; position: relative; }
+    .cc-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
+    .cc-qty { position: absolute; right: 5px; bottom: 4px; background: light-dark(#61798d, #17232d); color: white; border-radius: 9px; padding: 1px 5px; font-size: 11px; }
+    .cc-detail { margin-top: 10px; padding: 9px; background: light-dark(#c8d5df, #314657); border: 1px solid light-dark(#7f9bb1, #58758c); border-radius: 11px; }
+    .cc-detail-head { gap: 8px; }
+    .cc-detail-title { flex: 1; }
+    .cc-detail-title strong { display: block; font-weight: 600; }
+    .cc-detail-title span { color: light-dark(#5d7385, #bdcede); }
+    .cc-compare { margin: 7px 0; color: light-dark(#465f73, #ccdae5); }
+    .cc-better { color: light-dark(#1b7546, #7fd7a3); }
+    .cc-detail-actions { justify-content: flex-end; gap: 7px; }
+    .cc-action { border: 0; border-radius: 8px; padding: 7px 17px; background: light-dark(#7898b2, #49677e); }
+    .cc-action.primary { color: light-dark(#fff, #18232d); background: light-dark(#277c62, #80c8ac); }
+  </style>
+</head>
+<body>
+<div id="card-colony-backpack-mockup">
+  <section class="cc-panel" aria-label="背包和装备栏布局预览">
+    <div class="cc-header"><strong>背包</strong><span class="cc-capacity">12 / 24</span></div>
+    <div class="cc-person">
+      <button class="cc-arrow" id="cc-prev-person" type="button" aria-label="上一名人物">‹</button>
+      <div class="cc-avatar">人</div>
+      <div class="cc-person-copy"><strong id="cc-person-name">旅行者</strong><span id="cc-person-health">生命 15/15 · 当前换装人物</span></div>
+      <button class="cc-arrow" id="cc-next-person" type="button" aria-label="下一名人物">›</button>
+    </div>
+    <div class="cc-section">
+      <div class="cc-section-head"><strong>当前装备</strong><span>横向滑动 · 3 / 5</span></div>
+      <div class="cc-equip-strip">
+        <button class="cc-equip-nav prev" id="cc-equip-prev" type="button">‹</button>
+        <div class="cc-equip-row" id="cc-equip-row">
+          <button class="cc-equip-slot is-selected" type="button" data-item="木棍" data-type="武器" data-stat="攻击 +1"><b class="cc-icon">⚔</b><span>木棍</span><small>武器</small></button>
+          <button class="cc-equip-slot" type="button" data-item="布衣" data-type="护甲" data-stat="防御 +1"><b class="cc-icon">衣</b><span>布衣</span><small>护甲</small></button>
+          <button class="cc-equip-slot" type="button" data-item="空饰品槽" data-type="饰品" data-stat="尚未装备"><b class="cc-icon">＋</b><span>空槽</span><small>饰品</small></button>
+          <button class="cc-equip-slot" type="button" data-item="空副手槽" data-type="副手" data-stat="扩展槽位示例"><b class="cc-icon">盾</b><span>空槽</span><small>副手</small></button>
+          <button class="cc-equip-slot" type="button" data-item="空护符槽" data-type="护符" data-stat="扩展槽位示例"><b class="cc-icon">◇</b><span>空槽</span><small>护符</small></button>
+        </div>
+        <button class="cc-equip-nav next" id="cc-equip-next" type="button">›</button>
+      </div>
+    </div>
+    <div class="cc-section">
+      <div class="cc-section-head"><strong>携带物品</strong><span>三列 · 向下滚动</span></div>
+      <div class="cc-grid">
+        <button class="cc-item is-selected" type="button" data-item="短剑" data-type="武器" data-stat="攻击 +3" data-compare="比木棍多 2 点攻击"><b class="cc-icon">⚔</b><span class="cc-name">短剑</span><span class="cc-qty">1</span></button>
+        <button class="cc-item" type="button" data-item="浆果" data-type="食物" data-stat="恢复少量体力" data-compare="同类物品已合并"><b class="cc-icon">●</b><span class="cc-name">浆果</span><span class="cc-qty">×3</span></button>
+        <button class="cc-item" type="button" data-item="石料" data-type="材料" data-stat="基础建造材料" data-compare="同类物品已合并"><b class="cc-icon">◆</b><span class="cc-name">石料</span><span class="cc-qty">×4</span></button>
+        <button class="cc-item" type="button" data-item="药品" data-type="消耗品" data-stat="恢复生命" data-compare="可从背包取出使用"><b class="cc-icon">瓶</b><span class="cc-name">药品</span><span class="cc-qty">×2</span></button>
+        <button class="cc-item" type="button" data-item="木材" data-type="材料" data-stat="基础建造材料" data-compare="同类物品已合并"><b class="cc-icon">木</b><span class="cc-name">木材</span><span class="cc-qty">×6</span></button>
+        <button class="cc-item" type="button" data-item="盐" data-type="商品" data-stat="适合跑商交易" data-compare="当前持有 2 份"><b class="cc-icon">□</b><span class="cc-name">盐</span><span class="cc-qty">×2</span></button>
+        <button class="cc-item" type="button" data-item="金币袋" data-type="货币" data-stat="集中存放金币" data-compare="金币不逐张占据格子"><b class="cc-icon">¤</b><span class="cc-name">金币袋</span><span class="cc-qty">15</span></button>
+        <button class="cc-item" type="button" data-item="绳索" data-type="商品" data-stat="旅行用品" data-compare="当前持有 1 份"><b class="cc-icon">∞</b><span class="cc-name">绳索</span><span class="cc-qty">1</span></button>
+        <button class="cc-item" type="button" data-item="空格" data-type="背包槽" data-stat="可以继续存放物品" data-compare=""><b class="cc-icon">＋</b><span class="cc-name">空</span></button>
+      </div>
+    </div>
+    <div class="cc-detail">
+      <div class="cc-detail-head"><b class="cc-icon">⚔</b><div class="cc-detail-title"><strong id="cc-detail-name">短剑 · 武器</strong><span id="cc-detail-stat">攻击 +3</span></div></div>
+      <div class="cc-compare" id="cc-detail-compare"><span class="cc-better">↑ 比木棍多 2 点攻击</span></div>
+      <div class="cc-detail-actions"><button class="cc-action" type="button">取出</button><button class="cc-action primary" type="button">替换装备</button></div>
+    </div>
+  </section>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById('card-colony-backpack-mockup');
+    const people = [['旅行者','生命 15/15 · 当前换装人物'],['猎人','生命 12/12 · 当前换装人物'],['药师','生命 9/10 · 当前换装人物'],['护卫','生命 18/18 · 当前换装人物']];
+    let personIndex = 0, equipmentOffset = 0;
+    const showPerson = () => { root.querySelector('#cc-person-name').textContent = people[personIndex][0]; root.querySelector('#cc-person-health').textContent = people[personIndex][1]; };
+    root.querySelector('#cc-prev-person').onclick = () => { personIndex = (personIndex + people.length - 1) % people.length; showPerson(); };
+    root.querySelector('#cc-next-person').onclick = () => { personIndex = (personIndex + 1) % people.length; showPerson(); };
+    const moveEquipment = delta => { equipmentOffset = Math.max(0, Math.min(2, equipmentOffset + delta)); root.querySelector('#cc-equip-row').style.transform = `translateX(${-equipmentOffset * 99}px)`; };
+    root.querySelector('#cc-equip-prev').onclick = () => moveEquipment(-1);
+    root.querySelector('#cc-equip-next').onclick = () => moveEquipment(1);
+    root.querySelectorAll('.cc-item, .cc-equip-slot').forEach(button => button.onclick = () => {
+      root.querySelectorAll('.cc-item, .cc-equip-slot').forEach(candidate => candidate.classList.remove('is-selected'));
+      button.classList.add('is-selected');
+      root.querySelector('#cc-detail-name').textContent = `${button.dataset.item} · ${button.dataset.type}`;
+      root.querySelector('#cc-detail-stat').textContent = button.dataset.stat;
+      root.querySelector('#cc-detail-compare').innerHTML = button.dataset.compare ? `<span class="cc-better">↑ ${button.dataset.compare}</span>` : '选择物品后显示属性与操作';
+    });
+  })();
+</script>
+</body>
+</html>

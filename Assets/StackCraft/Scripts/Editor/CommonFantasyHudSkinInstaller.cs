@@ -533,7 +533,8 @@ namespace CryingSnow.StackCraft.EditorTools
                     StyleImage(drawerImage, panelSprite, ContentNavy);
             }
 
-            if (FindDescendant(root, "BackpackSidebarPageV2") != null ||
+            if (FindDescendant(root, "BackpackSidebarPageV3") != null ||
+                FindDescendant(root, "BackpackSidebarPageV2") != null ||
                 FindDescendant(root, "BackpackDrawerLayoutV1") != null)
                 return;
 

@@ -34,6 +34,15 @@ namespace CryingSnow.StackCraft
         [SerializeField] private TMP_Text selectedNameLabel;
         [SerializeField] private TMP_Text selectedTypeLabel;
         [SerializeField] private TMP_Text selectedDescriptionLabel;
+        [SerializeField] private TMP_Text characterNameLabel;
+        [SerializeField] private TMP_Text characterHealthLabel;
+        [SerializeField] private RawImage characterPortrait;
+        [SerializeField] private Button previousCharacterButton;
+        [SerializeField] private Button nextCharacterButton;
+        [SerializeField] private RectTransform equipmentSlotsRoot;
+        [SerializeField] private BackpackEquipmentSlotView equipmentSlotTemplate;
+        [SerializeField] private Button equipButton;
+        [SerializeField] private TMP_Text equipButtonLabel;
         [SerializeField] private RectTransform worldCardDragPreview;
         [SerializeField] private Image worldCardDragHeader;
         [SerializeField] private RawImage worldCardDragArt;
@@ -55,6 +64,8 @@ namespace CryingSnow.StackCraft
         private int originalWorldCullingMask;
         private int originalWorldEventMask;
         private string selectedEntryId;
+        private EquipmentSlot? selectedEquipmentSlot;
+        private readonly List<BackpackEquipmentSlotView> equipmentSlotViews = new();
         private CardInstance previewedWorldCard;
 
         private void Awake()
@@ -71,7 +82,11 @@ namespace CryingSnow.StackCraft
                 openButton?.onClick.AddListener(Toggle);
             closeButton?.onClick.AddListener(Close);
             arrangeButton?.onClick.AddListener(BackpackService.Arrange);
+            previousCharacterButton?.onClick.AddListener(SelectPreviousCharacter);
+            nextCharacterButton?.onClick.AddListener(SelectNextCharacter);
+            equipButton?.onClick.AddListener(HandleEquipmentAction);
             BackpackService.Changed += Refresh;
+            PartySelectionService.SelectionChanged += HandlePartySelectionChanged;
             ToggleView(tabToggle != null && tabToggle.isOn);
             Refresh();
         }
@@ -85,7 +100,11 @@ namespace CryingSnow.StackCraft
             openButton?.onClick.RemoveListener(Toggle);
             closeButton?.onClick.RemoveListener(Close);
             arrangeButton?.onClick.RemoveListener(BackpackService.Arrange);
+            previousCharacterButton?.onClick.RemoveListener(SelectPreviousCharacter);
+            nextCharacterButton?.onClick.RemoveListener(SelectNextCharacter);
+            equipButton?.onClick.RemoveListener(HandleEquipmentAction);
             BackpackService.Changed -= Refresh;
+            PartySelectionService.SelectionChanged -= HandlePartySelectionChanged;
 
             if (board3D != null)
             {
@@ -154,6 +173,7 @@ namespace CryingSnow.StackCraft
         {
             int count = backpack?.Count ?? 0;
             int capacity = backpack?.Capacity ?? 8;
+            RefreshSelectedCharacter();
             if (openButtonLabel != null)
                 openButtonLabel.text = $"背包  {count}/{capacity}";
             if (capacityLabel != null)
@@ -876,7 +896,7 @@ namespace CryingSnow.StackCraft
             float height = rows * grid.cellSize.y + (rows - 1) * grid.spacing.y;
             slotsRoot.sizeDelta = new Vector2(
                 slotsRoot.sizeDelta.x,
-                Mathf.Max(502f, height));
+                Mathf.Max(420f, height));
         }
 
         internal void SelectItem(
@@ -885,6 +905,9 @@ namespace CryingSnow.StackCraft
             CardDefinition definition)
         {
             selectedEntryId = entry?.InstanceId;
+            selectedEquipmentSlot = null;
+            foreach (BackpackEquipmentSlotView view in equipmentSlotViews)
+                view?.SetSelected(false);
             if (slotsRoot != null)
             {
                 foreach (BackpackItemView item in
@@ -920,11 +943,49 @@ namespace CryingSnow.StackCraft
                 }
                 selectedDescriptionLabel.text = description;
             }
+            RefreshEquipmentAction(definition);
+        }
+
+        internal void SelectEquipmentSlot(
+            BackpackEquipmentSlotView selectedView,
+            EquipmentSlot slot,
+            CardData equippedItem,
+            CardDefinition definition)
+        {
+            selectedEntryId = null;
+            selectedEquipmentSlot = slot;
+            foreach (BackpackEquipmentSlotView view in equipmentSlotViews)
+                view?.SetSelected(view == selectedView);
+            if (slotsRoot != null)
+            {
+                foreach (BackpackItemView item in
+                         slotsRoot.GetComponentsInChildren<BackpackItemView>(true))
+                    item.SetSelected(false);
+            }
+
+            if (selectedNameLabel != null)
+                selectedNameLabel.text = definition != null
+                    ? definition.DisplayName
+                    : $"空{BackpackEquipmentSlotView.SlotLabel(slot)}槽";
+            if (selectedTypeLabel != null)
+                selectedTypeLabel.text = BackpackEquipmentSlotView.SlotLabel(slot);
+            if (selectedDescriptionLabel != null)
+                selectedDescriptionLabel.text = definition != null &&
+                    !string.IsNullOrWhiteSpace(definition.Description)
+                    ? definition.Description
+                    : "从下方背包中选择对应装备。";
+            if (equipButton != null)
+                equipButton.gameObject.SetActive(equippedItem != null);
+            if (equipButtonLabel != null)
+                equipButtonLabel.text = "卸下";
         }
 
         private void ClearSelectionDetails()
         {
             selectedEntryId = null;
+            selectedEquipmentSlot = null;
+            if (equipButton != null)
+                equipButton.gameObject.SetActive(false);
             if (selectedNameLabel != null)
                 selectedNameLabel.text = "选择一个物品";
             if (selectedTypeLabel != null)
@@ -932,6 +993,356 @@ namespace CryingSnow.StackCraft
             if (selectedDescriptionLabel != null)
                 selectedDescriptionLabel.text =
                     "拖到场地取出；拖到其他格子交换位置。";
+        }
+
+        private void RefreshSelectedCharacter()
+        {
+            List<CardData> members = GameDirector.Instance?.GameData?.PartyMembers?
+                .Where(member => member != null)
+                .Take(GameData.MaximumPartySize)
+                .ToList() ?? new List<CardData>();
+            PartySelectionService.EnsureValidSelection(
+                members,
+                GameDirector.Instance?.GameData?.ProtagonistPersistentId);
+            CardData member = members.FirstOrDefault(candidate =>
+                candidate.PersistentId == PartySelectionService.SelectedPersistentId);
+            CardDefinition definition = ResolveDefinition(member?.Id);
+            if (characterNameLabel != null)
+                characterNameLabel.text = definition?.DisplayName ?? "未选择人物";
+            if (characterHealthLabel != null)
+            {
+                int maximum = Mathf.Max(1, member?.MaximumHealth ?? 1);
+                characterHealthLabel.text = member == null
+                    ? "请从左侧小队选择人物"
+                    : $"生命 {Mathf.Max(0, member.CurrentHealth)}/{maximum} · 当前换装人物";
+            }
+            if (characterPortrait != null)
+            {
+                characterPortrait.texture = definition?.ArtTexture;
+                characterPortrait.enabled = characterPortrait.texture != null;
+            }
+            if (previousCharacterButton != null)
+                previousCharacterButton.interactable = members.Count > 1;
+            if (nextCharacterButton != null)
+                nextCharacterButton.interactable = members.Count > 1;
+            RebuildEquipmentSlots(member);
+        }
+
+        private void RebuildEquipmentSlots(CardData member)
+        {
+            foreach (BackpackEquipmentSlotView view in equipmentSlotViews)
+            {
+                if (view != null && view != equipmentSlotTemplate)
+                {
+                    view.gameObject.SetActive(false);
+                    if (Application.isPlaying)
+                        Destroy(view.gameObject);
+                    else
+                        DestroyImmediate(view.gameObject);
+                }
+            }
+            equipmentSlotViews.Clear();
+            if (equipmentSlotsRoot == null || equipmentSlotTemplate == null)
+                return;
+
+            equipmentSlotTemplate.gameObject.SetActive(false);
+            foreach (Transform child in equipmentSlotsRoot.Cast<Transform>().ToList())
+            {
+                if (child != equipmentSlotTemplate.transform &&
+                    child.name.StartsWith("EquipmentSlot_"))
+                {
+                    child.gameObject.SetActive(false);
+                    if (Application.isPlaying)
+                        Destroy(child.gameObject);
+                    else
+                        DestroyImmediate(child.gameObject);
+                }
+            }
+            if (member != null)
+                member.EquippedItems ??= new List<CardData>();
+            foreach (EquipmentSlot slot in System.Enum.GetValues(typeof(EquipmentSlot)))
+            {
+                BackpackEquipmentSlotView view = Instantiate(
+                    equipmentSlotTemplate,
+                    equipmentSlotsRoot);
+                view.name = $"EquipmentSlot_{slot}";
+                view.gameObject.SetActive(true);
+                CardData item = member?.EquippedItems.FirstOrDefault(candidate =>
+                    ResolveDefinition(candidate?.Id)?.EquipmentSlot == slot);
+                view.Bind(slot, item, ResolveDefinition(item?.Id), this);
+                equipmentSlotViews.Add(view);
+            }
+        }
+
+        private void RefreshEquipmentAction(CardDefinition definition)
+        {
+            bool isEquipment = definition?.Category == CardCategory.Equipment;
+            if (equipButton != null)
+                equipButton.gameObject.SetActive(isEquipment);
+            if (equipButtonLabel != null)
+                equipButtonLabel.text = isEquipment ? "装备" : string.Empty;
+        }
+
+        private void HandleEquipmentAction()
+        {
+            if (IsPlayerCombatActive)
+            {
+                if (selectedDescriptionLabel != null)
+                    selectedDescriptionLabel.text = "战斗中无法更换装备。";
+                return;
+            }
+
+            CardData member = ResolveSelectedMember();
+            BackpackData backpack = BackpackService.Current;
+            CardInstance liveMember = CardManager.Instance?.AllCards.FirstOrDefault(
+                card => card != null && card.PersistentId == member?.PersistentId);
+            bool changed = selectedEquipmentSlot.HasValue
+                ? TryUnequipSelected(backpack, member, liveMember)
+                : TryEquipSelected(backpack, member, liveMember);
+            if (!changed)
+                return;
+
+            BackpackService.NotifyContentsChanged();
+            selectedEntryId = null;
+            selectedEquipmentSlot = null;
+            Refresh();
+        }
+
+        private bool TryEquipSelected(
+            BackpackData backpack,
+            CardData member,
+            CardInstance liveMember)
+        {
+            BackpackEntryData entry = backpack?.Find(selectedEntryId);
+            CardDefinition definition = ResolveDefinition(entry?.Card?.Id);
+            if (liveMember?.EquipperComponent == null || definition == null)
+            {
+                CardData simulated = SimulateEquipmentChange(
+                    member,
+                    definition?.EquipmentSlot,
+                    entry?.Card,
+                    remove: false);
+                if (simulated == null || !BackpackEquipmentTransfer.TryEquip(
+                    backpack,
+                    member,
+                    selectedEntryId,
+                    ResolveEquipmentSlot))
+                {
+                    return false;
+                }
+                CopySerializedMemberState(member, simulated);
+                return true;
+            }
+
+            if (entry == null || entry.IsReserved ||
+                definition.Category != CardCategory.Equipment)
+                return false;
+
+            CardInstance incoming = CardManager.Instance.RestoreUnmanagedCardFromData(
+                entry.Card,
+                Vector3.zero);
+            if (!liveMember.EquipperComponent.CanEquip(incoming))
+            {
+                DestroyRestoredCards(new[] { incoming });
+                return false;
+            }
+            EquipmentSlot slot = definition.EquipmentSlot;
+            CardInstance equippedBeforeChange = liveMember.EquipperComponent
+                .EquippedCards.FirstOrDefault(card =>
+                    card != null && card.Definition.EquipmentSlot == slot);
+            if (!backpack.TryRemove(selectedEntryId, out _))
+            {
+                DestroyRestoredCards(new[] { incoming });
+                return false;
+            }
+            CardInstance previous = liveMember.EquipperComponent
+                .UnequipToInventory(slot);
+            if (equippedBeforeChange != null && previous == null)
+            {
+                backpack.Entries.Add(entry);
+                backpack.Normalize();
+                DestroyRestoredCards(new[] { incoming });
+                return false;
+            }
+            BackpackEntryData previousBackpackEntry = null;
+            if (previous != null)
+                backpack.TryAdd(new CardData(previous), out previousBackpackEntry);
+            if (!liveMember.EquipperComponent.Equip(incoming))
+            {
+                if (previousBackpackEntry != null)
+                    backpack.TryRemove(previousBackpackEntry.InstanceId, out _);
+                backpack.Entries.Add(entry);
+                backpack.Normalize();
+                if (previous != null)
+                    liveMember.EquipperComponent.Equip(previous, notify: false);
+                DestroyRestoredCards(new[] { incoming });
+                return false;
+            }
+            if (previous != null)
+                Destroy(previous.gameObject);
+            CopyLiveMemberState(member, liveMember);
+            return true;
+        }
+
+        private bool TryUnequipSelected(
+            BackpackData backpack,
+            CardData member,
+            CardInstance liveMember)
+        {
+            if (!selectedEquipmentSlot.HasValue)
+                return false;
+            if (liveMember?.EquipperComponent == null)
+            {
+                CardData simulated = SimulateEquipmentChange(
+                    member,
+                    selectedEquipmentSlot.Value,
+                    incoming: null,
+                    remove: true);
+                if (simulated == null || !BackpackEquipmentTransfer.TryUnequip(
+                    backpack,
+                    member,
+                    selectedEquipmentSlot.Value,
+                    ResolveEquipmentSlot))
+                {
+                    return false;
+                }
+                CopySerializedMemberState(member, simulated);
+                return true;
+            }
+
+            CardInstance equipment = liveMember.EquipperComponent
+                .UnequipToInventory(selectedEquipmentSlot.Value);
+            if (equipment == null)
+                return false;
+            if (!backpack.TryAdd(new CardData(equipment), out _))
+            {
+                liveMember.EquipperComponent.Equip(equipment);
+                return false;
+            }
+            Destroy(equipment.gameObject);
+            CopyLiveMemberState(member, liveMember);
+            return true;
+        }
+
+        private static void CopyLiveMemberState(CardData destination, CardInstance source)
+        {
+            if (destination == null || source == null)
+                return;
+            CardData snapshot = new(source);
+            CopySerializedMemberState(destination, snapshot);
+        }
+
+        private static void CopySerializedMemberState(
+            CardData destination,
+            CardData snapshot)
+        {
+            if (destination == null || snapshot == null)
+                return;
+            destination.Id = snapshot.Id;
+            destination.OriginalId = snapshot.OriginalId;
+            destination.CurrentHealth = snapshot.CurrentHealth;
+            destination.MaximumHealth = snapshot.MaximumHealth;
+            destination.EquippedItems = snapshot.EquippedItems;
+        }
+
+        private static CardData SimulateEquipmentChange(
+            CardData member,
+            EquipmentSlot? slot,
+            CardData incoming,
+            bool remove)
+        {
+            if (member == null || !slot.HasValue || CardManager.Instance == null)
+                return null;
+
+            CardData candidate = CloneCardData(member);
+            candidate.Id = !string.IsNullOrWhiteSpace(member.OriginalId)
+                ? member.OriginalId
+                : member.Id;
+            candidate.OriginalId = null;
+            candidate.EquippedItems.RemoveAll(item =>
+                ResolveEquipmentSlot(item?.Id) == slot);
+            if (!remove)
+            {
+                if (incoming == null ||
+                    ResolveEquipmentSlot(incoming.Id) != slot)
+                    return null;
+                candidate.EquippedItems.Add(CloneCardData(incoming));
+            }
+
+            CardInstance simulated = CardManager.Instance
+                .RestoreUnmanagedCardFromData(candidate, Vector3.zero);
+            if (simulated == null)
+                return null;
+            CardData snapshot = new(simulated);
+            DestroyRestoredCards(new[] { simulated });
+            return snapshot;
+        }
+
+        private static CardData CloneCardData(CardData source)
+        {
+            if (source == null)
+                return null;
+            return new CardData
+            {
+                Id = source.Id,
+                PersistentId = source.PersistentId,
+                UsesLeft = source.UsesLeft,
+                CurrentHealth = source.CurrentHealth,
+                MaximumHealth = source.MaximumHealth,
+                CurrentNutrition = source.CurrentNutrition,
+                StoredCoins = source.StoredCoins,
+                IsLocationRandomSpawn = source.IsLocationRandomSpawn,
+                Level = source.Level,
+                Experience = source.Experience,
+                CurrentEnergy = source.CurrentEnergy,
+                MaxEnergy = source.MaxEnergy,
+                IsDowned = source.IsDowned,
+                OriginalId = source.OriginalId,
+                EquippedItems = source.EquippedItems?
+                    .Where(item => item != null)
+                    .Select(CloneCardData)
+                    .ToList() ?? new List<CardData>()
+            };
+        }
+
+        private CardData ResolveSelectedMember()
+        {
+            return GameDirector.Instance?.GameData?.PartyMembers?.FirstOrDefault(
+                member => member != null && member.PersistentId ==
+                    PartySelectionService.SelectedPersistentId);
+        }
+
+        private static EquipmentSlot? ResolveEquipmentSlot(string id)
+        {
+            CardDefinition definition = ResolveDefinition(id);
+            return definition?.Category == CardCategory.Equipment
+                ? definition.EquipmentSlot
+                : null;
+        }
+
+        private void SelectPreviousCharacter() => SelectAdjacentCharacter(-1);
+        private void SelectNextCharacter() => SelectAdjacentCharacter(1);
+
+        private void SelectAdjacentCharacter(int direction)
+        {
+            List<CardData> members = GameDirector.Instance?.GameData?.PartyMembers?
+                .Where(member => member != null &&
+                    !string.IsNullOrWhiteSpace(member.PersistentId))
+                .Take(GameData.MaximumPartySize)
+                .ToList() ?? new List<CardData>();
+            if (members.Count == 0)
+                return;
+            int current = members.FindIndex(member => member.PersistentId ==
+                PartySelectionService.SelectedPersistentId);
+            int next = (Mathf.Max(0, current) + direction + members.Count) %
+                members.Count;
+            PartySelectionService.Select(members[next].PersistentId);
+        }
+
+        private void HandlePartySelectionChanged(string persistentId)
+        {
+            if (IsOpen)
+                Refresh();
         }
 
         private static string CategoryLabel(CardCategory? category)

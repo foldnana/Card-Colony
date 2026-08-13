@@ -46,10 +46,16 @@ namespace CryingSnow.StackCraft
         /// <item><description>Recalculates all active stat modifiers to ensure the new base stats are modified correctly.</description></item>
         /// </list>
         /// </remarks>
-        public bool Equip(CardInstance equipmentCard)
+        public bool CanEquip(CardInstance equipmentCard)
         {
-            if (equipmentCard.EquipmentComponent == null) return false;
-            if (equipmentPanel == null) return false;
+            return equipmentCard != null &&
+                equipmentCard.EquipmentComponent != null &&
+                equipmentPanel != null;
+        }
+
+        public bool Equip(CardInstance equipmentCard, bool notify = true)
+        {
+            if (!CanEquip(equipmentCard)) return false;
 
             var slot = equipmentCard.Definition.EquipmentSlot;
 
@@ -102,7 +108,8 @@ namespace CryingSnow.StackCraft
             }
 
             _card.UpdateStatDisplays();
-            CardManager.Instance?.NotifyCardEquipped(equipmentCard.Definition);
+            if (notify)
+                CardManager.Instance?.NotifyCardEquipped(equipmentCard.Definition);
             return true;
         }
 
@@ -116,8 +123,22 @@ namespace CryingSnow.StackCraft
         /// </remarks>
         public void Unequip(EquipmentSlot slot)
         {
-            if (!_equippedItems.TryGetValue(slot, out var equipmentToDrop)) return;
-            if (equipmentPanel == null) return;
+            UnequipInternal(slot, returnToBoard: true);
+        }
+
+        public CardInstance UnequipToInventory(EquipmentSlot slot)
+        {
+            return UnequipInternal(slot, returnToBoard: false);
+        }
+
+        private CardInstance UnequipInternal(
+            EquipmentSlot slot,
+            bool returnToBoard)
+        {
+            if (!_equippedItems.TryGetValue(slot, out var equipmentToDrop))
+                return null;
+            if (equipmentPanel == null)
+                return null;
 
             foreach (var modifier in equipmentToDrop.Definition.StatModifiers)
             {
@@ -159,9 +180,11 @@ namespace CryingSnow.StackCraft
 
             equipmentToDrop.EquipmentComponent.OnUnequipped();
 
-            CardManager.Instance?.ReturnCardToBoard(equipmentToDrop);
+            if (returnToBoard)
+                CardManager.Instance?.ReturnCardToBoard(equipmentToDrop);
 
             _card.UpdateStatDisplays();
+            return equipmentToDrop;
         }
 
         /// <summary>

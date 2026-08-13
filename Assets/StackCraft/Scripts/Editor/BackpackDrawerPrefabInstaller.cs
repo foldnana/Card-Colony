@@ -13,7 +13,7 @@ namespace CryingSnow.StackCraft.EditorTools
     {
         private const string UiRootPath =
             "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
-        private const string VersionMarker = "BackpackSidebarPageV2";
+        private const string VersionMarker = "BackpackSidebarPageV3";
 
         static BackpackDrawerPrefabInstaller()
         {
@@ -65,6 +65,16 @@ namespace CryingSnow.StackCraft.EditorTools
                 EnsurePickupHint(drawer, capacity.font);
 
                 TMP_FontAsset font = capacity.font;
+                EnsureCharacterEquipmentArea(
+                    drawer,
+                    font,
+                    out TMP_Text characterName,
+                    out TMP_Text characterHealth,
+                    out RawImage characterPortrait,
+                    out Button previousCharacter,
+                    out Button nextCharacter,
+                    out RectTransform equipmentSlots,
+                    out BackpackEquipmentSlotView equipmentSlotTemplate);
                 ConfigureDragLayer(dragLayer);
                 EnsureWorldCardDragPreview(
                     dragLayer,
@@ -109,6 +119,24 @@ namespace CryingSnow.StackCraft.EditorTools
                 selectedDescription.text = "拖到场地取出；拖到其他格子交换位置。";
                 selectedDescription.enableWordWrapping = true;
 
+                Button equipButton = EnsureButton(
+                    details,
+                    "BackpackEquipmentActionButton",
+                    font,
+                    "装备");
+                SetAnchored(
+                    (RectTransform)equipButton.transform,
+                    new Vector2(-10f, 10f),
+                    new Vector2(104f, 38f),
+                    Vector2.one,
+                    Vector2.one);
+                StyleFlatButton(
+                    equipButton,
+                    new Color(0.20f, 0.54f, 0.40f, 1f),
+                    new Color(0.28f, 0.66f, 0.50f, 1f),
+                    Color.white);
+                equipButton.gameObject.SetActive(false);
+
                 EnsureMarker(backpackRoot);
                 var serialized = new SerializedObject(view);
                 SetReference(serialized, "openButton", null);
@@ -127,6 +155,18 @@ namespace CryingSnow.StackCraft.EditorTools
                     serialized,
                     "selectedDescriptionLabel",
                     selectedDescription);
+                SetReference(serialized, "characterNameLabel", characterName);
+                SetReference(serialized, "characterHealthLabel", characterHealth);
+                SetReference(serialized, "characterPortrait", characterPortrait);
+                SetReference(serialized, "previousCharacterButton", previousCharacter);
+                SetReference(serialized, "nextCharacterButton", nextCharacter);
+                SetReference(serialized, "equipmentSlotsRoot", equipmentSlots);
+                SetReference(serialized, "equipmentSlotTemplate", equipmentSlotTemplate);
+                SetReference(serialized, "equipButton", equipButton);
+                SetReference(
+                    serialized,
+                    "equipButtonLabel",
+                    equipButton.GetComponentInChildren<TMP_Text>(true));
                 SetReference(serialized, "worldCardDragPreview", worldCardPreview);
                 SetReference(serialized, "worldCardDragHeader", worldCardHeader);
                 SetReference(serialized, "worldCardDragArt", worldCardArt);
@@ -178,6 +218,10 @@ namespace CryingSnow.StackCraft.EditorTools
                 Require(drawer, "BackpackSelectedType");
                 Require(drawer, "BackpackSelectedDescription");
                 Require(drawer, "BackpackPickupHint");
+                Require(drawer, "BackpackCharacterHeader");
+                Require(drawer, "BackpackEquipmentViewport");
+                Require(drawer, "BackpackEquipmentSlots");
+                Require(drawer, "EquipmentSlotTemplate");
                 Transform dragLayer = Require(root.transform, "BackpackDragLayer");
                 Transform worldPreview = Require(
                     dragLayer,
@@ -192,18 +236,19 @@ namespace CryingSnow.StackCraft.EditorTools
                 if (drawer.parent != menuPanel ||
                     drawer.anchorMin != Vector2.zero ||
                     drawer.anchorMax != Vector2.one ||
-                    drawer.anchoredPosition != new Vector2(0f, -30f) ||
-                    drawer.sizeDelta != new Vector2(0f, -60f))
+                    drawer.offsetMin != new Vector2(14f, 14f) ||
+                    drawer.offsetMax != new Vector2(-14f, -72f))
                 {
                     throw new System.InvalidOperationException(
                         "Backpack sidebar page is not serialized correctly.");
                 }
-                if (grid.constraintCount != 2)
+                if (grid.constraintCount != 3)
                 {
                     throw new System.InvalidOperationException(
-                        "Backpack drawer must use two icon columns.");
+                        "Backpack drawer must use three compact icon columns.");
                 }
-                if (grid.cellSize.x < 168f || grid.cellSize.y < 140f)
+                if (grid.cellSize.x < 96f || grid.cellSize.x > 116f ||
+                    grid.cellSize.y < 88f || grid.cellSize.y > 112f)
                 {
                     throw new System.InvalidOperationException(
                         "Backpack drawer item cells are too small.");
@@ -226,6 +271,15 @@ namespace CryingSnow.StackCraft.EditorTools
                              "selectedNameLabel",
                              "selectedTypeLabel",
                              "selectedDescriptionLabel",
+                             "characterNameLabel",
+                             "characterHealthLabel",
+                             "characterPortrait",
+                             "previousCharacterButton",
+                             "nextCharacterButton",
+                             "equipmentSlotsRoot",
+                             "equipmentSlotTemplate",
+                             "equipButton",
+                             "equipButtonLabel",
                              "worldCardDragPreview",
                              "worldCardDragHeader",
                              "worldCardDragArt",
@@ -328,8 +382,8 @@ namespace CryingSnow.StackCraft.EditorTools
             drawer.anchorMin = Vector2.zero;
             drawer.anchorMax = Vector2.one;
             drawer.pivot = new Vector2(0.5f, 0.5f);
-            drawer.anchoredPosition = new Vector2(0f, -30f);
-            drawer.sizeDelta = new Vector2(0f, -60f);
+            drawer.offsetMin = new Vector2(14f, 14f);
+            drawer.offsetMax = new Vector2(-14f, -72f);
             drawer.localScale = Vector3.one;
             Image panelImage = drawer.GetComponent<Image>();
             panelImage.enabled = true;
@@ -531,7 +585,7 @@ namespace CryingSnow.StackCraft.EditorTools
         private static void ConfigureSlots(RectTransform slots)
         {
             RectTransform viewport = slots.parent as RectTransform;
-            SetStretch(viewport, 12f, 12f, 256f, 80f);
+            SetStretch(viewport, 12f, 12f, 220f, 330f);
             Image viewportImage = viewport.GetComponent<Image>();
             viewportImage.sprite = null;
             viewportImage.color = new Color(0.01f, 0.025f, 0.04f, 0.36f);
@@ -540,12 +594,12 @@ namespace CryingSnow.StackCraft.EditorTools
             slots.anchorMax = new Vector2(1f, 1f);
             slots.pivot = new Vector2(0.5f, 1f);
             slots.anchoredPosition = new Vector2(0f, -8f);
-            slots.sizeDelta = new Vector2(-16f, 502f);
+            slots.sizeDelta = new Vector2(-16f, 420f);
             GridLayoutGroup grid = slots.GetComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(172f, 146f);
-            grid.spacing = new Vector2(10f, 10f);
+            grid.cellSize = new Vector2(106f, 98f);
+            grid.spacing = new Vector2(8f, 8f);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-            grid.constraintCount = 2;
+            grid.constraintCount = 3;
             grid.childAlignment = TextAnchor.UpperCenter;
 
             foreach (Transform slot in slots)
@@ -561,6 +615,261 @@ namespace CryingSnow.StackCraft.EditorTools
                     slot.gameObject,
                     new Color(0.24f, 0.34f, 0.42f, 0.72f),
                     new Vector2(1f, -1f));
+            }
+        }
+
+        private static void EnsureCharacterEquipmentArea(
+            RectTransform drawer,
+            TMP_FontAsset font,
+            out TMP_Text characterName,
+            out TMP_Text characterHealth,
+            out RawImage characterPortrait,
+            out Button previousCharacter,
+            out Button nextCharacter,
+            out RectTransform equipmentSlots,
+            out BackpackEquipmentSlotView equipmentSlotTemplate)
+        {
+            RectTransform header = EnsurePanel(
+                drawer,
+                "BackpackCharacterHeader",
+                new Color(0.16f, 0.25f, 0.33f, 0.96f));
+            SetAnchored(
+                header,
+                new Vector2(12f, -50f),
+                new Vector2(-24f, 66f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            header.anchorMax = new Vector2(1f, 1f);
+
+            previousCharacter = EnsureButton(
+                header,
+                "BackpackPreviousCharacter",
+                font,
+                "<");
+            SetAnchored(
+                (RectTransform)previousCharacter.transform,
+                new Vector2(8f, -8f),
+                new Vector2(38f, 50f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            nextCharacter = EnsureButton(
+                header,
+                "BackpackNextCharacter",
+                font,
+                ">");
+            SetAnchored(
+                (RectTransform)nextCharacter.transform,
+                new Vector2(-8f, -8f),
+                new Vector2(38f, 50f),
+                new Vector2(1f, 1f),
+                new Vector2(1f, 1f));
+
+            RectTransform portraitRect = EnsurePanel(
+                header,
+                "BackpackCharacterPortraitFrame",
+                new Color(0.82f, 0.87f, 0.91f, 1f));
+            SetAnchored(
+                portraitRect,
+                new Vector2(54f, -8f),
+                new Vector2(50f, 50f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            Transform portraitTransform = Find(portraitRect, "Portrait");
+            if (portraitTransform == null)
+            {
+                var portraitObject = new GameObject(
+                    "Portrait",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(RawImage));
+                portraitObject.transform.SetParent(portraitRect, false);
+                characterPortrait = portraitObject.GetComponent<RawImage>();
+            }
+            else
+                characterPortrait = portraitTransform.GetComponent<RawImage>();
+            SetStretch(characterPortrait.rectTransform, 4f, 4f, 4f, 4f);
+            characterPortrait.raycastTarget = false;
+
+            characterName = EnsureText(
+                header,
+                "BackpackCharacterName",
+                font,
+                19f,
+                new Color(0.90f, 0.94f, 0.97f, 1f));
+            SetAnchored(
+                characterName.rectTransform,
+                new Vector2(114f, -8f),
+                new Vector2(-168f, 26f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            characterName.rectTransform.anchorMax = new Vector2(1f, 1f);
+            characterHealth = EnsureText(
+                header,
+                "BackpackCharacterHealth",
+                font,
+                14f,
+                new Color(0.68f, 0.78f, 0.86f, 1f));
+            SetAnchored(
+                characterHealth.rectTransform,
+                new Vector2(114f, -35f),
+                new Vector2(-168f, 20f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            characterHealth.rectTransform.anchorMax = new Vector2(1f, 1f);
+
+            TMP_Text equipmentTitle = EnsureText(
+                drawer,
+                "BackpackEquipmentTitle",
+                font,
+                17f,
+                new Color(0.88f, 0.92f, 0.95f, 1f));
+            equipmentTitle.text = "当前装备  ·  横向滑动";
+            SetAnchored(
+                equipmentTitle.rectTransform,
+                new Vector2(14f, -122f),
+                new Vector2(-28f, 26f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            equipmentTitle.rectTransform.anchorMax = new Vector2(1f, 1f);
+
+            RectTransform viewport = EnsurePanel(
+                drawer,
+                "BackpackEquipmentViewport",
+                new Color(0.08f, 0.14f, 0.19f, 0.82f));
+            if (viewport.GetComponent<RectMask2D>() == null)
+                viewport.gameObject.AddComponent<RectMask2D>();
+            ScrollRect scroll = viewport.GetComponent<ScrollRect>();
+            if (scroll == null)
+                scroll = viewport.gameObject.AddComponent<ScrollRect>();
+            SetAnchored(
+                viewport,
+                new Vector2(12f, -150f),
+                new Vector2(-24f, 104f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            viewport.anchorMax = new Vector2(1f, 1f);
+
+            RectTransform content = EnsurePanel(
+                viewport,
+                "BackpackEquipmentSlots",
+                Color.clear);
+            content.anchorMin = new Vector2(0f, 0f);
+            content.anchorMax = new Vector2(0f, 1f);
+            content.pivot = new Vector2(0f, 0.5f);
+            content.anchoredPosition = new Vector2(8f, 0f);
+            content.sizeDelta = new Vector2(380f, -12f);
+            HorizontalLayoutGroup layout = content.GetComponent<HorizontalLayoutGroup>();
+            if (layout == null)
+                layout = content.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.padding = new RectOffset(0, 8, 0, 0);
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = false;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+            ContentSizeFitter fitter = content.GetComponent<ContentSizeFitter>();
+            if (fitter == null)
+                fitter = content.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+            fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+            scroll.viewport = viewport;
+            scroll.content = content;
+            scroll.horizontal = true;
+            scroll.vertical = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 28f;
+            equipmentSlots = content;
+
+            foreach (Transform child in content.Cast<Transform>().ToArray())
+            {
+                if (child.name.StartsWith("EquipmentSlot_"))
+                    Object.DestroyImmediate(child.gameObject);
+            }
+
+            Transform templateTransform = Find(content, "EquipmentSlotTemplate");
+            GameObject template;
+            if (templateTransform == null)
+            {
+                template = new GameObject(
+                    "EquipmentSlotTemplate",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image),
+                    typeof(LayoutElement),
+                    typeof(BackpackEquipmentSlotView));
+                template.transform.SetParent(content, false);
+            }
+            else
+                template = templateTransform.gameObject;
+            RectTransform templateRect = (RectTransform)template.transform;
+            templateRect.sizeDelta = new Vector2(96f, 88f);
+            LayoutElement element = template.GetComponent<LayoutElement>();
+            element.preferredWidth = 96f;
+            element.preferredHeight = 88f;
+            Image templateImage = template.GetComponent<Image>();
+            templateImage.color = new Color(0.20f, 0.30f, 0.39f, 1f);
+            templateImage.raycastTarget = true;
+            Outline outline = template.GetComponent<Outline>();
+            if (outline == null)
+                outline = template.AddComponent<Outline>();
+            outline.effectColor = new Color(0.94f, 0.68f, 0.22f, 1f);
+            outline.effectDistance = new Vector2(2f, -2f);
+            outline.enabled = false;
+
+            RawImage art = EnsureRawImage(templateRect, "Art");
+            SetAnchored(
+                art.rectTransform,
+                new Vector2(0f, -5f),
+                new Vector2(44f, 44f),
+                new Vector2(0.5f, 1f),
+                new Vector2(0.5f, 1f));
+            TMP_Text itemName = EnsureText(
+                templateRect,
+                "ItemName",
+                font,
+                14f,
+                Color.white);
+            SetAnchored(
+                itemName.rectTransform,
+                new Vector2(4f, -51f),
+                new Vector2(-8f, 18f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            itemName.rectTransform.anchorMax = new Vector2(1f, 1f);
+            itemName.alignment = TextAlignmentOptions.Center;
+            TMP_Text slotName = EnsureText(
+                templateRect,
+                "SlotName",
+                font,
+                11f,
+                new Color(0.69f, 0.79f, 0.87f, 1f));
+            SetAnchored(
+                slotName.rectTransform,
+                new Vector2(4f, -69f),
+                new Vector2(-8f, 16f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            slotName.rectTransform.anchorMax = new Vector2(1f, 1f);
+            slotName.alignment = TextAlignmentOptions.Center;
+            equipmentSlotTemplate = template.GetComponent<BackpackEquipmentSlotView>();
+            var slotSerialized = new SerializedObject(equipmentSlotTemplate);
+            SetReference(slotSerialized, "art", art);
+            SetReference(slotSerialized, "itemNameLabel", itemName);
+            SetReference(slotSerialized, "slotNameLabel", slotName);
+            SetReference(slotSerialized, "selectionOutline", outline);
+            slotSerialized.ApplyModifiedPropertiesWithoutUndo();
+            template.SetActive(false);
+
+            foreach (EquipmentSlot slot in System.Enum.GetValues(typeof(EquipmentSlot)))
+            {
+                GameObject previewSlot = Object.Instantiate(template, content);
+                previewSlot.name = $"EquipmentSlot_{slot}";
+                previewSlot.SetActive(true);
+                previewSlot.GetComponentInChildren<TMP_Text>(true).text = "+";
+                TMP_Text[] labels = previewSlot.GetComponentsInChildren<TMP_Text>(true);
+                if (labels.Length > 1)
+                    labels[1].text = BackpackEquipmentSlotView.SlotLabel(slot);
             }
         }
 
@@ -586,8 +895,8 @@ namespace CryingSnow.StackCraft.EditorTools
             details.anchorMin = Vector2.zero;
             details.anchorMax = new Vector2(1f, 0f);
             details.pivot = Vector2.zero;
-            details.anchoredPosition = new Vector2(12f, 64f);
-            details.sizeDelta = new Vector2(-24f, 180f);
+            details.anchoredPosition = new Vector2(12f, 58f);
+            details.sizeDelta = new Vector2(-24f, 150f);
             details.localScale = Vector3.one;
             Image image = details.GetComponent<Image>();
             image.sprite = null;
@@ -629,6 +938,83 @@ namespace CryingSnow.StackCraft.EditorTools
             text.alignment = TextAlignmentOptions.TopLeft;
             text.raycastTarget = false;
             return text;
+        }
+
+        private static RectTransform EnsurePanel(
+            RectTransform parent,
+            string name,
+            Color color)
+        {
+            Transform existing = Find(parent, name);
+            GameObject panelObject;
+            if (existing == null)
+            {
+                panelObject = new GameObject(
+                    name,
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                panelObject.transform.SetParent(parent, false);
+            }
+            else
+                panelObject = existing.gameObject;
+            Image image = panelObject.GetComponent<Image>();
+            image.sprite = null;
+            image.color = color;
+            image.raycastTarget = color.a > 0f;
+            return (RectTransform)panelObject.transform;
+        }
+
+        private static Button EnsureButton(
+            RectTransform parent,
+            string name,
+            TMP_FontAsset font,
+            string label)
+        {
+            Transform existing = Find(parent, name);
+            GameObject buttonObject;
+            if (existing == null)
+            {
+                buttonObject = new GameObject(
+                    name,
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image),
+                    typeof(Button));
+                buttonObject.transform.SetParent(parent, false);
+            }
+            else
+                buttonObject = existing.gameObject;
+            Button button = buttonObject.GetComponent<Button>();
+            button.targetGraphic = buttonObject.GetComponent<Image>();
+            TMP_Text text = EnsureText(
+                (RectTransform)buttonObject.transform,
+                "Label",
+                font,
+                17f,
+                Color.white);
+            text.text = label;
+            text.alignment = TextAlignmentOptions.Center;
+            SetStretch(text.rectTransform, 0f, 0f, 0f, 0f);
+            return button;
+        }
+
+        private static RawImage EnsureRawImage(
+            RectTransform parent,
+            string name)
+        {
+            Transform existing = Find(parent, name);
+            if (existing != null)
+                return existing.GetComponent<RawImage>();
+            var imageObject = new GameObject(
+                name,
+                typeof(RectTransform),
+                typeof(CanvasRenderer),
+                typeof(RawImage));
+            imageObject.transform.SetParent(parent, false);
+            RawImage image = imageObject.GetComponent<RawImage>();
+            image.raycastTarget = false;
+            return image;
         }
 
         private static void ConfigureDetailsText(

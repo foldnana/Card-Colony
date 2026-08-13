@@ -87,7 +87,7 @@ namespace CryingSnow.StackCraft
             RectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             RectTransform.pivot = new Vector2(0.5f, 0.5f);
             RectTransform.anchoredPosition = Vector2.zero;
-            RectTransform.sizeDelta = new Vector2(128f, 128f);
+            RectTransform.sizeDelta = new Vector2(98f, 90f);
             RectTransform.localScale = Vector3.one;
 
             background = GetComponent<Image>();
@@ -122,7 +122,7 @@ namespace CryingSnow.StackCraft
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0f, 0f),
-                new Vector2(92f, 92f));
+                new Vector2(64f, 60f));
 
             if (quantity > 1)
             {
@@ -220,7 +220,7 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
-            RectTransform.sizeDelta = new Vector2(128f, 128f);
+            RectTransform.sizeDelta = new Vector2(98f, 90f);
             if (background != null)
             {
                 background.color = selectionOutline != null &&
@@ -236,7 +236,7 @@ namespace CryingSnow.StackCraft
                     new Vector2(0.5f, 0.5f),
                     new Vector2(0.5f, 0.5f),
                     Vector2.zero,
-                    new Vector2(92f, 92f));
+                    new Vector2(64f, 60f));
             }
             if (dragHeader != null)
                 dragHeader.gameObject.SetActive(false);

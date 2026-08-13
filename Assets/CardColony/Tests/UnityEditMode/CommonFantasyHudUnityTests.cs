@@ -138,7 +138,7 @@ namespace CardColony.Tests
             Transform backpackRoot =
                 FindDescendant(root.transform, "BackpackRoot");
             Assert.That(
-                FindDescendant(backpackRoot, "BackpackSidebarPageV2"),
+                FindDescendant(backpackRoot, "BackpackSidebarPageV3"),
                 Is.Not.Null,
                 "背包侧栏页面必须直接序列化在 UIRoot.prefab 中。");
             Transform drawer = FindDescendant(

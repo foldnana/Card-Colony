@@ -28,7 +28,7 @@ namespace CardColony.Tests
             GridLayoutGroup grid = FindDescendant(drawer, "BackpackSlots")
                 .GetComponent<GridLayoutGroup>();
 
-            Assert.That(FindDescendant(root, "BackpackSidebarPageV2"), Is.Not.Null,
+            Assert.That(FindDescendant(root, "BackpackSidebarPageV3"), Is.Not.Null,
                 "背包侧栏页面必须序列化进 UIRoot.prefab，而不是运行时临时生成。");
             Assert.That(backpackToggle, Is.Not.Null,
                 "右侧信息栏顶部必须有背包页签。");
@@ -44,10 +44,10 @@ namespace CardColony.Tests
                 "旧的左下角背包入口必须移除。");
             Assert.That(grid.constraint, Is.EqualTo(
                 GridLayoutGroup.Constraint.FixedColumnCount));
-            Assert.That(grid.constraintCount, Is.EqualTo(2));
-            Assert.That(grid.cellSize.x, Is.GreaterThanOrEqualTo(168f),
+            Assert.That(grid.constraintCount, Is.EqualTo(3));
+            Assert.That(grid.cellSize.x, Is.InRange(96f, 116f),
                 "两列物品格应填满侧栏宽度，不能继续缩在左上角。");
-            Assert.That(grid.cellSize.y, Is.GreaterThanOrEqualTo(140f));
+            Assert.That(grid.cellSize.y, Is.InRange(88f, 112f));
             TMP_Text pickupHint = FindDescendant(drawer, "BackpackPickupHint")
                 ?.GetComponent<TMP_Text>();
             Assert.That(pickupHint, Is.Not.Null);
@@ -57,7 +57,7 @@ namespace CardColony.Tests
             Assert.That(
                 ((RectTransform)FindDescendant(drawer, "BackpackSelectedDetails"))
                     .sizeDelta.y,
-                Is.GreaterThanOrEqualTo(160f));
+                Is.GreaterThanOrEqualTo(140f));
 
             Transform dragLayer = FindDescendant(prefab.transform, "BackpackDragLayer");
             Canvas dragCanvas = dragLayer.GetComponent<Canvas>();
@@ -97,6 +97,163 @@ namespace CardColony.Tests
             Assert.That(
                 backpackToggle.GetComponentInChildren<TMP_Text>(true).text,
                 Is.EqualTo("背包"));
+        }
+
+        [Test]
+        public void BackpackPrefab_UsesExpandableEquipmentStripAndCompactThreeColumnGrid()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Assert.That(prefab, Is.Not.Null);
+
+            Transform drawer = FindDescendant(
+                prefab.transform,
+                "BackpackTablePanel");
+            Transform characterHeader = FindDescendant(
+                drawer,
+                "BackpackCharacterHeader");
+            Transform equipmentViewport = FindDescendant(
+                drawer,
+                "BackpackEquipmentViewport");
+            Transform equipmentSlots = FindDescendant(
+                drawer,
+                "BackpackEquipmentSlots");
+            Transform itemViewport = FindDescendant(
+                drawer,
+                "BackpackScrollViewport");
+            GridLayoutGroup itemGrid = FindDescendant(
+                drawer,
+                "BackpackSlots").GetComponent<GridLayoutGroup>();
+
+            Assert.That(characterHeader, Is.Not.Null,
+                "背包顶部需要显示当前换装人物。 ");
+            Assert.That(
+                FindDescendant(characterHeader, "BackpackCharacterName")
+                    ?.GetComponent<TMP_Text>(),
+                Is.Not.Null);
+            Assert.That(equipmentViewport, Is.Not.Null,
+                "当前装备必须拥有独立的横向滚动视口。 ");
+            ScrollRect equipmentScroll = equipmentViewport
+                .GetComponent<ScrollRect>();
+            Assert.That(equipmentScroll, Is.Not.Null);
+            Assert.That(equipmentScroll.horizontal, Is.True);
+            Assert.That(equipmentScroll.vertical, Is.False);
+            Assert.That(equipmentScroll.content, Is.EqualTo(equipmentSlots));
+            Assert.That(
+                equipmentSlots.GetComponent<HorizontalLayoutGroup>(),
+                Is.Not.Null,
+                "装备槽必须由布局组件动态排列，不能写死三个位置。 ");
+            Assert.That(equipmentSlots.childCount, Is.GreaterThanOrEqualTo(3));
+            Assert.That(
+                FindDescendant(equipmentSlots, "EquipmentSlotTemplate"),
+                Is.Not.Null,
+                "需要保留可复用模板，以后增加槽位不必重做界面。 ");
+
+            Assert.That(itemGrid.constraint, Is.EqualTo(
+                GridLayoutGroup.Constraint.FixedColumnCount));
+            Assert.That(itemGrid.constraintCount, Is.EqualTo(3));
+            Assert.That(itemGrid.cellSize.x, Is.InRange(96f, 116f));
+            Assert.That(itemGrid.cellSize.y, Is.InRange(88f, 112f));
+            Assert.That(
+                ((RectTransform)itemViewport).sizeDelta.y,
+                Is.LessThanOrEqualTo(-250f),
+                "缩小格子后要保留足够的纵向浏览空间。 ");
+        }
+
+        [Test]
+        public void BackpackEquipmentTransfer_SwapsOldEquipmentBackIntoBackpack()
+        {
+            Type transferType = FindType(
+                "CryingSnow.StackCraft.BackpackEquipmentTransfer");
+            Assert.That(transferType, Is.Not.Null,
+                "需要独立的背包换装事务，防止旧装备掉到地图或丢失。 ");
+            Assert.That(
+                transferType.GetMethod(
+                    "TryEquip",
+                    BindingFlags.Public | BindingFlags.Static),
+                Is.Not.Null);
+            Assert.That(
+                transferType.GetMethod(
+                    "TryUnequip",
+                    BindingFlags.Public | BindingFlags.Static),
+                Is.Not.Null);
+        }
+
+        [Test]
+        public void BackpackEquipmentTransfer_ActuallySwapsAndUnequipsWithoutLosingCards()
+        {
+            Type transferType = FindType(
+                "CryingSnow.StackCraft.BackpackEquipmentTransfer");
+            Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type entryType = FindType("CryingSnow.StackCraft.BackpackEntryData");
+            Type slotType = FindType("CryingSnow.StackCraft.EquipmentSlot");
+            Assert.That(transferType, Is.Not.Null);
+            Assert.That(backpackType, Is.Not.Null);
+            Assert.That(cardDataType, Is.Not.Null);
+            Assert.That(entryType, Is.Not.Null);
+            Assert.That(slotType, Is.Not.Null);
+
+            object backpack = Activator.CreateInstance(backpackType);
+            object member = Activator.CreateInstance(cardDataType);
+            object oldEquipment = Activator.CreateInstance(cardDataType);
+            object incomingEquipment = Activator.CreateInstance(cardDataType);
+            cardDataType.GetField("Id")?.SetValue(oldEquipment, "old_weapon");
+            cardDataType.GetField("Id")?.SetValue(incomingEquipment, "new_weapon");
+            object equippedItems = cardDataType.GetField("EquippedItems")
+                ?.GetValue(member);
+            equippedItems?.GetType().GetMethod("Add")
+                ?.Invoke(equippedItems, new[] { oldEquipment });
+
+            object[] addArguments = { incomingEquipment, null };
+            Assert.That(
+                backpackType.GetMethod("TryAdd")?.Invoke(backpack, addArguments),
+                Is.True);
+            object incomingEntry = addArguments[1];
+            string entryId = (string)entryType.GetField("InstanceId")
+                ?.GetValue(incomingEntry);
+            object weaponSlot = Enum.GetValues(slotType).GetValue(0);
+            Type nullableSlotType = typeof(Nullable<>).MakeGenericType(slotType);
+            Type resolverType = typeof(Func<,>).MakeGenericType(
+                typeof(string),
+                nullableSlotType);
+            MethodInfo resolverFactory = GetType().GetMethod(
+                nameof(CreateEquipmentSlotResolver),
+                BindingFlags.Static | BindingFlags.NonPublic);
+            Delegate resolver = (Delegate)resolverFactory
+                ?.MakeGenericMethod(slotType)
+                .Invoke(null, new[] { weaponSlot });
+
+            MethodInfo tryEquip = transferType.GetMethod("TryEquip");
+            Assert.That(tryEquip?.Invoke(
+                null,
+                new[] { backpack, member, entryId, resolver }), Is.True);
+            Assert.That((int)backpackType.GetProperty("Count")?.GetValue(backpack),
+                Is.EqualTo(1));
+            object firstEquipped = equippedItems.GetType().GetProperty("Item")
+                ?.GetValue(equippedItems, new object[] { 0 });
+            Assert.That(cardDataType.GetField("Id")?.GetValue(firstEquipped),
+                Is.EqualTo("new_weapon"));
+
+            MethodInfo tryUnequip = transferType.GetMethod("TryUnequip");
+            Assert.That(tryUnequip?.Invoke(
+                null,
+                new[] { backpack, member, weaponSlot, resolver }), Is.True);
+            Assert.That((int)backpackType.GetProperty("Count")?.GetValue(backpack),
+                Is.EqualTo(2));
+            Assert.That((int)equippedItems.GetType().GetProperty("Count")
+                ?.GetValue(equippedItems), Is.Zero);
+        }
+
+        private static Delegate CreateEquipmentSlotResolver<TSlot>(object slot)
+            where TSlot : struct, Enum
+        {
+            TSlot typedSlot = (TSlot)slot;
+            Func<string, TSlot?> resolver = id =>
+                id == "old_weapon" || id == "new_weapon"
+                    ? typedSlot
+                    : null;
+            return resolver;
         }
 
         [Test]
@@ -225,13 +382,13 @@ namespace CardColony.Tests
                 RectTransform itemRect = (RectTransform)item.transform;
                 Assert.That(
                     Mathf.Abs(itemRect.sizeDelta.x - itemRect.sizeDelta.y),
-                    Is.LessThanOrEqualTo(8f));
-                Assert.That(itemRect.sizeDelta.x, Is.GreaterThanOrEqualTo(124f),
+                    Is.LessThanOrEqualTo(12f));
+                Assert.That(itemRect.sizeDelta.x, Is.InRange(94f, 104f),
                     "物品图标应与放大的背包格匹配。");
                 Transform art = FindDescendant(item.transform, "Art");
                 Assert.That(art, Is.Not.Null);
                 Assert.That(((RectTransform)art).sizeDelta.x,
-                    Is.GreaterThanOrEqualTo(88f));
+                    Is.GreaterThanOrEqualTo(60f));
                 Transform quantity = FindDescendant(item.transform, "QuantityBadge");
                 Assert.That(quantity, Is.Not.Null);
                 Assert.That(
@@ -352,7 +509,7 @@ namespace CardColony.Tests
                 Assert.That(item.transform.parent, Is.EqualTo(dragLayer));
                 Assert.That(item.transform.GetSiblingIndex(),
                     Is.EqualTo(dragLayer.childCount - 1));
-                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(128f, 128f)));
+                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(98f, 90f)));
                 Assert.That(dragHeader.gameObject.activeSelf, Is.False);
 
                 updateDrag.Invoke(ui.View, new object[] { item, outside });
@@ -371,7 +528,7 @@ namespace CardColony.Tests
                     Is.EqualTo("×3"));
 
                 updateDrag.Invoke(ui.View, new object[] { item, inside });
-                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(128f, 128f)));
+                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(98f, 90f)));
                 Assert.That(dragHeader.gameObject.activeSelf, Is.False);
             }
             finally
