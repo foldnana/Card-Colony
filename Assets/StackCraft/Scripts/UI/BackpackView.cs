@@ -27,6 +27,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Toggle fallbackToggle;
         [SerializeField] private RectTransform tablePanel;
         [SerializeField] private TMP_Text capacityLabel;
+        [SerializeField] private TMP_Text weightValueLabel;
         [SerializeField] private Button closeButton;
         [SerializeField] private Button arrangeButton;
         [SerializeField] private RectTransform slotsRoot;
@@ -34,6 +35,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private TMP_Text selectedNameLabel;
         [SerializeField] private TMP_Text selectedTypeLabel;
         [SerializeField] private TMP_Text selectedDescriptionLabel;
+        [SerializeField] private RawImage selectedArt;
         [SerializeField] private TMP_Text characterNameLabel;
         [SerializeField] private TMP_Text characterHealthLabel;
         [SerializeField] private RawImage characterPortrait;
@@ -41,6 +43,9 @@ namespace CryingSnow.StackCraft
         [SerializeField] private Button nextCharacterButton;
         [SerializeField] private RectTransform equipmentSlotsRoot;
         [SerializeField] private BackpackEquipmentSlotView equipmentSlotTemplate;
+        [SerializeField] private ScrollRect equipmentScrollRect;
+        [SerializeField] private Button previousEquipmentButton;
+        [SerializeField] private Button nextEquipmentButton;
         [SerializeField] private Button equipButton;
         [SerializeField] private TMP_Text equipButtonLabel;
         [SerializeField] private RectTransform worldCardDragPreview;
@@ -84,6 +89,8 @@ namespace CryingSnow.StackCraft
             arrangeButton?.onClick.AddListener(BackpackService.Arrange);
             previousCharacterButton?.onClick.AddListener(SelectPreviousCharacter);
             nextCharacterButton?.onClick.AddListener(SelectNextCharacter);
+            previousEquipmentButton?.onClick.AddListener(ScrollEquipmentLeft);
+            nextEquipmentButton?.onClick.AddListener(ScrollEquipmentRight);
             equipButton?.onClick.AddListener(HandleEquipmentAction);
             BackpackService.Changed += Refresh;
             PartySelectionService.SelectionChanged += HandlePartySelectionChanged;
@@ -102,6 +109,8 @@ namespace CryingSnow.StackCraft
             arrangeButton?.onClick.RemoveListener(BackpackService.Arrange);
             previousCharacterButton?.onClick.RemoveListener(SelectPreviousCharacter);
             nextCharacterButton?.onClick.RemoveListener(SelectNextCharacter);
+            previousEquipmentButton?.onClick.RemoveListener(ScrollEquipmentLeft);
+            nextEquipmentButton?.onClick.RemoveListener(ScrollEquipmentRight);
             equipButton?.onClick.RemoveListener(HandleEquipmentAction);
             BackpackService.Changed -= Refresh;
             PartySelectionService.SelectionChanged -= HandlePartySelectionChanged;
@@ -171,13 +180,23 @@ namespace CryingSnow.StackCraft
 
         public void Rebuild(BackpackData backpack)
         {
-            int count = backpack?.Count ?? 0;
-            int capacity = backpack?.Capacity ?? 8;
+            int capacity = backpack?.Capacity ?? 9;
+            float maximumWeight = backpack != null &&
+                backpack.MaximumCarryWeight > 0f
+                    ? backpack.MaximumCarryWeight
+                    : 20f;
+            float currentWeight = backpack?.CalculateWeight(card =>
+                ResolveDefinition(card?.Id)?.ItemWeight ?? 1f) ?? 0f;
+            string weightReadout =
+                $"重量 {FormatWeight(currentWeight)}/{FormatWeight(maximumWeight)}";
             RefreshSelectedCharacter();
             if (openButtonLabel != null)
-                openButtonLabel.text = $"背包  {count}/{capacity}";
+                openButtonLabel.text = $"背包  {weightReadout}";
             if (capacityLabel != null)
-                capacityLabel.text = $"背包  {count}/{capacity}";
+                capacityLabel.text = "重量";
+            if (weightValueLabel != null)
+                weightValueLabel.text =
+                    $"{FormatWeight(currentWeight)}/{FormatWeight(maximumWeight)}";
 
             if (slotsRoot == null)
                 return;
@@ -241,6 +260,13 @@ namespace CryingSnow.StackCraft
                 selected.Select();
             else
                 ClearSelectionDetails();
+        }
+
+        private static string FormatWeight(float weight)
+        {
+            return Mathf.Approximately(weight, Mathf.Round(weight))
+                ? Mathf.RoundToInt(weight).ToString()
+                : weight.ToString("0.0");
         }
 
         public bool IsPointerOverStorageArea(Vector2 screenPosition)
@@ -871,7 +897,11 @@ namespace CryingSnow.StackCraft
 
         private void EnsureVisualSlots(int capacity)
         {
-            while (slotsRoot.childCount < capacity)
+            int slotCapacity = Mathf.Max(0, capacity);
+            GridLayoutGroup grid = slotsRoot.GetComponent<GridLayoutGroup>();
+            int columns = Mathf.Max(1, grid != null ? grid.constraintCount : 1);
+
+            while (slotsRoot.childCount < slotCapacity)
             {
                 GameObject slot = new GameObject(
                     $"BackpackSlot{slotsRoot.childCount + 1}",
@@ -884,19 +914,23 @@ namespace CryingSnow.StackCraft
                 image.raycastTarget = false;
             }
 
-            foreach (Transform slot in slotsRoot)
+            for (int index = 0; index < slotsRoot.childCount; index++)
+            {
+                Transform slot = slotsRoot.GetChild(index);
+                bool isVisible = index < slotCapacity;
+                slot.gameObject.SetActive(isVisible);
+                slot.name = $"BackpackSlot{index + 1}";
                 StyleSlot(slot);
+            }
 
-            GridLayoutGroup grid = slotsRoot.GetComponent<GridLayoutGroup>();
             if (grid == null)
                 return;
 
-            int columns = Mathf.Max(1, grid.constraintCount);
-            int rows = Mathf.Max(2, Mathf.CeilToInt(capacity / (float)columns));
+            int rows = Mathf.Max(1, Mathf.CeilToInt(slotCapacity / (float)columns));
             float height = rows * grid.cellSize.y + (rows - 1) * grid.spacing.y;
             slotsRoot.sizeDelta = new Vector2(
                 slotsRoot.sizeDelta.x,
-                Mathf.Max(420f, height));
+                height + 16f);
         }
 
         internal void SelectItem(
@@ -922,6 +956,11 @@ namespace CryingSnow.StackCraft
                 selectedNameLabel.text = definition != null
                     ? definition.DisplayName
                     : "未知物品";
+            }
+            if (selectedArt != null)
+            {
+                selectedArt.texture = definition?.ArtTexture;
+                selectedArt.enabled = selectedArt.texture != null;
             }
             if (selectedTypeLabel != null)
                 selectedTypeLabel.text = CategoryLabel(definition?.Category);
@@ -967,6 +1006,11 @@ namespace CryingSnow.StackCraft
                 selectedNameLabel.text = definition != null
                     ? definition.DisplayName
                     : $"空{BackpackEquipmentSlotView.SlotLabel(slot)}槽";
+            if (selectedArt != null)
+            {
+                selectedArt.texture = definition?.ArtTexture;
+                selectedArt.enabled = selectedArt.texture != null;
+            }
             if (selectedTypeLabel != null)
                 selectedTypeLabel.text = BackpackEquipmentSlotView.SlotLabel(slot);
             if (selectedDescriptionLabel != null)
@@ -984,6 +1028,11 @@ namespace CryingSnow.StackCraft
         {
             selectedEntryId = null;
             selectedEquipmentSlot = null;
+            if (selectedArt != null)
+            {
+                selectedArt.texture = null;
+                selectedArt.enabled = false;
+            }
             if (equipButton != null)
                 equipButton.gameObject.SetActive(false);
             if (selectedNameLabel != null)
@@ -1014,7 +1063,7 @@ namespace CryingSnow.StackCraft
                 int maximum = Mathf.Max(1, member?.MaximumHealth ?? 1);
                 characterHealthLabel.text = member == null
                     ? "请从左侧小队选择人物"
-                    : $"生命 {Mathf.Max(0, member.CurrentHealth)}/{maximum} · 当前换装人物";
+                    : $"生命{Mathf.Max(0, member.CurrentHealth)}/{maximum}";
             }
             if (characterPortrait != null)
             {
@@ -1072,6 +1121,37 @@ namespace CryingSnow.StackCraft
                 view.Bind(slot, item, ResolveDefinition(item?.Id), this);
                 equipmentSlotViews.Add(view);
             }
+            Canvas.ForceUpdateCanvases();
+            RectTransform viewport = equipmentScrollRect?.viewport;
+            bool canScroll = viewport != null &&
+                equipmentSlotsRoot.rect.width > viewport.rect.width + 0.5f;
+            if (previousEquipmentButton != null)
+                previousEquipmentButton.interactable = canScroll;
+            if (nextEquipmentButton != null)
+                nextEquipmentButton.interactable = canScroll;
+        }
+
+        private void ScrollEquipmentLeft() => ScrollEquipment(-1f);
+        private void ScrollEquipmentRight() => ScrollEquipment(1f);
+
+        private void ScrollEquipment(float direction)
+        {
+            if (equipmentScrollRect == null || equipmentSlotsRoot == null)
+                return;
+            Canvas.ForceUpdateCanvases();
+            RectTransform viewport = equipmentScrollRect.viewport;
+            float overflow = Mathf.Max(
+                0f,
+                equipmentSlotsRoot.rect.width - (viewport?.rect.width ?? 0f));
+            if (overflow <= 0.5f)
+                return;
+            float targetX = Mathf.Clamp(
+                equipmentSlotsRoot.anchoredPosition.x - direction * 90f,
+                -overflow,
+                0f);
+            equipmentSlotsRoot.anchoredPosition = new Vector2(
+                targetX,
+                equipmentSlotsRoot.anchoredPosition.y);
         }
 
         private void RefreshEquipmentAction(CardDefinition definition)
@@ -1365,11 +1445,11 @@ namespace CryingSnow.StackCraft
                 return;
             slotImage.sprite = null;
             slotImage.type = Image.Type.Simple;
-            slotImage.color = new Color(0.018f, 0.045f, 0.07f, 0.92f);
+            slotImage.color = new Color(0.32f, 0.42f, 0.50f, 1f);
             slotImage.raycastTarget = false;
             ConfigureOutline(
                 slot.gameObject,
-                new Color(0.24f, 0.34f, 0.42f, 0.72f),
+                new Color(0.50f, 0.61f, 0.69f, 0.82f),
                 new Vector2(1f, -1f));
         }
 

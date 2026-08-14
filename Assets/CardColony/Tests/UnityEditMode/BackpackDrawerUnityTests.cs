@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using NUnit.Framework;
 using TMPro;
@@ -28,7 +29,7 @@ namespace CardColony.Tests
             GridLayoutGroup grid = FindDescendant(drawer, "BackpackSlots")
                 .GetComponent<GridLayoutGroup>();
 
-            Assert.That(FindDescendant(root, "BackpackSidebarPageV3"), Is.Not.Null,
+            Assert.That(FindDescendant(root, "BackpackSidebarPageV6"), Is.Not.Null,
                 "背包侧栏页面必须序列化进 UIRoot.prefab，而不是运行时临时生成。");
             Assert.That(backpackToggle, Is.Not.Null,
                 "右侧信息栏顶部必须有背包页签。");
@@ -45,15 +46,11 @@ namespace CardColony.Tests
             Assert.That(grid.constraint, Is.EqualTo(
                 GridLayoutGroup.Constraint.FixedColumnCount));
             Assert.That(grid.constraintCount, Is.EqualTo(3));
-            Assert.That(grid.cellSize.x, Is.InRange(96f, 116f),
+            Assert.That(grid.cellSize.x, Is.InRange(96f, 106f),
                 "两列物品格应填满侧栏宽度，不能继续缩在左上角。");
-            Assert.That(grid.cellSize.y, Is.InRange(88f, 112f));
-            TMP_Text pickupHint = FindDescendant(drawer, "BackpackPickupHint")
-                ?.GetComponent<TMP_Text>();
-            Assert.That(pickupHint, Is.Not.Null);
-            Assert.That(pickupHint.text, Does.Contain("拖"));
-            Assert.That(pickupHint.text, Does.Contain("背包"));
-            Assert.That(pickupHint.fontSize, Is.GreaterThanOrEqualTo(17f));
+            Assert.That(grid.cellSize.y, Is.EqualTo(grid.cellSize.x).Within(0.5f));
+            Assert.That(FindDescendant(drawer, "BackpackPickupHint"), Is.Null,
+                "顶部拖入提示会与人物栏重叠，紧凑布局中应移除。 ");
             Assert.That(
                 ((RectTransform)FindDescendant(drawer, "BackpackSelectedDetails"))
                     .sizeDelta.y,
@@ -135,10 +132,16 @@ namespace CardColony.Tests
                 "当前装备必须拥有独立的横向滚动视口。 ");
             ScrollRect equipmentScroll = equipmentViewport
                 .GetComponent<ScrollRect>();
+            ScrollRect itemScroll = itemViewport.GetComponent<ScrollRect>();
             Assert.That(equipmentScroll, Is.Not.Null);
             Assert.That(equipmentScroll.horizontal, Is.True);
             Assert.That(equipmentScroll.vertical, Is.False);
             Assert.That(equipmentScroll.content, Is.EqualTo(equipmentSlots));
+            Assert.That(itemScroll, Is.Not.Null);
+            Assert.That(itemScroll.vertical, Is.True);
+            Assert.That(itemScroll.horizontal, Is.False);
+            Assert.That(itemScroll.viewport, Is.EqualTo(itemViewport));
+            Assert.That(itemScroll.content, Is.EqualTo(itemGrid.transform));
             Assert.That(
                 equipmentSlots.GetComponent<HorizontalLayoutGroup>(),
                 Is.Not.Null,
@@ -152,12 +155,388 @@ namespace CardColony.Tests
             Assert.That(itemGrid.constraint, Is.EqualTo(
                 GridLayoutGroup.Constraint.FixedColumnCount));
             Assert.That(itemGrid.constraintCount, Is.EqualTo(3));
-            Assert.That(itemGrid.cellSize.x, Is.InRange(96f, 116f));
-            Assert.That(itemGrid.cellSize.y, Is.InRange(88f, 112f));
+            Assert.That(itemGrid.cellSize.x, Is.InRange(96f, 106f));
+            Assert.That(itemGrid.cellSize.y,
+                Is.EqualTo(itemGrid.cellSize.x).Within(0.5f));
+            RectTransform itemViewportRect = (RectTransform)itemViewport;
+            Assert.That(itemViewportRect.anchorMin.y, Is.EqualTo(0f),
+                "物品区底部应锚定侧栏底部，随屏幕高度扩展。 ");
+            Assert.That(itemViewportRect.anchorMax.y, Is.EqualTo(1f));
+            Assert.That(itemViewportRect.offsetMin.y, Is.GreaterThanOrEqualTo(230f),
+                "物品区需要给底部详情与整理按钮留出固定空间。 ");
+        }
+
+        [Test]
+        public void BackpackPrefab_DesignHierarchySeparatesTitleCapacityAndItemsSection()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform drawer = FindDescendant(
+                prefab.transform,
+                "BackpackTablePanel");
+
+            TMP_Text title = FindDescendant(drawer, "BackpackTitleText")
+                ?.GetComponent<TMP_Text>();
+            TMP_Text capacity = FindDescendant(drawer, "BackpackWeightText")
+                ?.GetComponent<TMP_Text>();
+            TMP_Text itemsTitle = FindDescendant(drawer, "BackpackItemsTitle")
+                ?.GetComponent<TMP_Text>();
+
+            Assert.That(title, Is.Not.Null, "设计稿要求背包标题与容量分列显示。");
+            Assert.That(capacity, Is.Not.Null);
+            Assert.That(title.rectTransform.anchorMin.x, Is.LessThan(0.5f));
+            Assert.That(capacity.rectTransform.anchoredPosition.x,
+                Is.GreaterThanOrEqualTo(150f));
+            Assert.That(itemsTitle, Is.Not.Null, "物品网格前需要“携带物品”分区标题。");
+            Assert.That(itemsTitle.text, Does.Contain("携带物品"));
+        }
+
+        [Test]
+        public void BackpackPrefab_LightNestedSurfacesMatchTheDesignPalette()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform drawer = FindDescendant(
+                prefab.transform,
+                "BackpackTablePanel");
+            Transform characterHeader = FindDescendant(
+                drawer,
+                "BackpackCharacterHeader");
+            Transform equipmentSlot = FindDescendant(
+                drawer,
+                "EquipmentSlot_Weapon");
+            Color characterSurface = characterHeader.GetComponent<Image>().color;
+            Color slotSurface = equipmentSlot.GetComponent<Image>().color;
+            TMP_Text characterName = FindDescendant(
+                characterHeader,
+                "BackpackCharacterName").GetComponent<TMP_Text>();
+            TMP_Text characterHealth = FindDescendant(
+                characterHeader,
+                "BackpackCharacterHealth").GetComponent<TMP_Text>();
+            TMP_Text slotName = FindDescendant(
+                equipmentSlot,
+                "SlotName").GetComponent<TMP_Text>();
+
+            Assert.That(RelativeLuminance(characterSurface),
+                Is.InRange(0.10f, 0.30f),
+                "人物栏需要中等明度蓝灰底，才能承载项目现有的白色线稿头像。 ");
+            Assert.That(RelativeLuminance(slotSurface),
+                Is.InRange(0.10f, 0.30f),
+                "装备槽不能过白或近黑，应使用能看清白色图标的中等蓝灰色。 ");
             Assert.That(
-                ((RectTransform)itemViewport).sizeDelta.y,
-                Is.LessThanOrEqualTo(-250f),
-                "缩小格子后要保留足够的纵向浏览空间。 ");
+                ContrastRatio(characterName.color, characterSurface),
+                Is.GreaterThanOrEqualTo(4f));
+            Assert.That(characterHealth.enableWordWrapping, Is.False,
+                "生命与换装提示必须保持单行，不能只剩下“生命”两个字。 ");
+            Assert.That(characterHealth.rectTransform.anchorMin.x,
+                Is.EqualTo(characterHealth.rectTransform.anchorMax.x),
+                "人物信息应使用明确宽度，避免拉伸锚点在窄侧栏中错误裁切。 ");
+            Assert.That(characterHealth.rectTransform.sizeDelta.x,
+                Is.GreaterThanOrEqualTo(150f));
+            Assert.That(
+                ContrastRatio(slotName.color, slotSurface),
+                Is.GreaterThanOrEqualTo(4f),
+                "中等蓝灰装备槽必须使用高对比度浅色文字。 ");
+            Button previousCharacter = FindDescendant(
+                    characterHeader,
+                    "BackpackPreviousCharacter")
+                .GetComponent<Button>();
+            TMP_Text previousLabel = previousCharacter
+                .GetComponentInChildren<TMP_Text>(true);
+            Assert.That(
+                ContrastRatio(
+                    previousLabel.color,
+                    previousCharacter.colors.normalColor),
+                Is.GreaterThanOrEqualTo(3f),
+                "人物切换箭头不能使用白字白底。 ");
+        }
+
+        [Test]
+        public void BackpackPrefab_CompactItemGridMatchesDesignCardHeight()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            GridLayoutGroup grid = FindDescendant(
+                    prefab.transform,
+                    "BackpackSlots")
+                .GetComponent<GridLayoutGroup>();
+
+            Assert.That(grid.constraintCount, Is.EqualTo(3));
+            Assert.That(grid.cellSize.x, Is.InRange(96f, 106f));
+            Assert.That(grid.cellSize.y, Is.EqualTo(grid.cellSize.x).Within(0.5f),
+                "设计稿使用更紧凑的横向物品卡，不应继续使用近方形大格子。");
+            RectTransform viewport = grid.transform.parent as RectTransform;
+            Assert.That(viewport.anchorMin.y, Is.EqualTo(0f));
+            Assert.That(viewport.anchorMax.y, Is.EqualTo(1f),
+                "物品视口应自适应填满装备栏与底部详情之间的空间。 ");
+            Assert.That(viewport.offsetMin.y, Is.GreaterThanOrEqualTo(230f));
+        }
+
+        [Test]
+        public void BackpackView_NineCapacityCreatesThreeCompleteScrollableRows()
+        {
+            LightweightBackpackUi ui = LightweightBackpackUi.Create();
+            try
+            {
+                ui.Grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+                ui.Grid.constraintCount = 3;
+                Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+                object backpack = Activator.CreateInstance(backpackType);
+                backpackType.GetField("SlotCapacity")?.SetValue(backpack, 9);
+
+                ui.View.GetType().GetMethod("Rebuild")
+                    ?.Invoke(ui.View, new[] { backpack });
+
+                Assert.That(ui.SlotsRoot.childCount, Is.EqualTo(9),
+                    "基础背包应正好生成八个真实格子，不能用第九个假格补角。 ");
+                Assert.That(ui.SlotsRoot.Cast<Transform>().All(slot =>
+                    slot.name.StartsWith("BackpackSlot")), Is.True);
+                float expectedThreeRowHeight =
+                    3f * ui.Grid.cellSize.y + 2f * ui.Grid.spacing.y;
+                Assert.That(ui.SlotsRoot.sizeDelta.y,
+                    Is.GreaterThanOrEqualTo(expectedThreeRowHeight),
+                    "八格背包应排成两列四行，并由外层 ScrollRect 负责纵向滚动。 ");
+            }
+            finally
+            {
+                ui.Dispose();
+            }
+        }
+
+        [Test]
+        public void BackpackData_TenthItemAutomaticallyAddsANewThreeSlotRow()
+        {
+            Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type entryType = FindType("CryingSnow.StackCraft.BackpackEntryData");
+            object backpack = Activator.CreateInstance(backpackType);
+            backpackType.GetField("SlotCapacity")?.SetValue(backpack, 8);
+            MethodInfo tryAdd = backpackType.GetMethod("TryAdd");
+
+            for (int index = 0; index < 10; index++)
+            {
+                object card = Activator.CreateInstance(cardDataType);
+                object[] args = { card, null };
+                Assert.That(tryAdd.Invoke(backpack, args), Is.True);
+                Assert.That(args[1], Is.TypeOf(entryType));
+            }
+
+            Assert.That(backpackType.GetProperty("Count")?.GetValue(backpack),
+                Is.EqualTo(10));
+            Assert.That(backpackType.GetProperty("Capacity")?.GetValue(backpack),
+                Is.EqualTo(12),
+                "第十件物品应自动增加一整行三个格子。");
+        }
+
+        [Test]
+        public void BackpackWeightModel_AndHeaderReadoutArePresent()
+        {
+            Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Type definitionType = FindType("CryingSnow.StackCraft.CardDefinition");
+            Assert.That(backpackType.GetField("MaximumCarryWeight"), Is.Not.Null);
+            Assert.That(backpackType.GetMethod("CalculateWeight"), Is.Not.Null);
+            Assert.That(definitionType.GetProperty("ItemWeight"), Is.Not.Null);
+            object backpack = Activator.CreateInstance(backpackType);
+            Assert.That(backpackType.GetField("MaximumCarryWeight")
+                ?.GetValue(backpack), Is.EqualTo(20f));
+            ScriptableObject definition = ScriptableObject.CreateInstance(definitionType);
+            try
+            {
+                Assert.That(definitionType.GetProperty("ItemWeight")
+                    ?.GetValue(definition), Is.EqualTo(1f));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(definition);
+            }
+
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform drawer = FindDescendant(prefab.transform, "BackpackTablePanel");
+            TMP_Text weight = FindDescendant(drawer, "BackpackWeightText")
+                ?.GetComponent<TMP_Text>();
+            TMP_Text weightValue = FindDescendant(drawer, "BackpackWeightValueText")
+                ?.GetComponent<TMP_Text>();
+            Assert.That(weight, Is.Not.Null);
+            Assert.That(weight.text, Does.Contain("重量"));
+            Assert.That(weightValue, Is.Not.Null);
+            Assert.That(weightValue.text, Does.Match(@"\d+/\d+"));
+            Assert.That(weight.rectTransform.anchoredPosition.x,
+                Is.GreaterThanOrEqualTo(150f),
+                "重量应放在背包标题栏右侧，避免占用九宫格和详情区。");
+        }
+
+        [Test]
+        public void BackpackData_CalculatesEveryPhysicalEntryWeight()
+        {
+            Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            object backpack = Activator.CreateInstance(backpackType);
+            MethodInfo tryAdd = backpackType.GetMethod("TryAdd");
+            foreach (string id in new[] { "heavy", "light", "negative" })
+            {
+                object card = Activator.CreateInstance(cardDataType);
+                cardDataType.GetField("Id")?.SetValue(card, id);
+                object[] addArgs = { card, null };
+                Assert.That(tryAdd.Invoke(backpack, addArgs), Is.True);
+            }
+
+            ParameterExpression cardParameter = Expression.Parameter(
+                cardDataType,
+                "card");
+            MemberExpression idField = Expression.Field(cardParameter, "Id");
+            Expression weightBody = Expression.Condition(
+                Expression.Equal(idField, Expression.Constant("heavy")),
+                Expression.Constant(2f),
+                Expression.Condition(
+                    Expression.Equal(idField, Expression.Constant("light")),
+                    Expression.Constant(0.5f),
+                    Expression.Constant(-4f)));
+            Type resolverType = typeof(Func<,>).MakeGenericType(
+                cardDataType,
+                typeof(float));
+            Delegate resolver = Expression.Lambda(
+                resolverType,
+                weightBody,
+                cardParameter).Compile();
+
+            float total = (float)backpackType.GetMethod("CalculateWeight")
+                .Invoke(backpack, new object[] { resolver });
+            Assert.That(total, Is.EqualTo(2.5f).Within(0.001f),
+                "重量应逐条累加，并把负数重量按零处理。");
+
+            LightweightBackpackUi ui = LightweightBackpackUi.Create();
+            try
+            {
+                ui.View.GetType().GetMethod("Rebuild")
+                    ?.Invoke(ui.View, new[] { backpack });
+                Assert.That(ui.WeightValueLabel.text, Is.EqualTo("3/20"),
+                    "缺少定义时每张实体卡按默认 1 重量显示。");
+            }
+            finally
+            {
+                ui.Dispose();
+            }
+        }
+
+        [Test]
+        public void BackpackTradeRollback_NormalizesLegacyEightSlotsToNine()
+        {
+            Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
+            Type entryType = FindType("CryingSnow.StackCraft.BackpackEntryData");
+            Type cardDataType = FindType("CryingSnow.StackCraft.CardData");
+            Type definitionType = FindType("CryingSnow.StackCraft.CardDefinition");
+            Type directionType = FindType("CryingSnow.StackCraft.MarketTradeDirection");
+            Type transactionType = FindType(
+                "CryingSnow.StackCraft.CardBackpackTradeInventory+BackpackTradeTransaction");
+            object backpack = Activator.CreateInstance(backpackType);
+            backpackType.GetField("SlotCapacity")?.SetValue(backpack, 8);
+            var entries = (System.Collections.IList)backpackType
+                .GetField("Entries")?.GetValue(backpack);
+            for (int index = 0; index < 8; index++)
+            {
+                object entry = Activator.CreateInstance(entryType);
+                entryType.GetField("InstanceId")?.SetValue(entry, $"legacy-{index}");
+                entryType.GetField("SlotIndex")?.SetValue(entry, index);
+                entryType.GetField("Card")?.SetValue(
+                    entry,
+                    Activator.CreateInstance(cardDataType));
+                entries.Add(entry);
+            }
+
+            ScriptableObject currency = ScriptableObject.CreateInstance(definitionType);
+            ScriptableObject commodity = ScriptableObject.CreateInstance(definitionType);
+            try
+            {
+                object direction = Enum.Parse(directionType, "PlayerBuys");
+                object transaction = Activator.CreateInstance(
+                    transactionType,
+                    BindingFlags.Instance | BindingFlags.Public |
+                    BindingFlags.NonPublic,
+                    null,
+                    new object[]
+                    {
+                        direction,
+                        backpack,
+                        currency,
+                        commodity,
+                        1,
+                        1,
+                        null
+                    },
+                    null);
+
+                backpackType.GetField("SlotCapacity")?.SetValue(backpack, 12);
+                entries.Add(Activator.CreateInstance(entryType));
+                transactionType.GetMethod("Rollback")?.Invoke(transaction, null);
+
+                Assert.That(backpackType.GetProperty("Count")?.GetValue(backpack),
+                    Is.EqualTo(8));
+                Assert.That(backpackType.GetProperty("Capacity")?.GetValue(backpack),
+                    Is.EqualTo(9));
+                var restoredEntries = (System.Collections.IList)backpackType
+                    .GetField("Entries")?.GetValue(backpack);
+                for (int index = 0; index < restoredEntries.Count; index++)
+                {
+                    Assert.That(entryType.GetField("SlotIndex")
+                        ?.GetValue(restoredEntries[index]), Is.EqualTo(index));
+                }
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(currency);
+                UnityEngine.Object.DestroyImmediate(commodity);
+            }
+        }
+
+        [Test]
+        public void BackpackPrefab_ProvidesSelectedArtAndEquipmentNavigation()
+        {
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(
+                "Assets/StackCraft/Prefabs/UI/UIRoot.prefab");
+            Transform drawer = FindDescendant(
+                prefab.transform,
+                "BackpackTablePanel");
+
+            Assert.That(
+                FindDescendant(drawer, "BackpackSelectedArt")
+                    ?.GetComponent<RawImage>(),
+                Is.Not.Null,
+                "详情区需要展示当前选中物品图标。");
+            Transform selectedArtFrame = FindDescendant(
+                drawer,
+                "BackpackSelectedArtFrame");
+            Assert.That(selectedArtFrame?.GetComponent<Image>(), Is.Not.Null,
+                "白色线稿图标需要独立的中等蓝灰底框，不能直接压在浅色详情面板上。 ");
+            Assert.That(
+                RelativeLuminance(selectedArtFrame.GetComponent<Image>().color),
+                Is.InRange(0.10f, 0.30f));
+            Assert.That(
+                FindDescendant(drawer, "BackpackPreviousEquipment")
+                    ?.GetComponent<Button>(),
+                Is.Not.Null);
+            Assert.That(
+                FindDescendant(drawer, "BackpackNextEquipment")
+                    ?.GetComponent<Button>(),
+                Is.Not.Null,
+                "横向装备栏需要明确的左右浏览按钮。");
+            RectTransform equipmentAction = FindDescendant(
+                    drawer,
+                    "BackpackEquipmentActionButton")
+                .GetComponent<RectTransform>();
+            Assert.That(equipmentAction.anchorMin.y, Is.EqualTo(0f),
+                "装备操作应位于详情区底部，不能悬浮并遮挡详情标题。");
+            Component slotView = FindDescendant(
+                    drawer,
+                    "EquipmentSlotTemplate")
+                .GetComponent(FindType(
+                    "CryingSnow.StackCraft.BackpackEquipmentSlotView"));
+            var serializedSlot = new SerializedObject(slotView);
+            UnityEngine.Object selection = serializedSlot
+                .FindProperty("selectionOutline")
+                ?.objectReferenceValue;
+            Assert.That(selection, Is.InstanceOf<Outline>(),
+                "装备槽选中边框必须绑定 Outline，点击后才能显示选中状态。 ");
         }
 
         [Test]
@@ -380,20 +759,35 @@ namespace CardColony.Tests
                 Assert.That(groupedEntryIds.Count, Is.EqualTo(3));
 
                 RectTransform itemRect = (RectTransform)item.transform;
-                Assert.That(
-                    Mathf.Abs(itemRect.sizeDelta.x - itemRect.sizeDelta.y),
-                    Is.LessThanOrEqualTo(12f));
-                Assert.That(itemRect.sizeDelta.x, Is.InRange(94f, 104f),
-                    "物品图标应与放大的背包格匹配。");
+                Assert.That(itemRect.sizeDelta.x, Is.InRange(96f, 106f),
+                    "物品卡宽度应与两列八宫格匹配。");
+                Assert.That(itemRect.sizeDelta.y,
+                    Is.EqualTo(itemRect.sizeDelta.x).Within(0.5f),
+                    "物品卡应采用紧凑横向布局，而不是近似正方形的大图标。");
                 Transform art = FindDescendant(item.transform, "Art");
                 Assert.That(art, Is.Not.Null);
                 Assert.That(((RectTransform)art).sizeDelta.x,
-                    Is.GreaterThanOrEqualTo(60f));
+                    Is.InRange(48f, 56f));
+                Transform itemName = FindDescendant(item.transform, "ItemName");
+                Assert.That(itemName, Is.Not.Null);
+                Assert.That(itemName.GetComponent<TMP_Text>().text,
+                    Does.Contain("苹果"));
+                Color itemSurface = item.GetComponent<Image>().color;
+                Assert.That(RelativeLuminance(itemSurface),
+                    Is.InRange(0.10f, 0.30f),
+                    "白色线稿物品图标需要中等明度蓝灰底，不能使用纯浅色或近黑背景。 ");
+                Assert.That(
+                    ContrastRatio(itemName.GetComponent<TMP_Text>().color, itemSurface),
+                    Is.GreaterThanOrEqualTo(4f),
+                    "浅色物品卡需要使用深色名称文字。 ");
                 Transform quantity = FindDescendant(item.transform, "QuantityBadge");
                 Assert.That(quantity, Is.Not.Null);
+                Assert.That(((RectTransform)quantity).sizeDelta.x,
+                    Is.LessThanOrEqualTo(28f),
+                    "数量角标必须保持为小型徽标，不能遮挡物品名称。");
                 Assert.That(
                     quantity.GetComponentInChildren<TMP_Text>().text,
-                    Is.EqualTo("×3"));
+                    Is.EqualTo("3"));
                 Assert.That(FindDescendant(item.transform, "Header"), Is.Null,
                     "背包格内不应继续绘制完整卡牌标题栏。");
                 Assert.That(FindDescendant(item.transform, "Title"), Is.Null,
@@ -417,10 +811,9 @@ namespace CardColony.Tests
                     Is.LessThan(0f));
 
                 setDragPresentation.Invoke(item, new object[] { false });
-                Assert.That(
-                    Mathf.Abs(itemRect.sizeDelta.x - itemRect.sizeDelta.y),
-                    Is.LessThanOrEqualTo(8f));
+                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(102f, 102f)));
                 Assert.That(dragHeader.gameObject.activeSelf, Is.False);
+                Assert.That(itemName.gameObject.activeSelf, Is.True);
 
                 itemType.GetMethod("OnPointerClick")
                     .Invoke(item, new object[] { null });
@@ -509,7 +902,7 @@ namespace CardColony.Tests
                 Assert.That(item.transform.parent, Is.EqualTo(dragLayer));
                 Assert.That(item.transform.GetSiblingIndex(),
                     Is.EqualTo(dragLayer.childCount - 1));
-                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(98f, 90f)));
+                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(102f, 102f)));
                 Assert.That(dragHeader.gameObject.activeSelf, Is.False);
 
                 updateDrag.Invoke(ui.View, new object[] { item, outside });
@@ -525,10 +918,10 @@ namespace CardColony.Tests
                         .GetValue(definition)));
                 Assert.That(quantity.gameObject.activeSelf, Is.True);
                 Assert.That(quantity.GetComponentInChildren<TMP_Text>().text,
-                    Is.EqualTo("×3"));
+                    Is.EqualTo("3"));
 
                 updateDrag.Invoke(ui.View, new object[] { item, inside });
-                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(98f, 90f)));
+                Assert.That(itemRect.sizeDelta, Is.EqualTo(new Vector2(102f, 102f)));
                 Assert.That(dragHeader.gameObject.activeSelf, Is.False);
             }
             finally
@@ -876,6 +1269,25 @@ namespace CardColony.Tests
                 Is.EqualTo(6));
         }
 
+        private static float ContrastRatio(Color foreground, Color background)
+        {
+            float ForegroundLuminance = RelativeLuminance(foreground);
+            float BackgroundLuminance = RelativeLuminance(background);
+            float lighter = Mathf.Max(ForegroundLuminance, BackgroundLuminance);
+            float darker = Mathf.Min(ForegroundLuminance, BackgroundLuminance);
+            return (lighter + 0.05f) / (darker + 0.05f);
+        }
+
+        private static float RelativeLuminance(Color color)
+        {
+            float Convert(float channel) => channel <= 0.03928f
+                ? channel / 12.92f
+                : Mathf.Pow((channel + 0.055f) / 1.055f, 2.4f);
+            return 0.2126f * Convert(color.r) +
+                   0.7152f * Convert(color.g) +
+                   0.0722f * Convert(color.b);
+        }
+
         private static Type FindType(string fullName)
         {
             Type type = AppDomain.CurrentDomain.GetAssemblies()
@@ -910,6 +1322,7 @@ namespace CardColony.Tests
             public GridLayoutGroup Grid { get; private set; }
             public RectTransform SlotsRoot { get; private set; }
             public TMP_Text CapacityLabel { get; private set; }
+            public TMP_Text WeightValueLabel { get; private set; }
             public TMP_Text SelectedName { get; private set; }
             public TMP_Text SelectedDescription { get; private set; }
 
@@ -934,6 +1347,9 @@ namespace CardColony.Tests
                 result.Drawer = (RectTransform)drawerObject.transform;
                 result.CapacityLabel = CreateText(
                     "BackpackCapacityText",
+                    result.Drawer);
+                result.WeightValueLabel = CreateText(
+                    "BackpackWeightValueText",
                     result.Drawer);
                 Button close = CreateButton("BackpackCloseButton", result.Drawer);
                 Button arrange = CreateButton("BackpackArrangeButton", result.Drawer);
@@ -968,6 +1384,7 @@ namespace CardColony.Tests
                 SetField(result.View, "openButtonLabel", openLabel);
                 SetField(result.View, "tablePanel", result.Drawer);
                 SetField(result.View, "capacityLabel", result.CapacityLabel);
+                SetField(result.View, "weightValueLabel", result.WeightValueLabel);
                 SetField(result.View, "closeButton", close);
                 SetField(result.View, "arrangeButton", arrange);
                 SetField(result.View, "slotsRoot", result.SlotsRoot);

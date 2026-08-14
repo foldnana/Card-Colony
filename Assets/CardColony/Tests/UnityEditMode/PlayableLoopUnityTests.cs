@@ -479,13 +479,13 @@ namespace CardColony.Tests
             Assert.That(scrollViewport, Is.Not.Null);
             Assert.That(scrollViewport.GetComponent<ScrollRect>(), Is.Not.Null);
             Assert.That(scrollViewport.GetComponent<RectMask2D>(), Is.Not.Null);
-            Assert.That(FindDescendant(backpackPage.gameObject, "BackpackCapacityText"), Is.Not.Null);
+            Assert.That(FindDescendant(backpackPage.gameObject, "BackpackWeightText"), Is.Not.Null);
             Assert.That(FindDescendant(uiRoot, "BackpackCloseButton"), Is.Null);
             Assert.That(
                 backpackPage.GetComponentsInChildren<Transform>(true)
                     .Count(child => child.name.StartsWith("BackpackSlot") &&
                         child.name != "BackpackSlots"),
-                Is.EqualTo(8));
+                Is.EqualTo(9));
 
             RectTransform rect = panel.GetComponent<RectTransform>();
             Assert.That(rect.anchorMin, Is.EqualTo(Vector2.zero));
@@ -2726,9 +2726,9 @@ namespace CardColony.Tests
                         component.GetType().FullName == "CryingSnow.StackCraft.BackpackItemView"),
                     Is.EqualTo(3), "背包条目必须显示为可拖拽图标，不能成为幽灵物品");
                 Assert.That(
-                    FindDescendant(backpackPage.gameObject, "BackpackCapacityText")
+                    FindDescendant(backpackPage.gameObject, "BackpackWeightValueText")
                         .GetComponent<TMPro.TMP_Text>().text,
-                    Does.Contain("3/24"));
+                    Does.Contain("3/20"));
                 Assert.That(
                     backpackPage.GetComponentsInChildren<Transform>(true).Count(child =>
                         child.name.StartsWith("BackpackSlot") &&
@@ -9581,7 +9581,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void GameData_CreatesEightSlotBackpackAndRepairsMissingOldSaveData()
+        public void GameData_CreatesNineSlotBackpackAndRepairsMissingOldSaveData()
         {
             System.Type gameDataType = FindType("CryingSnow.StackCraft.GameData");
             System.Type backpackType = FindType("CryingSnow.StackCraft.BackpackData");
@@ -9595,7 +9595,7 @@ namespace CardColony.Tests
 
             object backpack = backpackField.GetValue(gameData);
             Assert.That(backpack, Is.Not.Null);
-            Assert.That(backpackType.GetProperty("Capacity").GetValue(backpack), Is.EqualTo(8));
+            Assert.That(backpackType.GetProperty("Capacity").GetValue(backpack), Is.EqualTo(9));
 
             backpackType.GetField("Entries").SetValue(backpack, null);
             object normalized = ensureBackpack.Invoke(gameData, null);
@@ -9606,7 +9606,7 @@ namespace CardColony.Tests
             object repaired = ensureBackpack.Invoke(gameData, null);
             Assert.That(repaired, Is.Not.Null);
             Assert.That(backpackField.GetValue(gameData), Is.SameAs(repaired));
-            Assert.That(backpackType.GetProperty("Capacity").GetValue(repaired), Is.EqualTo(8));
+            Assert.That(backpackType.GetProperty("Capacity").GetValue(repaired), Is.EqualTo(9));
         }
 
         [Test]

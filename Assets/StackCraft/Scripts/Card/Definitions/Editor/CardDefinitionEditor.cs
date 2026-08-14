@@ -13,6 +13,7 @@ namespace CryingSnow.StackCraft
         private SerializedProperty artTextureProp;
 
         private SerializedProperty categoryProp;
+        private SerializedProperty itemWeightProp;
         private SerializedProperty factionProp;
         private SerializedProperty combatTypeProp;
         private SerializedProperty dialogueEnabledProp;
@@ -61,6 +62,7 @@ namespace CryingSnow.StackCraft
             artTextureProp = serializedObject.FindProperty("artTexture");
 
             categoryProp = serializedObject.FindProperty("category");
+            itemWeightProp = serializedObject.FindProperty("itemWeight");
             factionProp = serializedObject.FindProperty("faction");
             combatTypeProp = serializedObject.FindProperty("combatType");
             dialogueEnabledProp = serializedObject.FindProperty("dialogueEnabled");
@@ -220,6 +222,7 @@ namespace CryingSnow.StackCraft
             using (new EditorGUI.IndentLevelScope())
             {
                 EditorGUILayout.PropertyField(categoryProp);
+                EditorGUILayout.PropertyField(itemWeightProp);
 
                 if (category == CardCategory.Character || category == CardCategory.Mob)
                 {

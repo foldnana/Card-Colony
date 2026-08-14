@@ -533,7 +533,10 @@ namespace CryingSnow.StackCraft.EditorTools
                     StyleImage(drawerImage, panelSprite, ContentNavy);
             }
 
-            if (FindDescendant(root, "BackpackSidebarPageV3") != null ||
+            if (FindDescendant(root, "BackpackSidebarPageV6") != null ||
+                FindDescendant(root, "BackpackSidebarPageV5") != null ||
+                FindDescendant(root, "BackpackSidebarPageV4") != null ||
+                FindDescendant(root, "BackpackSidebarPageV3") != null ||
                 FindDescendant(root, "BackpackSidebarPageV2") != null ||
                 FindDescendant(root, "BackpackDrawerLayoutV1") != null)
                 return;
@@ -891,7 +894,6 @@ namespace CryingSnow.StackCraft.EditorTools
 
             foreach (string name in new[]
                      {
-                         "BackpackTablePanel",
                          "BackpackSelectedDetails",
                          "InfoPanel",
                          "NpcTradePanel",

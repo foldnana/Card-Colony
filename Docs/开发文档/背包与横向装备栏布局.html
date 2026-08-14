@@ -49,8 +49,8 @@
     .cc-equip-slot span { font-size: 12px; }
     .cc-equip-slot small { color: light-dark(#60778a, #bdcede); }
     .cc-icon { font-size: 23px; line-height: 1; }
-    .cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; max-height: 236px; overflow-y: auto; padding-right: 6px; }
-    .cc-item { min-width: 0; height: 72px; border: 2px solid transparent; background: light-dark(#d7e1e9, #2f4354); border-radius: 9px; display: grid; grid-template-columns: 32px 1fr; align-items: center; padding: 6px; text-align: left; position: relative; }
+    .cc-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; max-height: 332px; overflow-y: auto; padding-right: 6px; }
+    .cc-item { min-width: 0; aspect-ratio: 1; border: 2px solid transparent; background: light-dark(#d7e1e9, #2f4354); border-radius: 9px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 6px; text-align: center; position: relative; }
     .cc-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 12px; }
     .cc-qty { position: absolute; right: 5px; bottom: 4px; background: light-dark(#61798d, #17232d); color: white; border-radius: 9px; padding: 1px 5px; font-size: 11px; }
     .cc-detail { margin-top: 10px; padding: 9px; background: light-dark(#c8d5df, #314657); border: 1px solid light-dark(#7f9bb1, #58758c); border-radius: 11px; }
@@ -68,7 +68,7 @@
 <body>
 <div id="card-colony-backpack-mockup">
   <section class="cc-panel" aria-label="背包和装备栏布局预览">
-    <div class="cc-header"><strong>背包</strong><span class="cc-capacity">12 / 24</span></div>
+    <div class="cc-header"><strong>背包</strong><span class="cc-capacity">重量 8 / 20</span></div>
     <div class="cc-person">
       <button class="cc-arrow" id="cc-prev-person" type="button" aria-label="上一名人物">‹</button>
       <div class="cc-avatar">人</div>
@@ -100,7 +100,7 @@
         <button class="cc-item" type="button" data-item="盐" data-type="商品" data-stat="适合跑商交易" data-compare="当前持有 2 份"><b class="cc-icon">□</b><span class="cc-name">盐</span><span class="cc-qty">×2</span></button>
         <button class="cc-item" type="button" data-item="金币袋" data-type="货币" data-stat="集中存放金币" data-compare="金币不逐张占据格子"><b class="cc-icon">¤</b><span class="cc-name">金币袋</span><span class="cc-qty">15</span></button>
         <button class="cc-item" type="button" data-item="绳索" data-type="商品" data-stat="旅行用品" data-compare="当前持有 1 份"><b class="cc-icon">∞</b><span class="cc-name">绳索</span><span class="cc-qty">1</span></button>
-        <button class="cc-item" type="button" data-item="空格" data-type="背包槽" data-stat="可以继续存放物品" data-compare=""><b class="cc-icon">＋</b><span class="cc-name">空</span></button>
+        <button class="cc-item" type="button" data-item="空格" data-type="背包格" data-stat="可继续存放物品" data-compare="装满后自动向下增加一行"><b class="cc-icon">＋</b><span class="cc-name">空格</span></button>
       </div>
     </div>
     <div class="cc-detail">

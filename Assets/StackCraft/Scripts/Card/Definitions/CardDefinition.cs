@@ -27,6 +27,9 @@ namespace CryingSnow.StackCraft
         [SerializeField, Tooltip("Category that defines this card's type and gameplay behavior.")]
         private CardCategory category;
 
+        [SerializeField, Min(0f), Tooltip("Weight contributed while this card is stored in a backpack.")]
+        private float itemWeight = 1f;
+
         [SerializeField, Tooltip("Faction this card belongs to (e.g., Player, Mob, Neutral).")]
         private CardFaction faction;
 
@@ -158,6 +161,7 @@ namespace CryingSnow.StackCraft
         public Texture2D BaseTextureOverride => baseTextureOverride;
 
         public CardCategory Category => category;
+        public float ItemWeight => Mathf.Max(0f, itemWeight);
         public CardFaction Faction => faction;
         public bool IsLocationStatic => isLocationStatic;
         public bool PlayerDraggable =>

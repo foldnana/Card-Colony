@@ -12,7 +12,7 @@ namespace CryingSnow.StackCraft
         [SerializeField] private RawImage art;
         [SerializeField] private TMP_Text itemNameLabel;
         [SerializeField] private TMP_Text slotNameLabel;
-        [SerializeField] private Image selectionOutline;
+        [SerializeField] private Outline selectionOutline;
 
         private BackpackView owner;
         private CardData equippedItem;

@@ -20,6 +20,7 @@ namespace CryingSnow.StackCraft
         private Image background;
         private Outline selectionOutline;
         private RawImage art;
+        private TMP_Text itemName;
         private Image dragHeader;
         private TMP_Text dragTitle;
         private readonly List<string> entryIds = new();
@@ -87,19 +88,19 @@ namespace CryingSnow.StackCraft
             RectTransform.anchorMax = new Vector2(0.5f, 0.5f);
             RectTransform.pivot = new Vector2(0.5f, 0.5f);
             RectTransform.anchoredPosition = Vector2.zero;
-            RectTransform.sizeDelta = new Vector2(98f, 90f);
+            RectTransform.sizeDelta = new Vector2(102f, 102f);
             RectTransform.localScale = Vector3.one;
 
             background = GetComponent<Image>();
             background.sprite = null;
             background.type = Image.Type.Simple;
-            background.color = new Color(0.035f, 0.095f, 0.145f, 1f);
+            background.color = new Color(0.32f, 0.42f, 0.50f, 1f);
             background.raycastTarget = true;
             selectionOutline = GetComponent<Outline>();
             if (selectionOutline == null)
                 selectionOutline = gameObject.AddComponent<Outline>();
             selectionOutline.effectColor =
-                new Color(0.18f, 0.86f, 1f, 0.94f);
+                new Color(0.80f, 0.55f, 0.10f, 0.96f);
             selectionOutline.effectDistance = new Vector2(2f, -2f);
             selectionOutline.useGraphicAlpha = true;
             selectionOutline.enabled = false;
@@ -121,28 +122,45 @@ namespace CryingSnow.StackCraft
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f),
                 new Vector2(0.5f, 0.5f),
+                new Vector2(0f, 12f),
+                new Vector2(52f, 52f));
+
+            itemName = CreateText(
+                "ItemName",
+                transform,
+                font,
+                definition != null ? definition.DisplayName : "未知物品",
+                13f,
+                new Color(0.94f, 0.96f, 0.98f, 1f),
+                TextAlignmentOptions.Center);
+            SetRect(
+                itemName.rectTransform,
                 new Vector2(0f, 0f),
-                new Vector2(64f, 60f));
+                new Vector2(1f, 0f),
+                new Vector2(0.5f, 0f),
+                new Vector2(0f, 7f),
+                new Vector2(-12f, 24f));
+            itemName.overflowMode = TextOverflowModes.Ellipsis;
 
             if (quantity > 1)
             {
                 Image quantityBadge = CreateImage(
                     "QuantityBadge",
                     transform,
-                    new Color(0.015f, 0.025f, 0.035f, 0.94f));
+                    new Color(0.18f, 0.27f, 0.34f, 0.96f));
                 SetRect(
                     quantityBadge.rectTransform,
                     new Vector2(1f, 0f),
                     new Vector2(1f, 0f),
                     new Vector2(1f, 0f),
                     new Vector2(-4f, 4f),
-                    new Vector2(36f, 26f));
+                    new Vector2(26f, 20f));
                 TMP_Text quantityText = CreateText(
                     "Quantity",
                     quantityBadge.transform,
                     font,
-                    $"×{quantity}",
-                    15f,
+                    quantity.ToString(),
+                    13f,
                     Color.white,
                     TextAlignmentOptions.Center);
                 Stretch(quantityText.rectTransform);
@@ -172,7 +190,7 @@ namespace CryingSnow.StackCraft
             if (IsReserved)
             {
                 canvasGroup.alpha = 0.55f;
-                background.color = new Color(0.12f, 0.13f, 0.16f, 1f);
+                background.color = new Color(0.42f, 0.48f, 0.53f, 1f);
             }
         }
 
@@ -193,8 +211,8 @@ namespace CryingSnow.StackCraft
             if (background != null)
             {
                 background.color = selected
-                    ? new Color(0.055f, 0.18f, 0.26f, 1f)
-                    : new Color(0.035f, 0.095f, 0.145f, 1f);
+                    ? new Color(0.39f, 0.50f, 0.58f, 1f)
+                    : new Color(0.32f, 0.42f, 0.50f, 1f);
             }
         }
 
@@ -217,16 +235,18 @@ namespace CryingSnow.StackCraft
                 }
                 if (dragHeader != null)
                     dragHeader.gameObject.SetActive(true);
+                if (itemName != null)
+                    itemName.gameObject.SetActive(false);
                 return;
             }
 
-            RectTransform.sizeDelta = new Vector2(98f, 90f);
+            RectTransform.sizeDelta = new Vector2(102f, 102f);
             if (background != null)
             {
                 background.color = selectionOutline != null &&
                     selectionOutline.enabled
-                        ? new Color(0.055f, 0.18f, 0.26f, 1f)
-                        : new Color(0.035f, 0.095f, 0.145f, 1f);
+                        ? new Color(0.39f, 0.50f, 0.58f, 1f)
+                        : new Color(0.32f, 0.42f, 0.50f, 1f);
             }
             if (art != null)
             {
@@ -235,11 +255,13 @@ namespace CryingSnow.StackCraft
                     new Vector2(0.5f, 0.5f),
                     new Vector2(0.5f, 0.5f),
                     new Vector2(0.5f, 0.5f),
-                    Vector2.zero,
-                    new Vector2(64f, 60f));
+                    new Vector2(0f, 12f),
+                    new Vector2(52f, 52f));
             }
             if (dragHeader != null)
                 dragHeader.gameObject.SetActive(false);
+            if (itemName != null)
+                itemName.gameObject.SetActive(true);
         }
 
         public void OnBeginDrag(PointerEventData eventData)

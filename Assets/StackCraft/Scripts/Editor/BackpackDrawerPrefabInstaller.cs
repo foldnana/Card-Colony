@@ -13,7 +13,7 @@ namespace CryingSnow.StackCraft.EditorTools
     {
         private const string UiRootPath =
             "Assets/StackCraft/Prefabs/UI/UIRoot.prefab";
-        private const string VersionMarker = "BackpackSidebarPageV3";
+        private const string VersionMarker = "BackpackSidebarPageV6";
 
         static BackpackDrawerPrefabInstaller()
         {
@@ -37,9 +37,16 @@ namespace CryingSnow.StackCraft.EditorTools
                 Toggle tabToggle = EnsureSidebarToggle(header);
                 Toggle fallbackToggle = Require(header, "LocationToggle")
                     .GetComponent<Toggle>();
-                TMP_Text capacity = Require(
+                Transform weightTransform = Find(drawer, "BackpackWeightText") ??
+                    Require(drawer, "BackpackCapacityText");
+                weightTransform.name = "BackpackWeightText";
+                TMP_Text capacity = weightTransform.GetComponent<TMP_Text>();
+                TMP_Text weightValue = EnsureText(
                     drawer,
-                    "BackpackCapacityText").GetComponent<TMP_Text>();
+                    "BackpackWeightValueText",
+                    capacity.font,
+                    16f,
+                    new Color(0.28f, 0.42f, 0.53f, 1f));
                 Button arrangeButton = Require(
                     drawer,
                     "BackpackArrangeButton").GetComponent<Button>();
@@ -50,19 +57,20 @@ namespace CryingSnow.StackCraft.EditorTools
                     backpackRoot,
                     "BackpackDragLayer");
 
-                ConfigureSidebarPage(drawer, menuPanel, capacity);
+                ConfigureSidebarPage(drawer, menuPanel, capacity, weightValue);
                 ConfigureDrawerButton(
                     arrangeButton,
                     drawer,
-                    new Vector2(-12f, 12f),
+                    new Vector2(-12f, 16f),
                     new Vector2(120f, 44f),
                     new Vector2(1f, 0f),
                     new Vector2(1f, 0f),
-                    new Color(0.67f, 0.43f, 0.08f, 1f),
-                    new Color(0.88f, 0.64f, 0.18f, 1f),
-                    new Color(0.10f, 0.08f, 0.04f, 1f));
+                    new Color(0.82f, 0.64f, 0.36f, 1f),
+                    new Color(0.92f, 0.76f, 0.50f, 1f),
+                    new Color(0.20f, 0.12f, 0.04f, 1f));
                 ConfigureSlots(slots);
-                EnsurePickupHint(drawer, capacity.font);
+                EnsureItemsTitle(drawer, capacity.font);
+                DestroyIfPresent(drawer, "BackpackPickupHint");
 
                 TMP_FontAsset font = capacity.font;
                 EnsureCharacterEquipmentArea(
@@ -74,7 +82,10 @@ namespace CryingSnow.StackCraft.EditorTools
                     out Button previousCharacter,
                     out Button nextCharacter,
                     out RectTransform equipmentSlots,
-                    out BackpackEquipmentSlotView equipmentSlotTemplate);
+                    out BackpackEquipmentSlotView equipmentSlotTemplate,
+                    out ScrollRect equipmentScroll,
+                    out Button previousEquipment,
+                    out Button nextEquipment);
                 ConfigureDragLayer(dragLayer);
                 EnsureWorldCardDragPreview(
                     dragLayer,
@@ -84,36 +95,63 @@ namespace CryingSnow.StackCraft.EditorTools
                     out RawImage worldCardArt,
                     out TMP_Text worldCardTitle);
                 RectTransform details = EnsureDetailsPanel(drawer);
+                RectTransform selectedArtFrame = EnsurePanel(
+                    details,
+                    "BackpackSelectedArtFrame",
+                    new Color(0.32f, 0.42f, 0.50f, 1f));
+                SetAnchored(
+                    selectedArtFrame,
+                    new Vector2(12f, -12f),
+                    new Vector2(52f, 52f),
+                    new Vector2(0f, 1f),
+                    new Vector2(0f, 1f));
+                Transform existingSelectedArt = Find(details, "BackpackSelectedArt");
+                if (existingSelectedArt != null &&
+                    existingSelectedArt.parent != selectedArtFrame)
+                {
+                    existingSelectedArt.SetParent(selectedArtFrame, false);
+                }
+                RawImage selectedArt = EnsureRawImage(
+                    selectedArtFrame,
+                    "BackpackSelectedArt");
+                SetStretch(selectedArt.rectTransform, 5f, 5f, 5f, 5f);
+                selectedArt.enabled = false;
                 TMP_Text selectedName = EnsureText(
                     details,
                     "BackpackSelectedName",
                     font,
                     24f,
-                    new Color(0.35f, 0.83f, 0.96f, 1f));
+                    new Color(0.10f, 0.20f, 0.28f, 1f));
                 TMP_Text selectedType = EnsureText(
                     details,
                     "BackpackSelectedType",
                     font,
                     17f,
-                    new Color(0.92f, 0.72f, 0.30f, 1f));
+                    new Color(0.34f, 0.43f, 0.50f, 1f));
                 TMP_Text selectedDescription = EnsureText(
                     details,
                     "BackpackSelectedDescription",
                     font,
                     16f,
-                    new Color(0.88f, 0.90f, 0.92f, 1f));
+                    new Color(0.18f, 0.28f, 0.35f, 1f));
                 ConfigureDetailsText(
                     selectedName,
                     10f,
-                    32f);
+                    28f,
+                    74f,
+                    12f);
                 ConfigureDetailsText(
                     selectedType,
-                    46f,
-                    24f);
+                    39f,
+                    22f,
+                    74f,
+                    12f);
                 ConfigureDetailsText(
                     selectedDescription,
-                    76f,
-                    90f);
+                    68f,
+                    58f,
+                    12f,
+                    12f);
                 selectedName.text = "选择一个物品";
                 selectedType.text = string.Empty;
                 selectedDescription.text = "拖到场地取出；拖到其他格子交换位置。";
@@ -128,13 +166,13 @@ namespace CryingSnow.StackCraft.EditorTools
                     (RectTransform)equipButton.transform,
                     new Vector2(-10f, 10f),
                     new Vector2(104f, 38f),
-                    Vector2.one,
-                    Vector2.one);
+                    new Vector2(1f, 0f),
+                    new Vector2(1f, 0f));
                 StyleFlatButton(
                     equipButton,
-                    new Color(0.20f, 0.54f, 0.40f, 1f),
-                    new Color(0.28f, 0.66f, 0.50f, 1f),
-                    Color.white);
+                    new Color(0.68f, 0.84f, 0.73f, 1f),
+                    new Color(0.77f, 0.91f, 0.81f, 1f),
+                    new Color(0.08f, 0.25f, 0.16f, 1f));
                 equipButton.gameObject.SetActive(false);
 
                 EnsureMarker(backpackRoot);
@@ -145,6 +183,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 SetReference(serialized, "fallbackToggle", fallbackToggle);
                 SetReference(serialized, "tablePanel", drawer);
                 SetReference(serialized, "capacityLabel", capacity);
+                SetReference(serialized, "weightValueLabel", weightValue);
                 SetReference(serialized, "closeButton", null);
                 SetReference(serialized, "arrangeButton", arrangeButton);
                 SetReference(serialized, "slotsRoot", slots);
@@ -155,6 +194,7 @@ namespace CryingSnow.StackCraft.EditorTools
                     serialized,
                     "selectedDescriptionLabel",
                     selectedDescription);
+                SetReference(serialized, "selectedArt", selectedArt);
                 SetReference(serialized, "characterNameLabel", characterName);
                 SetReference(serialized, "characterHealthLabel", characterHealth);
                 SetReference(serialized, "characterPortrait", characterPortrait);
@@ -162,6 +202,12 @@ namespace CryingSnow.StackCraft.EditorTools
                 SetReference(serialized, "nextCharacterButton", nextCharacter);
                 SetReference(serialized, "equipmentSlotsRoot", equipmentSlots);
                 SetReference(serialized, "equipmentSlotTemplate", equipmentSlotTemplate);
+                SetReference(serialized, "equipmentScrollRect", equipmentScroll);
+                SetReference(
+                    serialized,
+                    "previousEquipmentButton",
+                    previousEquipment);
+                SetReference(serialized, "nextEquipmentButton", nextEquipment);
                 SetReference(serialized, "equipButton", equipButton);
                 SetReference(
                     serialized,
@@ -176,6 +222,10 @@ namespace CryingSnow.StackCraft.EditorTools
                 DestroyIfPresent(root.transform, "BackpackButton");
                 DestroyIfPresent(root.transform, "BackpackCloseButton");
                 DestroyIfPresent(backpackRoot, "BackpackDrawerLayoutV1");
+                DestroyIfPresent(backpackRoot, "BackpackSidebarPageV2");
+                DestroyIfPresent(backpackRoot, "BackpackSidebarPageV3");
+                DestroyIfPresent(backpackRoot, "BackpackSidebarPageV4");
+                DestroyIfPresent(backpackRoot, "BackpackSidebarPageV5");
                 drawer.gameObject.SetActive(false);
                 CommonFantasyHudSkinInstaller.ApplyToPrefabContents(root);
                 PrefabUtility.SaveAsPrefabAsset(root, UiRootPath);
@@ -214,12 +264,16 @@ namespace CryingSnow.StackCraft.EditorTools
 
                 Require(backpackRoot, VersionMarker);
                 Require(drawer, "BackpackSelectedDetails");
+                Require(drawer, "BackpackTitleText");
+                Require(drawer, "BackpackItemsTitle");
+                Require(drawer, "BackpackSelectedArt");
                 Require(drawer, "BackpackSelectedName");
                 Require(drawer, "BackpackSelectedType");
                 Require(drawer, "BackpackSelectedDescription");
-                Require(drawer, "BackpackPickupHint");
                 Require(drawer, "BackpackCharacterHeader");
                 Require(drawer, "BackpackEquipmentViewport");
+                Require(drawer, "BackpackPreviousEquipment");
+                Require(drawer, "BackpackNextEquipment");
                 Require(drawer, "BackpackEquipmentSlots");
                 Require(drawer, "EquipmentSlotTemplate");
                 Transform dragLayer = Require(root.transform, "BackpackDragLayer");
@@ -247,11 +301,11 @@ namespace CryingSnow.StackCraft.EditorTools
                     throw new System.InvalidOperationException(
                         "Backpack drawer must use three compact icon columns.");
                 }
-                if (grid.cellSize.x < 96f || grid.cellSize.x > 116f ||
-                    grid.cellSize.y < 88f || grid.cellSize.y > 112f)
+                if (grid.cellSize.x < 96f || grid.cellSize.x > 106f ||
+                    Mathf.Abs(grid.cellSize.x - grid.cellSize.y) > 0.5f)
                 {
                     throw new System.InvalidOperationException(
-                        "Backpack drawer item cells are too small.");
+                        "Backpack drawer item cells must be square.");
                 }
                 if (tabToggle.group == null ||
                     tabToggle.group != locationToggle.group)
@@ -267,10 +321,12 @@ namespace CryingSnow.StackCraft.EditorTools
                              "tabToggle",
                              "fallbackToggle",
                              "tablePanel",
+                             "weightValueLabel",
                              "slotsRoot",
                              "selectedNameLabel",
                              "selectedTypeLabel",
                              "selectedDescriptionLabel",
+                             "selectedArt",
                              "characterNameLabel",
                              "characterHealthLabel",
                              "characterPortrait",
@@ -278,6 +334,9 @@ namespace CryingSnow.StackCraft.EditorTools
                              "nextCharacterButton",
                              "equipmentSlotsRoot",
                              "equipmentSlotTemplate",
+                             "equipmentScrollRect",
+                             "previousEquipmentButton",
+                             "nextEquipmentButton",
                              "equipButton",
                              "equipButtonLabel",
                              "worldCardDragPreview",
@@ -350,33 +409,11 @@ namespace CryingSnow.StackCraft.EditorTools
             return toggle;
         }
 
-        private static TMP_Text EnsurePickupHint(
-            RectTransform drawer,
-            TMP_FontAsset font)
-        {
-            TMP_Text hint = EnsureText(
-                drawer,
-                "BackpackPickupHint",
-                font,
-                18f,
-                new Color(0.62f, 0.84f, 0.93f, 1f));
-            RectTransform hintRect = hint.rectTransform;
-            hintRect.anchorMin = new Vector2(0f, 1f);
-            hintRect.anchorMax = new Vector2(1f, 1f);
-            hintRect.pivot = new Vector2(0.5f, 1f);
-            hintRect.anchoredPosition = new Vector2(0f, -48f);
-            hintRect.sizeDelta = new Vector2(-28f, 28f);
-            hintRect.localScale = Vector3.one;
-            hint.text = "拖入背包 · 拖动图标换位";
-            hint.alignment = TextAlignmentOptions.MidlineLeft;
-            hint.enableWordWrapping = false;
-            return hint;
-        }
-
         private static void ConfigureSidebarPage(
             RectTransform drawer,
             Transform menuPanel,
-            TMP_Text capacity)
+            TMP_Text capacity,
+            TMP_Text weightValue)
         {
             drawer.SetParent(menuPanel, false);
             drawer.anchorMin = Vector2.zero;
@@ -402,15 +439,55 @@ namespace CryingSnow.StackCraft.EditorTools
             if (oldBackground != null)
                 Object.DestroyImmediate(oldBackground.gameObject);
 
+            TMP_Text title = EnsureText(
+                drawer,
+                "BackpackTitleText",
+                capacity.font,
+                24f,
+                new Color(0.10f, 0.22f, 0.31f, 1f));
+            title.text = "背包";
             SetAnchored(
-                capacity.rectTransform,
+                title.rectTransform,
                 new Vector2(14f, -7f),
-                new Vector2(240f, 38f),
+                new Vector2(110f, 36f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
-            capacity.fontSize = 26f;
-            capacity.color = new Color(0.92f, 0.94f, 0.96f, 1f);
+            title.alignment = TextAlignmentOptions.MidlineLeft;
+
+            SetAnchored(
+                capacity.rectTransform,
+                new Vector2(160f, -7f),
+                new Vector2(170f, 36f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            capacity.fontSize = 16f;
+            capacity.color = new Color(0.28f, 0.42f, 0.53f, 1f);
             capacity.alignment = TextAlignmentOptions.MidlineLeft;
+            capacity.enableWordWrapping = false;
+            capacity.overflowMode = TextOverflowModes.Overflow;
+            capacity.maxVisibleCharacters = 99999;
+            capacity.maxVisibleWords = 99999;
+            capacity.maxVisibleLines = 99999;
+            capacity.text = "重量";
+            var serializedCapacity = new SerializedObject(capacity);
+            SerializedProperty textStyleHash = serializedCapacity.FindProperty(
+                "m_TextStyleHashCode");
+            if (textStyleHash != null)
+                textStyleHash.intValue = 0;
+            serializedCapacity.ApplyModifiedPropertiesWithoutUndo();
+
+            SetAnchored(
+                weightValue.rectTransform,
+                new Vector2(224f, -7f),
+                new Vector2(106f, 36f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            weightValue.fontSize = 16f;
+            weightValue.color = capacity.color;
+            weightValue.alignment = TextAlignmentOptions.MidlineLeft;
+            weightValue.enableWordWrapping = false;
+            weightValue.overflowMode = TextOverflowModes.Overflow;
+            weightValue.text = "0/20";
         }
 
         private static void ConfigureEntryButton(
@@ -584,20 +661,34 @@ namespace CryingSnow.StackCraft.EditorTools
 
         private static void ConfigureSlots(RectTransform slots)
         {
+            while (slots.childCount < 9)
+            {
+                GameObject slot = new GameObject(
+                    $"BackpackSlot{slots.childCount + 1}",
+                    typeof(RectTransform),
+                    typeof(CanvasRenderer),
+                    typeof(Image));
+                slot.transform.SetParent(slots, false);
+            }
+
             RectTransform viewport = slots.parent as RectTransform;
-            SetStretch(viewport, 12f, 12f, 220f, 330f);
+            viewport.anchorMin = Vector2.zero;
+            viewport.anchorMax = Vector2.one;
+            viewport.pivot = new Vector2(0.5f, 0.5f);
+            viewport.offsetMin = new Vector2(12f, 232f);
+            viewport.offsetMax = new Vector2(-12f, -310f);
             Image viewportImage = viewport.GetComponent<Image>();
             viewportImage.sprite = null;
-            viewportImage.color = new Color(0.01f, 0.025f, 0.04f, 0.36f);
+            viewportImage.color = new Color(0.76f, 0.82f, 0.87f, 0.92f);
 
             slots.anchorMin = new Vector2(0f, 1f);
             slots.anchorMax = new Vector2(1f, 1f);
             slots.pivot = new Vector2(0.5f, 1f);
             slots.anchoredPosition = new Vector2(0f, -8f);
-            slots.sizeDelta = new Vector2(-16f, 420f);
+            slots.sizeDelta = new Vector2(-16f, 342f);
             GridLayoutGroup grid = slots.GetComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(106f, 98f);
-            grid.spacing = new Vector2(8f, 8f);
+            grid.cellSize = new Vector2(102f, 102f);
+            grid.spacing = new Vector2(6f, 6f);
             grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
             grid.constraintCount = 3;
             grid.childAlignment = TextAnchor.UpperCenter;
@@ -609,13 +700,34 @@ namespace CryingSnow.StackCraft.EditorTools
                     continue;
                 image.sprite = null;
                 image.type = Image.Type.Simple;
-                image.color = new Color(0.018f, 0.045f, 0.07f, 0.92f);
+                image.color = new Color(0.32f, 0.42f, 0.50f, 1f);
                 image.raycastTarget = false;
                 ConfigureOutline(
                     slot.gameObject,
-                    new Color(0.24f, 0.34f, 0.42f, 0.72f),
+                    new Color(0.50f, 0.61f, 0.69f, 0.82f),
                     new Vector2(1f, -1f));
             }
+        }
+
+        private static void EnsureItemsTitle(
+            RectTransform drawer,
+            TMP_FontAsset font)
+        {
+            TMP_Text title = EnsureText(
+                drawer,
+                "BackpackItemsTitle",
+                font,
+                17f,
+                new Color(0.12f, 0.27f, 0.38f, 1f));
+            title.text = "携带物品";
+            SetAnchored(
+                title.rectTransform,
+                new Vector2(14f, -278f),
+                new Vector2(-28f, 26f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            title.rectTransform.anchorMax = new Vector2(1f, 1f);
+            title.alignment = TextAlignmentOptions.MidlineLeft;
         }
 
         private static void EnsureCharacterEquipmentArea(
@@ -627,16 +739,19 @@ namespace CryingSnow.StackCraft.EditorTools
             out Button previousCharacter,
             out Button nextCharacter,
             out RectTransform equipmentSlots,
-            out BackpackEquipmentSlotView equipmentSlotTemplate)
+            out BackpackEquipmentSlotView equipmentSlotTemplate,
+            out ScrollRect equipmentScroll,
+            out Button previousEquipment,
+            out Button nextEquipment)
         {
             RectTransform header = EnsurePanel(
                 drawer,
                 "BackpackCharacterHeader",
-                new Color(0.16f, 0.25f, 0.33f, 0.96f));
+                new Color(0.32f, 0.42f, 0.50f, 1f));
             SetAnchored(
                 header,
                 new Vector2(12f, -50f),
-                new Vector2(-24f, 66f),
+                new Vector2(-24f, 76f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
             header.anchorMax = new Vector2(1f, 1f);
@@ -663,15 +778,31 @@ namespace CryingSnow.StackCraft.EditorTools
                 new Vector2(38f, 50f),
                 new Vector2(1f, 1f),
                 new Vector2(1f, 1f));
+            Color characterArrowNormal =
+                new Color(0.70f, 0.79f, 0.86f, 1f);
+            Color characterArrowHighlight =
+                new Color(0.82f, 0.88f, 0.92f, 1f);
+            Color characterArrowText =
+                new Color(0.10f, 0.22f, 0.31f, 1f);
+            StyleFlatButton(
+                previousCharacter,
+                characterArrowNormal,
+                characterArrowHighlight,
+                characterArrowText);
+            StyleFlatButton(
+                nextCharacter,
+                characterArrowNormal,
+                characterArrowHighlight,
+                characterArrowText);
 
             RectTransform portraitRect = EnsurePanel(
                 header,
                 "BackpackCharacterPortraitFrame",
-                new Color(0.82f, 0.87f, 0.91f, 1f));
+                new Color(0.28f, 0.38f, 0.46f, 1f));
             SetAnchored(
                 portraitRect,
-                new Vector2(54f, -8f),
-                new Vector2(50f, 50f),
+                new Vector2(52f, -10f),
+                new Vector2(56f, 56f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
             Transform portraitTransform = Find(portraitRect, "Portrait");
@@ -695,38 +826,40 @@ namespace CryingSnow.StackCraft.EditorTools
                 "BackpackCharacterName",
                 font,
                 19f,
-                new Color(0.90f, 0.94f, 0.97f, 1f));
+                new Color(0.94f, 0.96f, 0.98f, 1f));
             SetAnchored(
                 characterName.rectTransform,
-                new Vector2(114f, -8f),
-                new Vector2(-168f, 26f),
+                new Vector2(116f, -10f),
+                new Vector2(170f, 28f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
-            characterName.rectTransform.anchorMax = new Vector2(1f, 1f);
+            characterName.enableWordWrapping = false;
+            characterName.overflowMode = TextOverflowModes.Ellipsis;
             characterHealth = EnsureText(
                 header,
                 "BackpackCharacterHealth",
                 font,
                 14f,
-                new Color(0.68f, 0.78f, 0.86f, 1f));
+                new Color(0.82f, 0.88f, 0.92f, 1f));
             SetAnchored(
                 characterHealth.rectTransform,
-                new Vector2(114f, -35f),
-                new Vector2(-168f, 20f),
+                new Vector2(116f, -40f),
+                new Vector2(170f, 22f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
-            characterHealth.rectTransform.anchorMax = new Vector2(1f, 1f);
+            characterHealth.enableWordWrapping = false;
+            characterHealth.overflowMode = TextOverflowModes.Overflow;
 
             TMP_Text equipmentTitle = EnsureText(
                 drawer,
                 "BackpackEquipmentTitle",
                 font,
                 17f,
-                new Color(0.88f, 0.92f, 0.95f, 1f));
+                new Color(0.12f, 0.27f, 0.38f, 1f));
             equipmentTitle.text = "当前装备  ·  横向滑动";
             SetAnchored(
                 equipmentTitle.rectTransform,
-                new Vector2(14f, -122f),
+                new Vector2(14f, -136f),
                 new Vector2(-28f, 26f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
@@ -735,7 +868,7 @@ namespace CryingSnow.StackCraft.EditorTools
             RectTransform viewport = EnsurePanel(
                 drawer,
                 "BackpackEquipmentViewport",
-                new Color(0.08f, 0.14f, 0.19f, 0.82f));
+                new Color(0.48f, 0.57f, 0.65f, 1f));
             if (viewport.GetComponent<RectMask2D>() == null)
                 viewport.gameObject.AddComponent<RectMask2D>();
             ScrollRect scroll = viewport.GetComponent<ScrollRect>();
@@ -743,8 +876,8 @@ namespace CryingSnow.StackCraft.EditorTools
                 scroll = viewport.gameObject.AddComponent<ScrollRect>();
             SetAnchored(
                 viewport,
-                new Vector2(12f, -150f),
-                new Vector2(-24f, 104f),
+                new Vector2(42f, -164f),
+                new Vector2(-84f, 104f),
                 new Vector2(0f, 1f),
                 new Vector2(0f, 1f));
             viewport.anchorMax = new Vector2(1f, 1f);
@@ -780,6 +913,40 @@ namespace CryingSnow.StackCraft.EditorTools
             scroll.movementType = ScrollRect.MovementType.Clamped;
             scroll.scrollSensitivity = 28f;
             equipmentSlots = content;
+            equipmentScroll = scroll;
+
+            previousEquipment = EnsureButton(
+                drawer,
+                "BackpackPreviousEquipment",
+                font,
+                "<");
+            SetAnchored(
+                (RectTransform)previousEquipment.transform,
+                new Vector2(12f, -164f),
+                new Vector2(26f, 104f),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f));
+            nextEquipment = EnsureButton(
+                drawer,
+                "BackpackNextEquipment",
+                font,
+                ">");
+            SetAnchored(
+                (RectTransform)nextEquipment.transform,
+                new Vector2(-12f, -164f),
+                new Vector2(26f, 104f),
+                new Vector2(1f, 1f),
+                new Vector2(1f, 1f));
+            StyleFlatButton(
+                previousEquipment,
+                new Color(0.42f, 0.54f, 0.64f, 1f),
+                new Color(0.54f, 0.66f, 0.75f, 1f),
+                new Color(0.10f, 0.20f, 0.28f, 1f));
+            StyleFlatButton(
+                nextEquipment,
+                new Color(0.42f, 0.54f, 0.64f, 1f),
+                new Color(0.54f, 0.66f, 0.75f, 1f),
+                new Color(0.10f, 0.20f, 0.28f, 1f));
 
             foreach (Transform child in content.Cast<Transform>().ToArray())
             {
@@ -803,12 +970,12 @@ namespace CryingSnow.StackCraft.EditorTools
             else
                 template = templateTransform.gameObject;
             RectTransform templateRect = (RectTransform)template.transform;
-            templateRect.sizeDelta = new Vector2(96f, 88f);
+            templateRect.sizeDelta = new Vector2(84f, 88f);
             LayoutElement element = template.GetComponent<LayoutElement>();
-            element.preferredWidth = 96f;
+            element.preferredWidth = 84f;
             element.preferredHeight = 88f;
             Image templateImage = template.GetComponent<Image>();
-            templateImage.color = new Color(0.20f, 0.30f, 0.39f, 1f);
+            templateImage.color = new Color(0.34f, 0.45f, 0.53f, 1f);
             templateImage.raycastTarget = true;
             Outline outline = template.GetComponent<Outline>();
             if (outline == null)
@@ -829,7 +996,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 "ItemName",
                 font,
                 14f,
-                Color.white);
+                new Color(0.94f, 0.96f, 0.98f, 1f));
             SetAnchored(
                 itemName.rectTransform,
                 new Vector2(4f, -51f),
@@ -843,7 +1010,7 @@ namespace CryingSnow.StackCraft.EditorTools
                 "SlotName",
                 font,
                 11f,
-                new Color(0.69f, 0.79f, 0.87f, 1f));
+                new Color(0.94f, 0.96f, 0.98f, 1f));
             SetAnchored(
                 slotName.rectTransform,
                 new Vector2(4f, -69f),
@@ -892,19 +1059,19 @@ namespace CryingSnow.StackCraft.EditorTools
             }
 
             RectTransform details = (RectTransform)detailsObject.transform;
-            details.anchorMin = Vector2.zero;
+            details.anchorMin = new Vector2(0f, 0f);
             details.anchorMax = new Vector2(1f, 0f);
-            details.pivot = Vector2.zero;
-            details.anchoredPosition = new Vector2(12f, 58f);
+            details.pivot = new Vector2(0.5f, 0f);
+            details.anchoredPosition = new Vector2(0f, 72f);
             details.sizeDelta = new Vector2(-24f, 150f);
             details.localScale = Vector3.one;
             Image image = details.GetComponent<Image>();
             image.sprite = null;
-            image.color = new Color(0.035f, 0.12f, 0.18f, 0.98f);
+            image.color = new Color(0.78f, 0.84f, 0.88f, 1f);
             image.raycastTarget = false;
             ConfigureOutline(
                 detailsObject,
-                new Color(0.30f, 0.43f, 0.53f, 0.82f),
+                new Color(0.50f, 0.61f, 0.69f, 0.88f),
                 new Vector2(1f, -1f));
             return details;
         }
@@ -1020,14 +1187,18 @@ namespace CryingSnow.StackCraft.EditorTools
         private static void ConfigureDetailsText(
             TMP_Text text,
             float top,
-            float height)
+            float height,
+            float left,
+            float right)
         {
             RectTransform rect = text.rectTransform;
             rect.anchorMin = new Vector2(0f, 1f);
             rect.anchorMax = new Vector2(1f, 1f);
             rect.pivot = new Vector2(0.5f, 1f);
-            rect.anchoredPosition = new Vector2(0f, -top);
-            rect.sizeDelta = new Vector2(-24f, height);
+            rect.anchoredPosition = new Vector2(
+                (left - right) * 0.5f,
+                -top);
+            rect.sizeDelta = new Vector2(-(left + right), height);
             rect.localScale = Vector3.one;
         }
 

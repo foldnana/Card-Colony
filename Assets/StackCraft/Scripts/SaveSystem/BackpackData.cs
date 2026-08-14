@@ -7,7 +7,8 @@ namespace CryingSnow.StackCraft
     [Serializable]
     public sealed class BackpackData
     {
-        public int SlotCapacity = 8;
+        public int SlotCapacity = 9;
+        public float MaximumCarryWeight = 20f;
         public List<BackpackEntryData> Entries = new();
 
         public int Capacity => SlotCapacity;
@@ -15,8 +16,12 @@ namespace CryingSnow.StackCraft
 
         public void Normalize()
         {
-            if (SlotCapacity <= 0)
-                SlotCapacity = 8;
+            if (SlotCapacity < 9)
+                SlotCapacity = 9;
+            else if (SlotCapacity % 3 != 0)
+                SlotCapacity = ((SlotCapacity + 2) / 3) * 3;
+            if (MaximumCarryWeight <= 0f)
+                MaximumCarryWeight = 20f;
             Entries ??= new List<BackpackEntryData>();
 
             var usedIds = new HashSet<string>();
@@ -60,6 +65,21 @@ namespace CryingSnow.StackCraft
             };
             Entries.Add(entry);
             return true;
+        }
+
+        public float CalculateWeight(Func<CardData, float> weightResolver)
+        {
+            if (Entries == null || weightResolver == null)
+                return 0f;
+
+            float total = 0f;
+            foreach (BackpackEntryData entry in Entries)
+            {
+                if (entry?.Card != null)
+                    total += Math.Max(0f, weightResolver(entry.Card));
+            }
+
+            return total;
         }
 
         public bool TryRemove(string instanceId, out CardData card)
@@ -191,7 +211,7 @@ namespace CryingSnow.StackCraft
             if (requiredSlots <= SlotCapacity)
                 return;
 
-            const int slotsPerRow = 4;
+            const int slotsPerRow = 3;
             SlotCapacity = ((requiredSlots + slotsPerRow - 1) / slotsPerRow) *
                 slotsPerRow;
         }

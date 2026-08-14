@@ -138,7 +138,7 @@ namespace CardColony.Tests
             Transform backpackRoot =
                 FindDescendant(root.transform, "BackpackRoot");
             Assert.That(
-                FindDescendant(backpackRoot, "BackpackSidebarPageV3"),
+                FindDescendant(backpackRoot, "BackpackSidebarPageV6"),
                 Is.Not.Null,
                 "背包侧栏页面必须直接序列化在 UIRoot.prefab 中。");
             Transform drawer = FindDescendant(
@@ -171,7 +171,7 @@ namespace CardColony.Tests
 
             TMP_Text capacity = FindDescendant(
                 root.transform,
-                "BackpackCapacityText").GetComponent<TMP_Text>();
+                "BackpackWeightText").GetComponent<TMP_Text>();
             Assert.That(capacity.color.b,
                 Is.GreaterThanOrEqualTo(capacity.color.r),
                 "背包容量文字应使用清晰的冷白色，而不是旧皮革板金色。");
