@@ -37,6 +37,10 @@ namespace CryingSnow.StackCraft
         private readonly List<CardInstance> combatants = new();
         private readonly HashSet<CardInstance> participants = new();
         private readonly HashSet<string> resolvedDefeatIds = new();
+        private readonly HashSet<string> defeatedActorIds =
+            new(StringComparer.Ordinal);
+        private readonly HashSet<string> retreatedPlayerIds =
+            new(StringComparer.Ordinal);
         private readonly Dictionary<CardInstance, long> joinSequences = new();
         private readonly CombatCommandQueue commands = new();
         private readonly CombatActionScheduler scheduler = new();
@@ -637,6 +641,7 @@ namespace CryingSnow.StackCraft
             string key = SessionId + ":" + persistentId;
             if (!resolvedDefeatIds.Add(key))
                 return;
+            defeatedActorIds.Add(persistentId);
 
             CancelQueuedCommandForActor(
                 defeated,
@@ -772,6 +777,8 @@ namespace CryingSnow.StackCraft
                 commands.CancelForActor(card.PersistentId);
                 card.Combatant.LeaveCombat();
                 card.Combatant.GrantReaggroProtection(3f);
+                if (!string.IsNullOrWhiteSpace(card.PersistentId))
+                    retreatedPlayerIds.Add(card.PersistentId);
                 Publish(CombatEventType.RetreatSucceeded, card, chance: chance);
                 Rect?.UpdateLayout();
                 if (Attackers.Count == 0 || Defenders.Count == 0)
@@ -802,9 +809,13 @@ namespace CryingSnow.StackCraft
             return false;
         }
 
-        public void EndImmediately() => EndCombat();
+        public void EndImmediately() => EndCombat(
+            CombatOutcomeResult.Aborted,
+            "EndedImmediately");
 
-        private void EndCombat()
+        private void EndCombat(
+            CombatOutcomeResult? forcedResult = null,
+            string forcedReason = null)
         {
             if (Phase == CombatPhase.Finished)
                 return;
@@ -816,6 +827,21 @@ namespace CryingSnow.StackCraft
             }
             reservations.ReleaseSession(SessionId);
             commands.Clear();
+            CombatOutcomeResult outcome = forcedResult ?? DetermineOutcome();
+            string endReason = forcedReason ?? outcome switch
+            {
+                CombatOutcomeResult.Victory => "EnemiesDefeated",
+                CombatOutcomeResult.Defeat => "PlayerDefeated",
+                CombatOutcomeResult.Retreated => "PlayerRetreated",
+                _ => "CombatAborted"
+            };
+            string[] survivors = combatants
+                .Where(card => card != null && card.CurrentHealth > 0 &&
+                    !card.IsDowned &&
+                    !string.IsNullOrWhiteSpace(card.PersistentId))
+                .Select(card => card.PersistentId)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
             Publish(CombatEventType.CombatEnded);
             if (Rect != null)
             {
@@ -836,6 +862,27 @@ namespace CryingSnow.StackCraft
                 stack.SetTargetPosition(position);
             }
             Phase = CombatPhase.Finished;
+            CombatManager.Instance?.PublishOutcome(
+                SessionId,
+                outcome,
+                endReason,
+                survivors,
+                defeatedActorIds);
+        }
+
+        private CombatOutcomeResult DetermineOutcome()
+        {
+            bool playerAlive = combatants.Any(card =>
+                card != null && card.Definition?.Faction == CardFaction.Player &&
+                card.CurrentHealth > 0 && !card.IsDowned);
+            bool mobAlive = combatants.Any(card =>
+                card != null && card.Definition?.Faction == CardFaction.Mob &&
+                card.CurrentHealth > 0 && !card.IsDowned);
+            return CombatOutcomeRules.Resolve(
+                playerAlive,
+                mobAlive,
+                retreatedPlayerIds.Count > 0,
+                forceAbort: false);
         }
 
         public void CleanUpForMerge()
@@ -911,7 +958,12 @@ namespace CryingSnow.StackCraft
                 }
             }
             foreach (string key in data.ResolvedDefeatIds ?? new())
+            {
                 resolvedDefeatIds.Add(key);
+                int separator = key?.LastIndexOf(':') ?? -1;
+                if (separator >= 0 && separator < key.Length - 1)
+                    defeatedActorIds.Add(key[(separator + 1)..]);
+            }
         }
 
         internal long GetJoinSequence(CardInstance card, long fallback)
@@ -1001,6 +1053,8 @@ namespace CryingSnow.StackCraft
             }
             foreach (string key in source.ResolvedDefeatIds)
                 resolvedDefeatIds.Add(key);
+            defeatedActorIds.UnionWith(source.defeatedActorIds);
+            retreatedPlayerIds.UnionWith(source.retreatedPlayerIds);
 
             BackpackData backpack = BackpackService.Current;
             if (backpack?.Entries != null && source.SessionId != SessionId)

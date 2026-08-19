@@ -157,6 +157,7 @@ namespace CryingSnow.StackCraft
         public float TimeoutSeconds { get; set; }
         public bool CreditedToParty { get; set; }
         public bool ProtagonistParticipated { get; set; }
+        public string RecoveryToken { get; set; } = string.Empty;
 
         public GameplayInteractionRequest(
             string operationId,
@@ -193,6 +194,10 @@ namespace CryingSnow.StackCraft
         public string FailureCode { get; }
         public string ContextId { get; }
         public int Quantity { get; }
+        public IReadOnlyList<string> InitiatorActorIds { get; }
+        public IReadOnlyList<string> TargetActorIds { get; }
+        public IReadOnlyDictionary<string, string> ResultValues { get; }
+        public string PersistedEventId { get; }
 
         public InteractionResult(
             string operationId,
@@ -201,7 +206,11 @@ namespace CryingSnow.StackCraft
             string outcomeId,
             string failureCode,
             string contextId,
-            int quantity = 1)
+            int quantity = 1,
+            IEnumerable<string> initiatorActorIds = null,
+            IEnumerable<string> targetActorIds = null,
+            IReadOnlyDictionary<string, string> resultValues = null,
+            string persistedEventId = null)
         {
             OperationId = operationId ?? string.Empty;
             ActionId = actionId ?? string.Empty;
@@ -210,6 +219,13 @@ namespace CryingSnow.StackCraft
             FailureCode = failureCode ?? string.Empty;
             ContextId = contextId ?? string.Empty;
             Quantity = Math.Max(0, quantity);
+            InitiatorActorIds = (initiatorActorIds ?? Array.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+            TargetActorIds = (targetActorIds ?? Array.Empty<string>())
+                .Where(value => !string.IsNullOrWhiteSpace(value)).ToArray();
+            ResultValues = resultValues ??
+                new Dictionary<string, string>(StringComparer.Ordinal);
+            PersistedEventId = persistedEventId ?? string.Empty;
         }
     }
 
@@ -235,6 +251,11 @@ namespace CryingSnow.StackCraft
         bool TryCancel(string reason);
     }
 
+    public interface IRecoverableGameplayInteractionOperation
+    {
+        string RecoveryToken { get; }
+    }
+
     public interface IGameplayInteractionHandler
     {
         string ActionId { get; }
@@ -243,6 +264,13 @@ namespace CryingSnow.StackCraft
             GameplayInteractionRequest request,
             GameplayInteractionContext context);
         IGameplayInteractionOperation Begin(
+            GameplayInteractionRequest request,
+            GameplayInteractionContext context);
+    }
+
+    public interface IGameplayInteractionRecoveryHandler
+    {
+        IGameplayInteractionOperation Recover(
             GameplayInteractionRequest request,
             GameplayInteractionContext context);
     }
@@ -343,6 +371,19 @@ namespace CryingSnow.StackCraft
         public IGameplayInteractionOperation Execute(
             GameplayInteractionRequest request)
         {
+            return ExecuteInternal(request, recover: false);
+        }
+
+        public IGameplayInteractionOperation Recover(
+            GameplayInteractionRequest request)
+        {
+            return ExecuteInternal(request, recover: true);
+        }
+
+        private IGameplayInteractionOperation ExecuteInternal(
+            GameplayInteractionRequest request,
+            bool recover)
+        {
             if (request == null ||
                 string.IsNullOrWhiteSpace(request.OperationId) ||
                 string.IsNullOrWhiteSpace(request.ActionId))
@@ -366,9 +407,12 @@ namespace CryingSnow.StackCraft
                     validation?.ErrorCode ?? "ValidationFailed");
             }
 
-            IGameplayInteractionOperation operation = handler.Begin(
-                request,
-                context);
+            if (recover && handler is not IGameplayInteractionRecoveryHandler)
+                return StartFailure(request, "RecoveryUnsupported");
+            IGameplayInteractionOperation operation = recover
+                ? ((IGameplayInteractionRecoveryHandler)handler).Recover(
+                    request, context)
+                : handler.Begin(request, context);
             if (operation == null)
                 return StartFailure(request, "OperationNotCreated");
             operation.Progressed += progress => eventSink?.Publish(

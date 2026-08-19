@@ -389,6 +389,15 @@ namespace CryingSnow.StackCraft
         public List<string> CommittedResultIds = new();
         public List<string> CompletedOnceNarrativeIds = new();
         public List<string> CompletedSourceRunKeys = new();
+        public List<NarrativeRunCounterData> LastRunNumbers = new();
+        public List<string> PendingTriggerInstanceIds = new();
+    }
+
+    public enum NarrativeResumePolicy
+    {
+        ResumeFromCheckpoint = 0,
+        RestartCheckpointNode = 1,
+        AbortIfInteractionMissing = 2
     }
 
     [System.Serializable]
@@ -397,7 +406,46 @@ namespace CryingSnow.StackCraft
         public string NarrativeId;
         public int NarrativeVersion;
         public string RunId;
+        public string CheckpointNodeId;
+        public int CheckpointCommandIndex;
+        public List<string> SelectedChoiceIds = new();
         public List<string> CommittedResultIds = new();
+        public NarrativeWaitingInteractionData WaitingInteraction;
+        public NarrativeResumePolicy ResumePolicy =
+            NarrativeResumePolicy.ResumeFromCheckpoint;
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeWaitingInteractionData
+    {
+        public string OperationId;
+        public string ActionId;
+        public string ContextId;
+        public string RecoveryToken;
+        public List<string> InitiatorActorIds = new();
+        public List<string> TargetActorIds = new();
+        public List<NarrativeInteractionArgumentData> Arguments = new();
+        public float TimeoutSeconds;
+        public bool CreditedToParty;
+        public bool ProtagonistParticipated;
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeInteractionArgumentData
+    {
+        public string Key;
+        public InteractionValueType ValueType;
+        public string StringValue;
+        public int IntValue;
+        public float FloatValue;
+        public bool BoolValue;
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeRunCounterData
+    {
+        public string NarrativeId;
+        public int LastRunNumber;
     }
 
     [System.Serializable]

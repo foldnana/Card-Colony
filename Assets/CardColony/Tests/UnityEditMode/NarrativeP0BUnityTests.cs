@@ -770,8 +770,10 @@ namespace CardColony.Tests
             Assert.That(definition, Is.Not.Null,
                 "P0-B 必须包含可在河湾村触发的商人受威吓样例。");
 
-            Assert.That(GetProperty<string>(definition, "Id"),
-                Is.EqualTo("npc_event.riverbend-grocer"));
+            string narrativeId = GetProperty<string>(definition, "Id");
+            Assert.That(narrativeId,
+                Is.EqualTo("npc_event.riverbend-grocer")
+                    .Or.EqualTo("npc_event.riverbend-grocer-ambush"));
             IEnumerable nodes = GetProperty<IEnumerable>(definition, "Nodes");
             string[] commandNames = nodes.Cast<object>()
                 .SelectMany(node => GetProperty<IEnumerable>(node, "Commands")
@@ -784,8 +786,17 @@ namespace CardColony.Tests
             Assert.That(commandNames, Does.Contain("PlayCinematicAttack"));
             Assert.That(commandNames, Does.Contain("ShowChoice"));
             Assert.That(commandNames, Does.Contain("DespawnActor"));
-            Assert.That(commandNames, Does.Not.Contain("ExecuteInteraction"),
-                "P0-B 样例不得提前进入正式战斗。 ");
+            if (narrativeId == "npc_event.riverbend-grocer")
+            {
+                Assert.That(commandNames,
+                    Does.Not.Contain("ExecuteInteraction"),
+                    "P0-B v1 样例不得提前进入正式战斗。 ");
+            }
+            else
+            {
+                Assert.That(commandNames, Does.Contain("ExecuteInteraction"),
+                    "P0-C v2 样例必须把同一事件升级为正式互动。 ");
+            }
 
             Type validatorType = RequireType(
                 "CryingSnow.StackCraft.NarrativeValidator");

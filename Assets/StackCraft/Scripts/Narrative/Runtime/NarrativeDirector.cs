@@ -36,6 +36,8 @@ namespace CryingSnow.StackCraft
         private bool closeDialogueOnFinish;
         private NarrativeRuntimeState lastPresentedRuntimeState =
             NarrativeRuntimeState.Idle;
+        private NarrativeRunStateData pendingResumeRun;
+        private bool resumeAttempted;
 
         public static NarrativeDirector Instance { get; private set; }
         public NarrativeDirectorState State { get; private set; } =
@@ -76,11 +78,20 @@ namespace CryingSnow.StackCraft
                 new ValidationGameplayInteractionHandler(
                     "narrative.validation",
                     "validated"));
+            interactionRegistry.Register(
+                new CombatGameplayInteractionHandler());
+            interactionRegistry.Register(
+                new InvestigationGameplayInteractionHandler());
             SceneManager.sceneLoaded += HandleSceneLoaded;
         }
 
         private void Update()
         {
+            if (!resumeAttempted && State == NarrativeDirectorState.Idle &&
+                GameDirector.Instance?.GameData != null)
+            {
+                TryResumeActiveNarrative();
+            }
             if (State != NarrativeDirectorState.Playing || runtime == null)
                 return;
 
@@ -119,6 +130,23 @@ namespace CryingSnow.StackCraft
             NarrativeTriggerSubmissionResult result = scheduler.Submit(
                 request,
                 canStartImmediately);
+            if (result is NarrativeTriggerSubmissionResult.Started or
+                NarrativeTriggerSubmissionResult.Queued)
+            {
+                GameData data = GameDirector.Instance?.GameData;
+                if (data != null)
+                {
+                    data.Narrative ??= new NarrativeHistoryData();
+                    data.Narrative.PendingTriggerInstanceIds ??=
+                        new List<string>();
+                    if (!data.Narrative.PendingTriggerInstanceIds.Contains(
+                            request.TriggerInstanceId))
+                    {
+                        data.Narrative.PendingTriggerInstanceIds.Add(
+                            request.TriggerInstanceId);
+                    }
+                }
+            }
             if (result == NarrativeTriggerSubmissionResult.Started)
                 StartScheduled(request);
             return result;
@@ -187,7 +215,12 @@ namespace CryingSnow.StackCraft
                     resolvedActors,
                     commandExecutor);
                 State = NarrativeDirectorState.Playing;
-                if (!runtime.Start(definition, runId))
+                NarrativeRunStateData resume = pendingResumeRun;
+                pendingResumeRun = null;
+                bool started = resume != null
+                    ? runtime.Resume(definition, resume)
+                    : runtime.Start(definition, runId);
+                if (!started)
                 {
                     Fail(runtime.FailureReason);
                     return false;
@@ -210,6 +243,27 @@ namespace CryingSnow.StackCraft
                 value != null && string.Equals(value.Id, narrativeId,
                     StringComparison.Ordinal));
             return definition != null && Play(definition, runId);
+        }
+
+        public bool TryResumeActiveNarrative()
+        {
+            resumeAttempted = true;
+            NarrativeRunStateData saved =
+                GameDirector.Instance?.GameData?.Narrative?.ActiveRun;
+            if (saved == null || string.IsNullOrWhiteSpace(saved.NarrativeId) ||
+                string.IsNullOrWhiteSpace(saved.CheckpointNodeId))
+                return false;
+            NarrativeDefinition definition = definitions.FirstOrDefault(value =>
+                value != null && string.Equals(
+                    value.Id, saved.NarrativeId, StringComparison.Ordinal));
+            if (definition == null || definition.Version !=
+                Math.Max(1, saved.NarrativeVersion))
+                return false;
+            pendingResumeRun = saved;
+            bool resumed = Play(definition, saved.RunId);
+            if (!resumed)
+                pendingResumeRun = null;
+            return resumed;
         }
 
         public bool TryPlayQuestOffer(string questId, string sourceRunId)
@@ -245,7 +299,13 @@ namespace CryingSnow.StackCraft
         {
             if (string.IsNullOrWhiteSpace(npcId))
                 return false;
-            string narrativeId = $"npc_event.{npcId}";
+            string baseNarrativeId = $"npc_event.{npcId}";
+            string p0cNarrativeId = $"{baseNarrativeId}-ambush";
+            string narrativeId = definitions.Any(value => value != null &&
+                    string.Equals(value.Id, p0cNarrativeId,
+                        StringComparison.Ordinal))
+                ? p0cNarrativeId
+                : baseNarrativeId;
             if (definitions.All(value => value == null ||
                     !string.Equals(value.Id, narrativeId,
                         StringComparison.Ordinal)))
@@ -498,6 +558,20 @@ namespace CryingSnow.StackCraft
                     string.Equals(data.Narrative.ActiveRun.NarrativeId,
                         activeDefinition?.Id, StringComparison.Ordinal))
                 {
+                    data.Narrative.LastRunNumbers ??=
+                        new List<NarrativeRunCounterData>();
+                    NarrativeRunCounterData counter = data.Narrative
+                        .LastRunNumbers.FirstOrDefault(value => value != null &&
+                            value.NarrativeId == activeDefinition.Id);
+                    if (counter == null)
+                    {
+                        counter = new NarrativeRunCounterData
+                        {
+                            NarrativeId = activeDefinition.Id
+                        };
+                        data.Narrative.LastRunNumbers.Add(counter);
+                    }
+                    counter.LastRunNumber++;
                     data.Narrative.ActiveRun = null;
                 }
                 GameDirector.Instance?.SaveGame();
@@ -517,6 +591,9 @@ namespace CryingSnow.StackCraft
             State = NarrativeDirectorState.Idle;
             if (activeTrigger != null)
             {
+                GameData data = GameDirector.Instance?.GameData;
+                data?.Narrative?.PendingTriggerInstanceIds?.Remove(
+                    activeTrigger.TriggerInstanceId);
                 scheduler.CompleteActive();
                 activeTrigger = null;
             }
@@ -582,8 +659,11 @@ namespace CryingSnow.StackCraft
         private void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             scheduler.DiscardQueuedForSceneLoad();
+            GameDirector.Instance?.GameData?.Narrative?.
+                PendingTriggerInstanceIds?.Clear();
             if (State != NarrativeDirectorState.Idle)
                 Cancel("SceneLoaded");
+            resumeAttempted = false;
         }
 
         private static bool RequiresDialoguePanel(

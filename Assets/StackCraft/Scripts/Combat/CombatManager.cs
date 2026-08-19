@@ -11,6 +11,9 @@ namespace CryingSnow.StackCraft
 
         public static CombatManager Instance { get; private set; }
         public event System.Action<CombatEvent> EventPublished;
+        public event System.Action<CombatOutcome> OutcomePublished;
+
+        private readonly CombatSessionOutcomeTracker outcomeTracker = new();
 
         internal void Publish(CombatEvent combatEvent)
         {
@@ -18,6 +21,33 @@ namespace CryingSnow.StackCraft
         }
 
         internal void PublishEvent(CombatEvent combatEvent) => Publish(combatEvent);
+
+        internal void PublishOutcome(
+            string finalSessionId,
+            CombatOutcomeResult result,
+            string endReason,
+            IEnumerable<string> survivingActorIds,
+            IEnumerable<string> defeatedActorIds)
+        {
+            foreach (string originalSessionId in outcomeTracker
+                         .OriginalsForFinal(finalSessionId).ToArray())
+            {
+                OutcomePublished?.Invoke(outcomeTracker.CreateOutcome(
+                    originalSessionId,
+                    result,
+                    endReason,
+                    survivingActorIds,
+                    defeatedActorIds));
+            }
+        }
+
+        public string ResolveFinalSessionId(string originalSessionId) =>
+            outcomeTracker.ResolveFinalSession(originalSessionId);
+
+        public void RegisterSessionAlias(
+            string originalSessionId,
+            string finalSessionId) =>
+            outcomeTracker.Register(originalSessionId, finalSessionId);
 
         #region Serialized Fields
         [Header("RPS Settings")]
@@ -182,6 +212,18 @@ namespace CryingSnow.StackCraft
 
         private void OnDestroy()
         {
+            foreach (CombatTask task in _activeCombats
+                         .Where(task => task?.IsOngoing == true).ToArray())
+            {
+                PublishOutcome(
+                    task.SessionId,
+                    CombatOutcomeResult.Aborted,
+                    "CombatManagerDestroyed",
+                    task.Attackers.Concat(task.Defenders)
+                        .Where(card => card != null && card.CurrentHealth > 0)
+                        .Select(card => card.PersistentId),
+                    System.Array.Empty<string>());
+            }
             if (_activeCombats.Contains(CombatFocusService.FocusedCombat))
                 CombatFocusService.Clear();
             if (GameDirector.Instance != null)
@@ -250,6 +292,7 @@ namespace CryingSnow.StackCraft
                     defenders.ForEach(card => card.Combatant.EnterCombat(task));
                     task.RestoreRuntime(combatData);
                     _activeCombats.Add(task);
+                    outcomeTracker.Register(task.SessionId, task.SessionId);
                     nextRequestedSequence = System.Math.Max(
                         nextRequestedSequence,
                         task.QueuedCommands
@@ -309,13 +352,34 @@ namespace CryingSnow.StackCraft
         /// <returns>The newly created or merged <see cref="CombatTask"/>, or null if creation failed.</returns>
         public CombatTask StartCombat(List<CardInstance> attackers, List<CardInstance> defenders, bool playerIsAttacker)
         {
+            return StartCombat(
+                attackers,
+                defenders,
+                playerIsAttacker,
+                null);
+        }
+
+        public CombatTask StartCombat(
+            List<CardInstance> attackers,
+            List<CardInstance> defenders,
+            bool playerIsAttacker,
+            string originalSessionId)
+        {
             // 1. Find any existing combat tasks that overlap with the new one's initiation area.
             var tasksToMerge = FindOverlappingTasks(attackers, defenders);
 
             // 2. If overlaps are found, initiate a merge.
             if (tasksToMerge.Any())
             {
-                return MergeCombats(attackers, defenders, tasksToMerge);
+                CombatTask merged = MergeCombats(
+                    attackers, defenders, tasksToMerge);
+                if (merged != null &&
+                    !string.IsNullOrWhiteSpace(originalSessionId))
+                {
+                    outcomeTracker.Register(
+                        originalSessionId, merged.SessionId);
+                }
+                return merged;
             }
             // 3. Otherwise, create a standard, isolated combat.
             else
@@ -327,7 +391,19 @@ namespace CryingSnow.StackCraft
                         "Operation=StartCombat Code=SessionLimitReached");
                     return null;
                 }
-                return CreateCombatTaskInternal(attackers, defenders, playerIsAttacker);
+                CombatTask created = CreateCombatTaskInternal(
+                    attackers, defenders, playerIsAttacker);
+                if (created != null)
+                {
+                    outcomeTracker.Register(
+                        created.SessionId, created.SessionId);
+                    if (!string.IsNullOrWhiteSpace(originalSessionId))
+                    {
+                        outcomeTracker.Register(
+                            originalSessionId, created.SessionId);
+                    }
+                }
+                return created;
             }
         }
 
@@ -442,6 +518,10 @@ namespace CryingSnow.StackCraft
                 .Where(task => task != null)
                 .OrderBy(task => task.CreatedSequence)
                 .FirstOrDefault();
+            string[] mergedSessionIds = tasksToMerge
+                .Where(task => task != null)
+                .Select(task => task.SessionId)
+                .ToArray();
 
             // Clean up the old visuals after retaining their runtime state.
             foreach (var task in tasksToMerge)
@@ -469,6 +549,12 @@ namespace CryingSnow.StackCraft
             allPlayerUnits.ForEach(card => card.Combatant.EnterCombat(merged));
             allMobUnits.ForEach(card => card.Combatant.EnterCombat(merged));
             _activeCombats.Add(merged);
+            outcomeTracker.Register(merged.SessionId, merged.SessionId);
+            foreach (string previousSessionId in mergedSessionIds)
+            {
+                outcomeTracker.RemapFinalSession(
+                    previousSessionId, merged.SessionId);
+            }
             EnsureDefaultCombatFocus();
             merged.PublishMerged();
             CardManager.Instance?.ResolveOverlaps(rect);

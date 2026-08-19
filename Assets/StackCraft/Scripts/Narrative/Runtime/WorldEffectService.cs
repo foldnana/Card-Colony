@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 namespace CryingSnow.StackCraft
 {
@@ -261,6 +262,30 @@ namespace CryingSnow.StackCraft
                 case NarrativeEffectType.ApplyDamage:
                     return WorldEffectResult.Failed(
                         "ApplyDamage requires a resolved narrative actor.");
+                case NarrativeEffectType.GiveCoins:
+                {
+                    if (request.IntValue <= 0)
+                        return WorldEffectResult.Failed(
+                            "Coin reward must be greater than zero.");
+                    CardDefinition currency = CardManager.Instance?
+                        .GetDefinitionById(request.TargetId) ??
+                        Resources.LoadAll<CardDefinition>("Cards")
+                            .FirstOrDefault(value => value != null &&
+                                value.Id == request.TargetId &&
+                                value.Category == CardCategory.Currency);
+                    if (currency == null)
+                        return WorldEffectResult.Failed(
+                            "Coin definition is unavailable.");
+                    if (!BackpackService.TryStoreGeneratedCards(
+                            currency,
+                            request.IntValue,
+                            gameData.EnsureBackpack()))
+                    {
+                        return WorldEffectResult.Failed(
+                            "Coin reward could not enter the backpack.");
+                    }
+                    break;
+                }
                 default:
                     return WorldEffectResult.Failed(
                         $"Unsupported world effect: {request.EffectType}.");

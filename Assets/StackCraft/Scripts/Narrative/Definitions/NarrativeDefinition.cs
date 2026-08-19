@@ -36,7 +36,8 @@ namespace CryingSnow.StackCraft
         Checkpoint = 26,
         SceneTransition = 27,
         IrreversibleConfirmation = 28,
-        ApplyDamage = 29
+        ApplyDamage = 29,
+        BranchByInteractionOutcome = 30
     }
 
     public enum NarrativeBarrierType
@@ -74,7 +75,8 @@ namespace CryingSnow.StackCraft
         IncrementWorldFactInt = 3,
         StartQuest = 4,
         ReportQuestEvent = 5,
-        ApplyDamage = 6
+        ApplyDamage = 6,
+        GiveCoins = 7
     }
 
     [Serializable]

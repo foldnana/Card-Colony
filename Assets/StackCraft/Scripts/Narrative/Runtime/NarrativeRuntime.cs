@@ -58,6 +58,10 @@ namespace CryingSnow.StackCraft
         private IGameplayInteractionOperation currentOperation;
         private Action<InteractionResult> currentOperationCompleted;
         private NarrativeCommandDefinition currentInteractionCommand;
+        private InteractionResult lastInteractionResult;
+        private bool recoverNextInteraction;
+        private NarrativeWaitingInteractionData recoveryWaitingData;
+        private readonly List<string> selectedChoiceIds = new();
         private float interactionTimeoutRemaining;
         private float waitTimeRemaining;
         private bool skippingToBarrier;
@@ -128,6 +132,56 @@ namespace CryingSnow.StackCraft
             CurrentChoiceTitle = string.Empty;
             currentChoices.Clear();
             FailureReason = string.Empty;
+            lastInteractionResult = null;
+            recoverNextInteraction = false;
+            recoveryWaitingData = null;
+            selectedChoiceIds.Clear();
+            State = NarrativeRuntimeState.Playing;
+            SaveCheckpoint(currentNode.Id, 0, null, null);
+            Advance();
+            return State != NarrativeRuntimeState.Failed;
+        }
+
+        public bool Resume(
+            NarrativeDefinition narrative,
+            NarrativeRunStateData savedRun)
+        {
+            if (narrative == null || savedRun == null ||
+                !string.Equals(narrative.Id, savedRun.NarrativeId,
+                    StringComparison.Ordinal) ||
+                narrative.Version != Math.Max(1, savedRun.NarrativeVersion) ||
+                string.IsNullOrWhiteSpace(savedRun.RunId))
+                return false;
+
+            DetachCurrentOperation(cancel: false, "NarrativeResumed");
+            runGeneration++;
+            NarrativeValidationReport validation =
+                NarrativeValidator.Validate(narrative);
+            if (!validation.IsValid)
+            {
+                Fail(string.Join("\n", validation.Errors));
+                return false;
+            }
+            definition = narrative;
+            runId = savedRun.RunId;
+            currentNode = definition.FindNode(savedRun.CheckpointNodeId);
+            if (currentNode == null)
+            {
+                Fail("Saved narrative checkpoint node is missing.");
+                return false;
+            }
+            commandIndex = Math.Max(0, Math.Min(
+                savedRun.CheckpointCommandIndex,
+                currentNode.Commands.Count));
+            selectedChoiceIds.Clear();
+            selectedChoiceIds.AddRange(savedRun.SelectedChoiceIds ?? new());
+            CurrentLine = null;
+            CurrentChoiceTitle = string.Empty;
+            currentChoices.Clear();
+            FailureReason = string.Empty;
+            lastInteractionResult = null;
+            recoverNextInteraction = savedRun.WaitingInteraction != null;
+            recoveryWaitingData = savedRun.WaitingInteraction;
             State = NarrativeRuntimeState.Playing;
             Advance();
             return State != NarrativeRuntimeState.Failed;
@@ -182,7 +236,14 @@ namespace CryingSnow.StackCraft
 
             currentChoices.Clear();
             CurrentChoiceTitle = string.Empty;
-            return JumpTo(choice.TargetNodeId);
+            if (!selectedChoiceIds.Contains(choice.ChoiceId))
+                selectedChoiceIds.Add(choice.ChoiceId);
+            State = NarrativeRuntimeState.Playing;
+            if (!MoveToNode(choice.TargetNodeId))
+                return false;
+            SaveCheckpoint(currentNode.Id, 0, null, null);
+            Advance();
+            return State != NarrativeRuntimeState.Failed;
         }
 
         public void Cancel(string reason = "Cancelled")
@@ -217,8 +278,12 @@ namespace CryingSnow.StackCraft
             }
 
             if (State != NarrativeRuntimeState.WaitingForInteraction ||
-                currentOperation == null ||
-                interactionTimeoutRemaining <= 0f ||
+                currentOperation == null)
+                return;
+
+            RefreshWaitingCheckpointToken();
+
+            if (interactionTimeoutRemaining <= 0f ||
                 unscaledDeltaSeconds <= 0f)
                 return;
 
@@ -320,11 +385,22 @@ namespace CryingSnow.StackCraft
                         if (State == NarrativeRuntimeState.WaitingForInteraction)
                             return;
                         break;
+                    case NarrativeCommandType.BranchByInteractionOutcome:
+                        if (!BranchByInteractionOutcome(command))
+                            return;
+                        break;
                     case NarrativeCommandType.EndNarrative:
                         skippingToBarrier = false;
                         Complete();
                         return;
                     case NarrativeCommandType.Checkpoint:
+                        SaveCheckpoint(
+                            currentNode.Id,
+                            commandIndex,
+                            null,
+                            null);
+                        State = NarrativeRuntimeState.WaitingAtBarrier;
+                        return;
                     case NarrativeCommandType.SceneTransition:
                     case NarrativeCommandType.IrreversibleConfirmation:
                         State = NarrativeRuntimeState.WaitingAtBarrier;
@@ -556,11 +632,22 @@ namespace CryingSnow.StackCraft
                     argument.ValueType,
                     GetInteractionArgumentValue(argument)));
             }
+            if (recoverNextInteraction && recoveryWaitingData != null)
+                request = RestoreInteractionRequest(recoveryWaitingData);
 
             IGameplayInteractionOperation operation;
             try
             {
-                operation = interactionGateway.Execute(request);
+                SaveCheckpoint(
+                    currentNode.Id,
+                    Math.Max(0, commandIndex - 1),
+                    null,
+                    null);
+                operation = recoverNextInteraction
+                    ? interactionGateway.Recover(request)
+                    : interactionGateway.Execute(request);
+                recoverNextInteraction = false;
+                recoveryWaitingData = null;
             }
             catch (Exception exception)
             {
@@ -571,14 +658,24 @@ namespace CryingSnow.StackCraft
                 return HandleFailure(command,
                     "Interaction operation was not created.");
             if (operation.Result != null)
-                return HandleInteractionResult(command, parameters,
-                    operation.Result);
+            {
+                bool handled = HandleInteractionResult(
+                    command, parameters, operation.Result);
+                if (handled)
+                    SaveCheckpoint(currentNode.Id, commandIndex, null, null);
+                return handled;
+            }
 
             State = NarrativeRuntimeState.WaitingForInteraction;
             currentOperation = operation;
             currentInteractionCommand = command;
             interactionTimeoutRemaining = Math.Max(0f,
                 parameters.TimeoutSeconds);
+            SaveCheckpoint(
+                currentNode.Id,
+                Math.Max(0, commandIndex - 1),
+                request,
+                operation);
             int expectedGeneration = runGeneration;
             currentOperationCompleted = result =>
             {
@@ -591,7 +688,11 @@ namespace CryingSnow.StackCraft
                     DetachCurrentOperation(cancel: false, string.Empty);
                     State = NarrativeRuntimeState.Playing;
                     if (HandleInteractionResult(command, parameters, result))
+                    {
+                        SaveCheckpoint(
+                            currentNode.Id, commandIndex, null, null);
                         Advance();
+                    }
                 }
                 catch (Exception exception)
                 {
@@ -632,11 +733,35 @@ namespace CryingSnow.StackCraft
                     result?.FailureCode ?? "InteractionFailed");
             }
 
+            lastInteractionResult = result;
+
             NarrativeInteractionOutcomeBranch branch =
                 parameters.OutcomeBranches.FirstOrDefault(value =>
                     value != null && string.Equals(value.OutcomeId,
                         result.OutcomeId, StringComparison.Ordinal));
             return branch == null || MoveToNode(branch.TargetNodeId);
+        }
+
+        private bool BranchByInteractionOutcome(
+            NarrativeCommandDefinition command)
+        {
+            if (lastInteractionResult == null)
+                return HandleFailure(command, "InteractionResultMissing");
+            NarrativeInteractionOutcomeBranch branch =
+                command.InteractionParameters?.OutcomeBranches?
+                    .FirstOrDefault(value => value != null &&
+                        string.Equals(value.OutcomeId,
+                            lastInteractionResult.OutcomeId,
+                            StringComparison.Ordinal));
+            if (branch == null)
+            {
+                return HandleFailure(command,
+                    $"InteractionOutcomeUnhandled:{lastInteractionResult.OutcomeId}");
+            }
+            if (!MoveToNode(branch.TargetNodeId))
+                return false;
+            SaveCheckpoint(currentNode.Id, 0, null, null);
+            return true;
         }
 
         private static object GetInteractionArgumentValue(
@@ -713,6 +838,150 @@ namespace CryingSnow.StackCraft
                 if (!string.IsNullOrWhiteSpace(persistentId))
                     yield return persistentId;
             }
+        }
+
+        private void SaveCheckpoint(
+            string nodeId,
+            int nextCommandIndex,
+            GameplayInteractionRequest waitingRequest,
+            IGameplayInteractionOperation waitingOperation)
+        {
+            GameData data = worldEffects.GameData;
+            if (data == null || definition == null ||
+                string.IsNullOrWhiteSpace(runId) ||
+                string.IsNullOrWhiteSpace(nodeId))
+                return;
+            data.Narrative ??= new NarrativeHistoryData();
+            NarrativeRunStateData saved = data.Narrative.ActiveRun;
+            if (saved == null ||
+                !string.Equals(saved.NarrativeId, definition.Id,
+                    StringComparison.Ordinal) ||
+                saved.NarrativeVersion != definition.Version ||
+                !string.Equals(saved.RunId, runId, StringComparison.Ordinal))
+            {
+                saved = new NarrativeRunStateData
+                {
+                    NarrativeId = definition.Id,
+                    NarrativeVersion = definition.Version,
+                    RunId = runId
+                };
+                data.Narrative.ActiveRun = saved;
+            }
+            saved.CommittedResultIds ??= new List<string>();
+            saved.SelectedChoiceIds = new List<string>(selectedChoiceIds);
+            saved.CheckpointNodeId = nodeId;
+            saved.CheckpointCommandIndex = Math.Max(0, nextCommandIndex);
+            saved.WaitingInteraction = waitingRequest == null
+                ? null
+                : CreateWaitingInteractionData(
+                    waitingRequest, waitingOperation);
+            saved.ResumePolicy = waitingRequest == null
+                ? NarrativeResumePolicy.ResumeFromCheckpoint
+                : NarrativeResumePolicy.AbortIfInteractionMissing;
+        }
+
+        private static NarrativeWaitingInteractionData
+            CreateWaitingInteractionData(
+                GameplayInteractionRequest request,
+                IGameplayInteractionOperation operation)
+        {
+            var saved = new NarrativeWaitingInteractionData
+            {
+                OperationId = request.OperationId,
+                ActionId = request.ActionId,
+                ContextId = request.ContextId,
+                RecoveryToken = operation is
+                    IRecoverableGameplayInteractionOperation recoverable
+                        ? recoverable.RecoveryToken
+                        : request.RecoveryToken,
+                TimeoutSeconds = request.TimeoutSeconds,
+                CreditedToParty = request.CreditedToParty,
+                ProtagonistParticipated = request.ProtagonistParticipated,
+                InitiatorActorIds = new List<string>(
+                    request.InitiatorActorIds),
+                TargetActorIds = new List<string>(request.TargetActorIds)
+            };
+            foreach (GameplayInteractionArgument argument in request.Arguments)
+            {
+                var value = new NarrativeInteractionArgumentData
+                {
+                    Key = argument.Key,
+                    ValueType = argument.ValueType
+                };
+                switch (argument.ValueType)
+                {
+                    case InteractionValueType.Int:
+                        value.IntValue = argument.Value is int intValue
+                            ? intValue
+                            : 0;
+                        break;
+                    case InteractionValueType.Float:
+                        value.FloatValue = argument.Value is float floatValue
+                            ? floatValue
+                            : 0f;
+                        break;
+                    case InteractionValueType.Bool:
+                        value.BoolValue = argument.Value is bool boolValue &&
+                            boolValue;
+                        break;
+                    default:
+                        value.StringValue = argument.Value?.ToString() ??
+                            string.Empty;
+                        break;
+                }
+                saved.Arguments.Add(value);
+            }
+            return saved;
+        }
+
+        private static GameplayInteractionRequest RestoreInteractionRequest(
+            NarrativeWaitingInteractionData saved)
+        {
+            var request = new GameplayInteractionRequest(
+                saved.OperationId,
+                saved.ActionId)
+            {
+                ContextId = saved.ContextId ?? string.Empty,
+                RecoveryToken = saved.RecoveryToken ?? string.Empty,
+                TimeoutSeconds = Math.Max(0f, saved.TimeoutSeconds),
+                CreditedToParty = saved.CreditedToParty,
+                ProtagonistParticipated = saved.ProtagonistParticipated
+            };
+            request.InitiatorActorIds.AddRange(
+                saved.InitiatorActorIds ?? new List<string>());
+            request.TargetActorIds.AddRange(
+                saved.TargetActorIds ?? new List<string>());
+            foreach (NarrativeInteractionArgumentData argument in
+                     saved.Arguments ?? new List<NarrativeInteractionArgumentData>())
+            {
+                if (argument == null)
+                    continue;
+                object value = argument.ValueType switch
+                {
+                    InteractionValueType.Int => argument.IntValue,
+                    InteractionValueType.Float => argument.FloatValue,
+                    InteractionValueType.Bool => argument.BoolValue,
+                    _ => argument.StringValue
+                };
+                request.Arguments.Add(new GameplayInteractionArgument(
+                    argument.Key,
+                    argument.ValueType,
+                    value));
+            }
+            return request;
+        }
+
+        private void RefreshWaitingCheckpointToken()
+        {
+            NarrativeRunStateData saved =
+                worldEffects.GameData?.Narrative?.ActiveRun;
+            if (saved?.WaitingInteraction == null ||
+                currentOperation is not
+                    IRecoverableGameplayInteractionOperation recoverable)
+                return;
+            string token = recoverable.RecoveryToken ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(token))
+                saved.WaitingInteraction.RecoveryToken = token;
         }
 
         private bool HandleUnsupportedCommand(NarrativeCommandDefinition command)

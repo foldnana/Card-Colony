@@ -259,6 +259,9 @@ namespace CryingSnow.StackCraft
                 case NarrativeCommandType.ExecuteInteraction:
                     ValidateInteraction(command, nodeIds, report);
                     break;
+                case NarrativeCommandType.BranchByInteractionOutcome:
+                    ValidateInteractionBranches(command, nodeIds, report);
+                    break;
                 case NarrativeCommandType.AcquireActorControl:
                 case NarrativeCommandType.ReleaseActorControl:
                 case NarrativeCommandType.MoveToMarker:
@@ -285,6 +288,38 @@ namespace CryingSnow.StackCraft
                             "缺少图片资源。");
                     }
                     break;
+            }
+        }
+
+        private static void ValidateInteractionBranches(
+            NarrativeCommandDefinition command,
+            HashSet<string> nodeIds,
+            NarrativeValidationReport report)
+        {
+            NarrativeInteractionParameters parameters =
+                command.InteractionParameters;
+            if (parameters?.OutcomeBranches == null ||
+                parameters.OutcomeBranches.Count == 0)
+            {
+                report.AddError(
+                    $"互动结果分支 {command.CommandId} 至少需要一个结果分支。");
+                return;
+            }
+            foreach (NarrativeInteractionOutcomeBranch branch in
+                     parameters.OutcomeBranches)
+            {
+                if (branch == null || string.IsNullOrWhiteSpace(branch.OutcomeId))
+                {
+                    report.AddError(
+                        $"互动结果分支 {command.CommandId} 包含空 OutcomeId。");
+                    continue;
+                }
+                ValidateRequiredTarget(
+                    branch.TargetNodeId,
+                    string.Empty,
+                    $"互动结果 {branch.OutcomeId}",
+                    nodeIds,
+                    report);
             }
         }
 
