@@ -412,6 +412,12 @@ namespace CryingSnow.StackCraft
                 report.AddWarning(prefix +
                     $"战斗目标 {objective.ObjectiveId} 未要求主角参与。");
             }
+            if (objective.Type == WorldQuestObjectiveType.Interaction &&
+                string.IsNullOrWhiteSpace(objective.TargetId))
+            {
+                report.AddError(prefix +
+                    $"互动目标 {objective.ObjectiveId} 缺少 ActionId。");
+            }
             if (string.IsNullOrWhiteSpace(objective.DisplayText))
                 report.AddError(prefix + "目标显示文本不能为空。");
         }

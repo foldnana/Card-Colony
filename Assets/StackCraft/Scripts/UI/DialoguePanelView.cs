@@ -123,6 +123,31 @@ namespace CryingSnow.StackCraft
             BuildChoiceTray(title, options);
         }
 
+        public void ShowNarrative(
+            string speakerName,
+            Texture speakerPortrait,
+            string dialogue,
+            string title,
+            IReadOnlyList<DialogueChoiceOption> options)
+        {
+            gameObject.SetActive(true);
+            responseGoodbyeCallback = null;
+            if (portraitBackground != null)
+                portraitBackground.gameObject.SetActive(false);
+            if (portrait != null)
+            {
+                portrait.texture = speakerPortrait;
+                portrait.gameObject.SetActive(speakerPortrait != null);
+            }
+            if (speakerNameLabel != null)
+                speakerNameLabel.text = speakerName ?? string.Empty;
+            if (dialogueTextLabel != null)
+                dialogueTextLabel.text = dialogue ?? string.Empty;
+            if (inlineActions != null)
+                inlineActions.SetActive(false);
+            BuildChoiceTray(title, options);
+        }
+
         public void ShowResponse(string response)
         {
             HideChoiceTray();
@@ -163,7 +188,10 @@ namespace CryingSnow.StackCraft
                     speaker.BaseTextureOverride != null);
             }
             if (portrait != null)
+            {
                 portrait.texture = speaker.ArtTexture;
+                portrait.gameObject.SetActive(speaker.ArtTexture != null);
+            }
             if (speakerNameLabel != null)
                 speakerNameLabel.text = speaker.DisplayName;
             if (dialogueTextLabel != null)

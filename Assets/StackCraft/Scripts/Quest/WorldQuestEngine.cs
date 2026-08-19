@@ -1917,6 +1917,11 @@ namespace CryingSnow.StackCraft
                 WorldQuestObjectiveType.DialogueChoice =>
                     questEvent.Type ==
                         WorldQuestEventType.DialogueChoiceSelected,
+                WorldQuestObjectiveType.Interaction =>
+                    questEvent.Type ==
+                        WorldQuestEventType.GameplayInteraction &&
+                    questEvent.InteractionPhase ==
+                        objective.InteractionPhase,
                 _ => false
             };
             if (!typeMatches)

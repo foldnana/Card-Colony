@@ -15,7 +15,8 @@ namespace CryingSnow.StackCraft
         InventorySnapshotChanged = 7,
         ProtagonistLevelChanged = 8,
         WorldDayStarted = 9,
-        DialogueChoiceSelected = 10
+        DialogueChoiceSelected = 10,
+        GameplayInteraction = 11
     }
 
     public enum WorldQuestTradeDirection
@@ -39,6 +40,15 @@ namespace CryingSnow.StackCraft
         public string ContextId { get; }
         public int Amount { get; }
         public WorldQuestTradeDirection TradeDirection { get; }
+        public GameplayInteractionPhase InteractionPhase { get; }
+        public string ActionId =>
+            Type == WorldQuestEventType.GameplayInteraction
+                ? PrimaryTargetId
+                : string.Empty;
+        public string InteractionOutcomeId =>
+            Type == WorldQuestEventType.GameplayInteraction
+                ? SecondaryTargetId
+                : string.Empty;
 
         public WorldQuestEvent(
             string eventId,
@@ -53,6 +63,37 @@ namespace CryingSnow.StackCraft
             string contextId,
             int amount,
             WorldQuestTradeDirection tradeDirection)
+            : this(
+                eventId,
+                type,
+                worldHour,
+                locationId,
+                actorPersistentId,
+                creditedToPlayerParty,
+                protagonistParticipated,
+                primaryTargetId,
+                secondaryTargetId,
+                contextId,
+                amount,
+                tradeDirection,
+                GameplayInteractionPhase.Resolved)
+        {
+        }
+
+        public WorldQuestEvent(
+            string eventId,
+            WorldQuestEventType type,
+            long worldHour,
+            string locationId,
+            string actorPersistentId,
+            bool creditedToPlayerParty,
+            bool protagonistParticipated,
+            string primaryTargetId,
+            string secondaryTargetId,
+            string contextId,
+            int amount,
+            WorldQuestTradeDirection tradeDirection,
+            GameplayInteractionPhase interactionPhase)
         {
             EventId = eventId;
             Type = type;
@@ -66,6 +107,7 @@ namespace CryingSnow.StackCraft
             ContextId = contextId;
             Amount = amount;
             TradeDirection = tradeDirection;
+            InteractionPhase = interactionPhase;
         }
     }
 

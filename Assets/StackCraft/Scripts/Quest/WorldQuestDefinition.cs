@@ -60,7 +60,8 @@ namespace CryingSnow.StackCraft
         CurrencyBalance = 9,
         ProtagonistLevel = 10,
         WorldDayReached = 11,
-        DialogueChoice = 12
+        DialogueChoice = 12,
+        Interaction = 13
     }
 
     public enum WorldQuestActorRequirement
@@ -172,6 +173,8 @@ namespace CryingSnow.StackCraft
         [SerializeField, Min(1)] private int requiredAmount = 1;
         [SerializeField] private WorldQuestProgressMode progressMode;
         [SerializeField] private WorldQuestActorRequirement actorRequirement;
+        [SerializeField] private GameplayInteractionPhase interactionPhase =
+            GameplayInteractionPhase.Resolved;
         [SerializeField] private bool optional;
         [SerializeField] private bool showProgress = true;
         [SerializeField] private string displayText;
@@ -185,6 +188,7 @@ namespace CryingSnow.StackCraft
         internal int SerializedRequiredAmount => requiredAmount;
         public WorldQuestProgressMode ProgressMode => progressMode;
         public WorldQuestActorRequirement ActorRequirement => actorRequirement;
+        public GameplayInteractionPhase InteractionPhase => interactionPhase;
         public bool Optional => optional;
         public bool ShowProgress => showProgress;
         public string DisplayText => displayText;

@@ -1,0 +1,308 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a2e11b94c91c514aaba6f1a4497b3e2, type: 3}
+  m_Name: Narrative_Riverbend_FirstCommission
+  m_EditorClassIdentifier:
+  id: quest_offer.story_riverbend_whispering_forest_01
+  version: 1
+  displayName: "\u6751\u957F\u53D1\u5E03\u9996\u4E2A\u59D4\u6258"
+  canSkip: 0
+  allowCameraInput: 1
+  entryNodeId: offer
+  actorBindings:
+  - roleId: Player
+    resolveMode: 1
+    persistentId:
+    cardDefinitionId:
+    displayName: "\u65C5\u884C\u8005"
+    portrait: {fileID: 0}
+  - roleId: Mayor
+    resolveMode: 2
+    persistentId:
+    cardDefinitionId: riverbend-village-chief
+    displayName: "\u6751\u957F"
+    portrait: {fileID: 0}
+  nodes:
+  - id: offer
+    commands:
+    - commandId: greeting
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Mayor
+        textKey: story.riverbend.first_commission.greeting
+        fallbackText: "\u5E74\u8F7B\u4EBA\uFF0C\u4F4E\u8BED\u68EE\u6797\u6700\u8FD1\u5F88\u4E0D\u5B89\u5B81\u3002\u4F60\u613F\u610F\u66FF\u6751\u5B50\u8C03\u67E5\u5417\uFF1F"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    - commandId: decision
+      type: 2
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback: "\u662F\u5426\u63A5\u53D7\u59D4\u6258\uFF1F"
+        choices:
+        - choiceId: accept
+          textKey: story.riverbend.first_commission.accept
+          fallbackText: "\u63A5\u53D7\u59D4\u6258"
+          targetNodeId: accepted
+          important: 1
+        - choiceId: decline
+          textKey: story.riverbend.first_commission.decline
+          fallbackText: "\u6682\u65F6\u62D2\u7EDD"
+          targetNodeId: declined
+          important: 1
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    nextNodeId:
+    failureNodeId:
+  - id: accepted
+    commands:
+    - commandId: instructions
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Mayor
+        textKey: story.riverbend.first_commission.instructions
+        fallbackText: "\u5148\u51C6\u5907\u4E00\u4E9B\u8865\u7ED9\uFF0C\u518D\u53BB\u4F4E\u8BED\u68EE\u6797\u67E5\u660E\u5F02\u54CD\u7684\u6765\u6E90\u3002"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    - commandId: start_quest
+      type: 5
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 4
+        resultId: accept_first_commission
+        targetId: story_riverbend_whispering_forest_01
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    - commandId: end
+      type: 7
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    nextNodeId:
+    failureNodeId:
+  - id: declined
+    commands:
+    - commandId: declined_line
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Mayor
+        textKey: story.riverbend.first_commission.declined_line
+        fallbackText: "\u6CA1\u5173\u7CFB\u3002\u51C6\u5907\u597D\u4E86\u518D\u6765\u627E\u6211\u3002"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    - commandId: end
+      type: 7
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+    nextNodeId:
+    failureNodeId:

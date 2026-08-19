@@ -33,6 +33,7 @@ namespace CryingSnow.StackCraft
         public List<MarketStateData> Markets = new();
         public List<WorldQuestStateData> WorldQuests = new();
         public List<WorldFactData> WorldFacts = new();
+        public NarrativeHistoryData Narrative = new();
         public List<string> ProcessedWorldQuestEventIds = new();
         public string TrackedWorldQuestId;
         public List<string> LocationHistory = new();
@@ -379,6 +380,24 @@ namespace CryingSnow.StackCraft
         {
             return ProtagonistRules.IsProtagonist(this, cardData);
         }
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeHistoryData
+    {
+        public NarrativeRunStateData ActiveRun;
+        public List<string> CommittedResultIds = new();
+        public List<string> CompletedOnceNarrativeIds = new();
+        public List<string> CompletedSourceRunKeys = new();
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeRunStateData
+    {
+        public string NarrativeId;
+        public int NarrativeVersion;
+        public string RunId;
+        public List<string> CommittedResultIds = new();
     }
 
     [System.Serializable]

@@ -160,6 +160,14 @@ namespace CryingSnow.StackCraft
                 runtime.GetNpcInteractions(npcId);
             if (interactions.Count == 0)
                 return false;
+            if (interactions.Count == 1 &&
+                interactions[0].Status == WorldQuestStatus.Available &&
+                NarrativeDirector.Instance?.TryPlayQuestOffer(
+                    interactions[0].QuestId,
+                    $"npc:{npc.PersistentId}:{interactions[0].QuestId}") == true)
+            {
+                return true;
+            }
             if (interactions.Count > 1)
             {
                 ShowWorldQuestSelection(interactions);

@@ -48,6 +48,7 @@ namespace CryingSnow.StackCraft
             SceneManager.sceneLoaded += HandleSceneLoaded;
             SavedGames = SaveSystem.LoadAllValidData<GameData>();
             WorldQuestRuntime.Ensure(gameObject);
+            NarrativeDirector.Ensure(gameObject);
         }
 
         private void OnDestroy()
@@ -91,7 +92,7 @@ namespace CryingSnow.StackCraft
         #region Core Game Flow
         /// <summary>
         /// Initializes a new game session. It automatically finds the next available save slot
-        /// number, creates a new GameData object with the provided preferences, and starts 
+        /// number, creates a new GameData object with the provided preferences, and starts
         /// the travel sequence to load the default game scene.
         /// </summary>
         /// <param name="prefs">The gameplay settings for the new session.</param>
@@ -256,7 +257,7 @@ namespace CryingSnow.StackCraft
         }
 
         /// <summary>
-        /// Deletes a specified saved game session from both the in-memory list of saved games 
+        /// Deletes a specified saved game session from both the in-memory list of saved games
         /// and the physical save file on disk.
         /// </summary>
         /// <param name="gameData">The GameData object corresponding to the save file to be deleted.</param>
@@ -280,7 +281,7 @@ namespace CryingSnow.StackCraft
         /// Handles the final 'game over' state.
         /// </summary>
         /// <remarks>
-        /// This method deletes the current game save file and immediately transitions the player 
+        /// This method deletes the current game save file and immediately transitions the player
         /// back to the title scene.
         /// </remarks>
         public void GameOver()
@@ -438,8 +439,8 @@ namespace CryingSnow.StackCraft
         /// Starts a scene transition sequence, handling saving and transporting traveler cards.
         /// </summary>
         /// <remarks>
-        /// It determines the next scene by finding the current scene in the targetScenes list and 
-        /// moving to the next one cyclically. The transition involves a screen fade and scene load, 
+        /// It determines the next scene by finding the current scene in the targetScenes list and
+        /// moving to the next one cyclically. The transition involves a screen fade and scene load,
         /// during which card data for all travelers is preserved.
         /// </remarks>
         /// <param name="targetScenes">A list defining the order of scenes in a travel cycle.</param>
