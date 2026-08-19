@@ -223,18 +223,43 @@ namespace CryingSnow.StackCraft
         /// <returns>Coroutine yielding until movement finishes.</returns>
         public IEnumerator MoveTo(Vector3 target, float duration = 0.5f)
         {
+            Tween tween = FocusOn(target, duration);
+            if (tween != null)
+                yield return tween.WaitForCompletion();
+        }
+
+        public Tween FocusOn(Vector3 target, float duration = 0.5f)
+        {
+            if (cameraTransform == null)
+                return null;
             isDragging = false;
             dragOrigin = Input.mousePosition;
-
             float desiredDistance = Mathf.Lerp(maxDistance, minDistance, 0.8f);
             Vector3 offset = -cameraTransform.forward * desiredDistance;
             Vector3 newCameraPosition = target + offset;
-
-            yield return transform.DOMove(newCameraPosition, duration)
-                .SetUpdate(true)
-                .WaitForCompletion();
-
             targetPos = newCameraPosition;
+            ClampTargetPosition();
+            newCameraPosition = targetPos;
+            if (duration <= 0f)
+            {
+                transform.position = newCameraPosition;
+                return null;
+            }
+            return transform.DOMove(newCameraPosition, duration)
+                .SetUpdate(true)
+                .OnComplete(() => targetPos = newCameraPosition);
+        }
+
+        public Vector3 GetRigPosition() => transform.position;
+
+        public void SetRigPositionInstant(Vector3 position)
+        {
+            transform.DOKill(false);
+            velocity = Vector3.zero;
+            isDragging = false;
+            targetPos = position;
+            ClampTargetPosition();
+            transform.position = targetPos;
         }
 
         /// <summary>

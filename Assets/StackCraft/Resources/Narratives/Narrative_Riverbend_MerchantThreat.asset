@@ -1,0 +1,1281 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5a2e11b94c91c514aaba6f1a4497b3e2, type: 3}
+  m_Name: Narrative_Riverbend_MerchantThreat
+  m_EditorClassIdentifier:
+  id: npc_event.riverbend-grocer
+  version: 1
+  displayName: "\u6CB3\u6E7E\u6751\u6742\u8D27\u5546\u53D7\u5A01\u5413"
+  canSkip: 1
+  allowCameraInput: 0
+  entryNodeId: begin
+  actorBindings:
+  - roleId: Player
+    resolveMode: 1
+    persistentId:
+    cardDefinitionId:
+    displayName: "\u65C5\u884C\u8005"
+    portrait: {fileID: 0}
+  - roleId: Merchant
+    resolveMode: 2
+    persistentId:
+    cardDefinitionId: riverbend-grocer
+    displayName: "\u6742\u8D27\u5546"
+    portrait: {fileID: 0}
+  - roleId: Threat
+    resolveMode: 4
+    persistentId:
+    cardDefinitionId: f6cac76a302245f3912997c679ee3b17
+    displayName: "\u54E5\u5E03\u6797"
+    portrait: {fileID: 0}
+  nodes:
+  - id: begin
+    commands:
+    - commandId: control_merchant
+      type: 9
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: spawn_threat
+      type: 17
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole: Merchant
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 1.8, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: control_threat
+      type: 9
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: focus_merchant
+      type: 24
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.35
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: approach_merchant
+      type: 11
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole: Merchant
+        speed: 0
+        duration: 0.7
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 1.1, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: face_threat
+      type: 13
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole: Threat
+        speed: 0
+        duration: 0.25
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: merchant_surprised
+      type: 16
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.55
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message: "\uFF01"
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: merchant_question
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Merchant
+        textKey:
+        fallbackText: "\u4F60\u4EEC\u60F3\u5E72\u4EC0\u4E48\uFF1F"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: threat_demand
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Threat
+        textKey:
+        fallbackText: "\u628A\u503C\u94B1\u7684\u8D27\u7269\u90FD\u4EA4\u51FA\u6765\uFF01"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: threatening_swing
+      type: 19
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole: Merchant
+        speed: 0
+        duration: 0.7
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: merchant_shock
+      type: 16
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.65
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message: "\u60CA"
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: player_decision
+      type: 2
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback: "\u773C\u524D\u7684\u51B2\u7A81\u5C1A\u672A\u6F14\u53D8\u6210\u6B63\u5F0F\u6218\u6597\u3002"
+        choices:
+        - choiceId: confront
+          textKey:
+          fallbackText: "\u4E0A\u524D\u5236\u6B62"
+          targetNodeId: confront
+          important: 1
+        - choiceId: observe
+          textKey:
+          fallbackText: "\u6682\u65F6\u89C2\u5BDF"
+          targetNodeId: observe
+          important: 1
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    nextNodeId:
+    failureNodeId:
+  - id: confront
+    commands:
+    - commandId: control_player
+      type: 9
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Player
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: player_steps_in
+      type: 11
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Player
+        targetRole: Threat
+        speed: 0
+        duration: 0.55
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: -1.05, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: player_faces_threat
+      type: 13
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Player
+        targetRole: Threat
+        speed: 0
+        duration: 0.2
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: player_warning
+      type: 1
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole: Player
+        textKey:
+        fallbackText: "\u5230\u6B64\u4E3A\u6B62\u3002\u79BB\u5F00\u8FD9\u91CC\u3002"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: threat_angry
+      type: 15
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole:
+        speed: 0
+        duration: 0.8
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message: "\u8FD9\u6B21\u5148\u653E\u8FC7\u4F60\u4EEC\uFF01"
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: player_returns
+      type: 14
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Player
+        targetRole:
+        speed: 0
+        duration: 0.45
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: release_player
+      type: 10
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Player
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    nextNodeId: cleanup
+    failureNodeId:
+  - id: observe
+    commands:
+    - commandId: observe_line
+      type: 0
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText: "\u4F60\u6CA1\u6709\u8D38\u7136\u4ECB\u5165\u3002\u54E5\u5E03\u6797\u89C1\u9644\u8FD1\u6709\u4EBA\uFF0C\u6682\u65F6\u9000\u5F00\u4E86\u3002"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: threat_retreats
+      type: 15
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole:
+        speed: 0
+        duration: 0.75
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message: "\u522B\u591A\u7BA1\u95F2\u4E8B\u3002"
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    nextNodeId: cleanup
+    failureNodeId:
+  - id: cleanup
+    commands:
+    - commandId: merchant_returns
+      type: 14
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.35
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: release_threat
+      type: 10
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: despawn_threat
+      type: 18
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Threat
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: release_merchant
+      type: 10
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole: Merchant
+        targetRole:
+        speed: 0
+        duration: 0.5
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: no_combat_yet
+      type: 0
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText: "\u51B2\u7A81\u6682\u65F6\u5E73\u606F\uFF0C\u6CA1\u6709\u8FDB\u5165\u6B63\u5F0F\u6218\u6597\u3002"
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    - commandId: end
+      type: 7
+      flowParameters:
+        targetNodeId:
+      dialogueParameters:
+        actorRole:
+        textKey:
+        fallbackText:
+        choiceTitleKey:
+        choiceTitleFallback:
+        choices: []
+      actorActionParameters:
+        actorRole:
+        targetRole:
+        speed: 0
+        duration: 0
+        markerPosition: {x: 0, y: 0, z: 0}
+        offset: {x: 0, y: 0, z: 0}
+        message:
+        emoteId:
+      timingParameters:
+        duration: 0
+      mediaParameters:
+        assetReference: {fileID: 0}
+        waitForCompletion: 0
+        duration: 0
+      interactionParameters:
+        actionId:
+        initiatorRoles: []
+        targetRoles: []
+        contextId:
+        arguments: []
+        outcomeBranches: []
+        timeoutSeconds: 0
+      effectParameters:
+        effectType: 0
+        resultId:
+        targetId:
+        secondaryTargetId:
+        stringValue:
+        intValue: 0
+        boolValue: 0
+      failurePolicy: 0
+      failureNodeId:
+      barrierType: 0
+    nextNodeId:
+    failureNodeId:

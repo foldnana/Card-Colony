@@ -133,6 +133,12 @@ namespace CryingSnow.StackCraft
             player = IsPlayerCharacter(first) ? first : second;
             npc = IsDialogueNpc(first) ? first : second;
             IsActive = true;
+            if (NarrativeDirector.Instance?.TryPlayNpcNarrative(
+                    npc.Definition.Id,
+                    $"npc:{npc.PersistentId}:event") == true)
+            {
+                return true;
+            }
             if (TryShowWorldQuestDialogue())
                 return true;
 

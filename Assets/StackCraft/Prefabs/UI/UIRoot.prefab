@@ -19014,6 +19014,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1737869229267424171}
   - component: {fileID: 6268040368857231537}
+  - component: {fileID: 3227798749416175994}
   m_Layer: 0
   m_Name: UIRoot
   m_TagString: Untagged
@@ -19069,6 +19070,19 @@ MonoBehaviour:
   increaseButton: {fileID: 176678065689120421}
   maximumButton: {fileID: 1184927757325796448}
   confirmButton: {fileID: 9019332296973592963}
+--- !u!114 &3227798749416175994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6036944310662717278}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cd4aaf79800347d3ac9a48c84ce4f5e4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  presentationPrefab: {fileID: 4975895957564190502, guid: bda04d1fbb2490a428fa76ca0295cac0, type: 3}
 --- !u!1 &6050495294107119649
 GameObject:
   m_ObjectHideFlags: 0

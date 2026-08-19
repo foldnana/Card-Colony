@@ -160,8 +160,9 @@ namespace CryingSnow.StackCraft
                     report.AddError(
                         $"参与者 {binding.RoleId} 缺少 PersistentId。");
                 }
-                if (binding.ResolveMode ==
-                        NarrativeActorResolveMode.CardDefinitionId &&
+                if (binding.ResolveMode is
+                        NarrativeActorResolveMode.CardDefinitionId or
+                        NarrativeActorResolveMode.SpawnTemporary &&
                     string.IsNullOrWhiteSpace(binding.CardDefinitionId))
                 {
                     report.AddError(
@@ -241,11 +242,86 @@ namespace CryingSnow.StackCraft
                     break;
                 case NarrativeCommandType.SetWorldFact:
                 case NarrativeCommandType.StartQuest:
-                    ValidateEffect(command, resultIds, report);
+                    ValidateEffect(command, resultIds, report,
+                        requiresTargetId: true);
+                    break;
+                case NarrativeCommandType.ApplyDamage:
+                    ValidateActorAction(
+                        command, actorRoles, requiresTarget: false, report);
+                    ValidateEffect(command, resultIds, report,
+                        requiresTargetId: false);
+                    if ((command.EffectParameters?.IntValue ?? 0) <= 0)
+                    {
+                        report.AddError(
+                            $"伤害指令 {command.CommandId} 的伤害值必须大于 0。");
+                    }
                     break;
                 case NarrativeCommandType.ExecuteInteraction:
                     ValidateInteraction(command, nodeIds, report);
                     break;
+                case NarrativeCommandType.AcquireActorControl:
+                case NarrativeCommandType.ReleaseActorControl:
+                case NarrativeCommandType.MoveToMarker:
+                case NarrativeCommandType.ReturnToOrigin:
+                case NarrativeCommandType.ShowSpeechBubble:
+                case NarrativeCommandType.ShowEmote:
+                case NarrativeCommandType.SpawnActor:
+                case NarrativeCommandType.DespawnActor:
+                case NarrativeCommandType.FocusActor:
+                    ValidateActorAction(
+                        command, actorRoles, requiresTarget: false, report);
+                    break;
+                case NarrativeCommandType.MoveToActor:
+                case NarrativeCommandType.FaceActor:
+                case NarrativeCommandType.PlayCinematicAttack:
+                    ValidateActorAction(
+                        command, actorRoles, requiresTarget: true, report);
+                    break;
+                case NarrativeCommandType.ShowFullscreenImage:
+                    if (command.MediaParameters?.AssetReference == null)
+                    {
+                        report.AddError(
+                            $"指令 {command.CommandId} ShowFullscreenImage " +
+                            "缺少图片资源。");
+                    }
+                    break;
+            }
+        }
+
+        private static void ValidateActorAction(
+            NarrativeCommandDefinition command,
+            HashSet<string> actorRoles,
+            bool requiresTarget,
+            NarrativeValidationReport report)
+        {
+            NarrativeActorActionParameters parameters =
+                command.ActorActionParameters;
+            if (parameters == null ||
+                string.IsNullOrWhiteSpace(parameters.ActorRole))
+            {
+                report.AddError(
+                    $"指令 {command.CommandId} 缺少 ActorRole。");
+                return;
+            }
+            if (!actorRoles.Contains(parameters.ActorRole))
+            {
+                report.AddError(
+                    $"指令 {command.CommandId} 引用了未声明角色：" +
+                    parameters.ActorRole);
+            }
+            if (string.IsNullOrWhiteSpace(parameters.TargetRole))
+            {
+                if (requiresTarget)
+                {
+                    report.AddError(
+                        $"指令 {command.CommandId} 缺少 TargetRole。");
+                }
+            }
+            else if (!actorRoles.Contains(parameters.TargetRole))
+            {
+                report.AddError(
+                    $"指令 {command.CommandId} 引用了未声明目标角色：" +
+                    parameters.TargetRole);
             }
         }
 
@@ -308,7 +384,8 @@ namespace CryingSnow.StackCraft
         private static void ValidateEffect(
             NarrativeCommandDefinition command,
             HashSet<string> resultIds,
-            NarrativeValidationReport report)
+            NarrativeValidationReport report,
+            bool requiresTargetId)
         {
             NarrativeEffectParameters effect = command.EffectParameters;
             if (effect == null)
@@ -321,7 +398,7 @@ namespace CryingSnow.StackCraft
                 report.AddError($"结果指令 {command.CommandId} 缺少 ResultId。");
             else if (!resultIds.Add(effect.ResultId))
                 report.AddError($"ResultId 重复：{effect.ResultId}");
-            if (string.IsNullOrWhiteSpace(effect.TargetId))
+            if (requiresTargetId && string.IsNullOrWhiteSpace(effect.TargetId))
                 report.AddError($"结果指令 {command.CommandId} 缺少 TargetId。");
         }
 

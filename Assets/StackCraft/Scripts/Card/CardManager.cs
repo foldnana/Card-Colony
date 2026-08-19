@@ -612,11 +612,14 @@ namespace CryingSnow.StackCraft
             CardStack stackToIgnore = null,
             bool notifyCreated = true,
             bool notifyStats = true,
-            bool registerWithManager = true)
+            bool registerWithManager = true,
+            bool allowAggressiveInFriendlyMode = false)
         {
             MarkCardAsDiscovered(definition);
 
-            if (GameDirector.Instance.GameData.GameplayPrefs.IsFriendlyMode && definition.IsAggressive)
+            if (!allowAggressiveInFriendlyMode &&
+                GameDirector.Instance.GameData.GameplayPrefs.IsFriendlyMode &&
+                definition.IsAggressive)
             {
                 return null;
             }

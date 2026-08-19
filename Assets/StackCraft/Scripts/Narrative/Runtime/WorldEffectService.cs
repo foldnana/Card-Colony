@@ -123,17 +123,72 @@ namespace CryingSnow.StackCraft
                     "Narrative, run, node, and result identifiers are required.");
             }
 
+            return ApplyCommitted(
+                narrativeId,
+                narrativeVersion,
+                runId,
+                nodeId,
+                request.ResultId,
+                commitId => ApplyCore(request, commitId));
+        }
+
+        public WorldEffectResult ApplyDamage(
+            string narrativeId,
+            int narrativeVersion,
+            string runId,
+            string nodeId,
+            string resultId,
+            CardInstance target,
+            int damage)
+        {
+            if (target == null)
+                return WorldEffectResult.Failed("Damage target is missing.");
+            if (damage <= 0)
+                return WorldEffectResult.Failed(
+                    "Damage amount must be greater than zero.");
+
+            return ApplyCommitted(
+                narrativeId,
+                narrativeVersion,
+                runId,
+                nodeId,
+                resultId,
+                _ =>
+                {
+                    target.TakeDamage(damage);
+                    if (target != null && target.CurrentHealth <= 0)
+                        target.Kill();
+                    return WorldEffectResult.AppliedNow();
+                });
+        }
+
+        private WorldEffectResult ApplyCommitted(
+            string narrativeId,
+            int narrativeVersion,
+            string runId,
+            string nodeId,
+            string resultId,
+            Func<string, WorldEffectResult> apply)
+        {
+            if (string.IsNullOrWhiteSpace(narrativeId) ||
+                string.IsNullOrWhiteSpace(runId) ||
+                string.IsNullOrWhiteSpace(nodeId) ||
+                string.IsNullOrWhiteSpace(resultId))
+            {
+                return WorldEffectResult.Failed(
+                    "Narrative, run, node, and result identifiers are required.");
+            }
+
             NarrativeRunStateData run = EnsureRun(
                 narrativeId, narrativeVersion, runId);
             string commitId = string.Join(":", narrativeId,
-                Math.Max(1, narrativeVersion), runId, nodeId,
-                request.ResultId);
+                Math.Max(1, narrativeVersion), runId, nodeId, resultId);
             gameData.Narrative.CommittedResultIds ??= new List<string>();
             if (gameData.Narrative.CommittedResultIds.Contains(commitId) ||
                 run.CommittedResultIds.Contains(commitId))
                 return WorldEffectResult.Duplicate();
 
-            WorldEffectResult result = ApplyCore(request, commitId);
+            WorldEffectResult result = apply(commitId);
             if (result.Applied)
             {
                 run.CommittedResultIds.Add(commitId);
@@ -203,6 +258,9 @@ namespace CryingSnow.StackCraft
                         return WorldEffectResult.Failed(result.Message);
                     break;
                 }
+                case NarrativeEffectType.ApplyDamage:
+                    return WorldEffectResult.Failed(
+                        "ApplyDamage requires a resolved narrative actor.");
                 default:
                     return WorldEffectResult.Failed(
                         $"Unsupported world effect: {request.EffectType}.");

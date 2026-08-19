@@ -41,6 +41,7 @@ namespace CryingSnow.StackCraft
         public int CurrentEnergy { get; private set; } = 4;
         public int MaxEnergy { get; private set; } = 4;
         public bool IsDowned { get; private set; }
+        public bool IsNarrativeTemporary { get; private set; }
 
         public CardDefinition BaseDefinition => EquipperComponent?.OriginalDefinition ?? Definition;
         public CardStack OriginalCraftingStack { get; set; }
@@ -72,6 +73,11 @@ namespace CryingSnow.StackCraft
         #endregion
 
         #region Lifecycle & Initialization
+        public void MarkNarrativeTemporary()
+        {
+            IsNarrativeTemporary = true;
+        }
+
         /// <summary>
         /// Fully initializes the card: setting definitions, generating stats, applying visuals,
         /// creating and registering its stack, and attempting to merge with any nearby compatible stack.

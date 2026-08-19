@@ -1,5 +1,8 @@
-using UnityEngine;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using UnityEngine;
+using ArgumentNullException = System.ArgumentNullException;
+using IDisposable = System.IDisposable;
 
 namespace CryingSnow.StackCraft
 {
@@ -22,7 +25,10 @@ namespace CryingSnow.StackCraft
         private Vector2 idleRange;
         private float idleTimeRemaining;
         private bool configured;
-        private bool interactionPaused;
+        private readonly Dictionary<object, int> pauseOwners =
+            new(ReferenceComparer.Instance);
+        private readonly object legacyPauseOwner = new();
+        private IDisposable legacyPauseLease;
 
         [Header("Social Interaction")]
         [SerializeField, Min(0.5f)]
@@ -35,7 +41,7 @@ namespace CryingSnow.StackCraft
         public LocationNpcActivityState State { get; private set; } = LocationNpcActivityState.Idle;
         public Vector3 HomePosition { get; private set; }
         public Vector3 Destination { get; private set; }
-        public bool IsInteractionPaused => interactionPaused;
+        public bool IsInteractionPaused => pauseOwners.Count > 0;
         public float SocialSearchRadius
         {
             get => socialSearchRadius;
@@ -61,6 +67,8 @@ namespace CryingSnow.StackCraft
         private void OnDestroy()
         {
             ActiveActivities.Remove(this);
+            pauseOwners.Clear();
+            legacyPauseLease = null;
         }
 
         private void Update()
@@ -109,7 +117,23 @@ namespace CryingSnow.StackCraft
 
         public void SetInteractionPaused(bool paused)
         {
-            interactionPaused = paused;
+            if (paused)
+            {
+                legacyPauseLease ??= AcquirePause(legacyPauseOwner);
+                return;
+            }
+
+            legacyPauseLease?.Dispose();
+            legacyPauseLease = null;
+        }
+
+        public IDisposable AcquirePause(object owner)
+        {
+            if (owner == null)
+                throw new ArgumentNullException(nameof(owner));
+            pauseOwners.TryGetValue(owner, out int count);
+            pauseOwners[owner] = count + 1;
+            return new PauseLease(this, owner);
         }
 
         public void Tick(float deltaTime)
@@ -123,7 +147,7 @@ namespace CryingSnow.StackCraft
             }
 
             if (!configured ||
-                interactionPaused ||
+                IsInteractionPaused ||
                 deltaTime <= 0f ||
                 card == null ||
                 card.Stack == null ||
@@ -285,7 +309,7 @@ namespace CryingSnow.StackCraft
 
         private bool IsSociallyAvailable =>
             configured &&
-            !interactionPaused &&
+            !IsInteractionPaused &&
             State == LocationNpcActivityState.Idle &&
             card?.Stack != null &&
             card.Stack.Cards.Count == 1 &&
@@ -314,6 +338,48 @@ namespace CryingSnow.StackCraft
                     socialCooldownRange.y));
             SocialCooldownRemaining =
                 Random.Range(minimum, maximum);
+        }
+
+        private void ReleasePause(object owner)
+        {
+            if (owner == null || !pauseOwners.TryGetValue(owner, out int count))
+                return;
+            if (count <= 1)
+                pauseOwners.Remove(owner);
+            else
+                pauseOwners[owner] = count - 1;
+        }
+
+        private sealed class PauseLease : IDisposable
+        {
+            private LocationNpcActivity activity;
+            private object owner;
+
+            public PauseLease(LocationNpcActivity activity, object owner)
+            {
+                this.activity = activity;
+                this.owner = owner;
+            }
+
+            public void Dispose()
+            {
+                LocationNpcActivity current = activity;
+                object currentOwner = owner;
+                activity = null;
+                owner = null;
+                current?.ReleasePause(currentOwner);
+            }
+        }
+
+        private sealed class ReferenceComparer : IEqualityComparer<object>
+        {
+            public static readonly ReferenceComparer Instance = new();
+
+            public new bool Equals(object x, object y) =>
+                ReferenceEquals(x, y);
+
+            public int GetHashCode(object value) =>
+                value == null ? 0 : RuntimeHelpers.GetHashCode(value);
         }
     }
 }

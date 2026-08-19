@@ -11,17 +11,34 @@ namespace CryingSnow.StackCraft
             string displayName,
             Texture portrait,
             CardInstance card)
+            : this(roleId, displayName, portrait, card, string.Empty)
+        {
+        }
+
+        public NarrativeActorHandle(
+            string roleId,
+            string displayName,
+            Texture portrait,
+            CardInstance card,
+            string cardDefinitionId)
         {
             RoleId = roleId ?? string.Empty;
             DisplayName = displayName ?? string.Empty;
             Portrait = portrait;
             Card = card;
+            CardDefinitionId = cardDefinitionId ?? string.Empty;
         }
 
         public string RoleId { get; }
         public string DisplayName { get; }
         public Texture Portrait { get; }
-        public CardInstance Card { get; }
+        public CardInstance Card { get; private set; }
+        public string CardDefinitionId { get; }
+
+        public void AttachCard(CardInstance card)
+        {
+            Card = card;
+        }
     }
 
     public sealed class NarrativeActorResolver
@@ -34,6 +51,7 @@ namespace CryingSnow.StackCraft
             CardInstance card = binding.ResolveMode switch
             {
                 NarrativeActorResolveMode.PresentationOnly => null,
+                NarrativeActorResolveMode.SpawnTemporary => null,
                 NarrativeActorResolveMode.PartyLeader =>
                     GameDirector.Instance?.FindActiveProtagonistCard(),
                 NarrativeActorResolveMode.PersistentId =>
@@ -56,7 +74,8 @@ namespace CryingSnow.StackCraft
                 binding.Portrait != null
                     ? binding.Portrait
                     : card?.BaseDefinition?.ArtTexture,
-                card);
+                card,
+                binding.CardDefinitionId);
         }
     }
 }

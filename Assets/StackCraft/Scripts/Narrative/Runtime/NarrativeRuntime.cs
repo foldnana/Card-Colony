@@ -13,7 +13,10 @@ namespace CryingSnow.StackCraft
         WaitingForChoice = 3,
         WaitingForInteraction = 4,
         Completed = 5,
-        Failed = 6
+        Failed = 6,
+        WaitingForTime = 7,
+        WaitingAtBarrier = 8,
+        WaitingForPresentation = 9
     }
 
     public sealed class NarrativeLine
@@ -45,6 +48,7 @@ namespace CryingSnow.StackCraft
         private readonly GameplayInteractionGateway interactionGateway;
         private readonly IReadOnlyDictionary<string, NarrativeActorHandle>
             actorHandles;
+        private readonly INarrativeCommandExecutor commandExecutor;
         private NarrativeDefinition definition;
         private NarrativeNodeDefinition currentNode;
         private string runId;
@@ -55,6 +59,10 @@ namespace CryingSnow.StackCraft
         private Action<InteractionResult> currentOperationCompleted;
         private NarrativeCommandDefinition currentInteractionCommand;
         private float interactionTimeoutRemaining;
+        private float waitTimeRemaining;
+        private bool skippingToBarrier;
+        private INarrativeCommandOperation currentPresentationOperation;
+        private Action<NarrativeCommandResult> presentationCompleted;
         private int runGeneration;
 
         public NarrativeRuntime(WorldEffectService worldEffects)
@@ -73,11 +81,21 @@ namespace CryingSnow.StackCraft
             WorldEffectService worldEffects,
             GameplayInteractionGateway interactionGateway,
             IReadOnlyDictionary<string, NarrativeActorHandle> actorHandles)
+            : this(worldEffects, interactionGateway, actorHandles, null)
+        {
+        }
+
+        public NarrativeRuntime(
+            WorldEffectService worldEffects,
+            GameplayInteractionGateway interactionGateway,
+            IReadOnlyDictionary<string, NarrativeActorHandle> actorHandles,
+            INarrativeCommandExecutor commandExecutor)
         {
             this.worldEffects = worldEffects ?? throw new ArgumentNullException(
                 nameof(worldEffects));
             this.interactionGateway = interactionGateway;
             this.actorHandles = actorHandles;
+            this.commandExecutor = commandExecutor;
         }
 
         public NarrativeRuntimeState State { get; private set; } =
@@ -117,12 +135,38 @@ namespace CryingSnow.StackCraft
 
         public void Continue()
         {
-            if (State != NarrativeRuntimeState.WaitingForInput)
+            if (State != NarrativeRuntimeState.WaitingForInput &&
+                State != NarrativeRuntimeState.WaitingAtBarrier)
                 return;
 
             CurrentLine = null;
             State = NarrativeRuntimeState.Playing;
             Advance();
+        }
+
+        public bool SkipToNextBarrier()
+        {
+            if (definition == null || !definition.CanSkip ||
+                State is NarrativeRuntimeState.Idle or
+                    NarrativeRuntimeState.Completed or
+                    NarrativeRuntimeState.Failed or
+                    NarrativeRuntimeState.WaitingForChoice or
+                    NarrativeRuntimeState.WaitingForInteraction or
+                    NarrativeRuntimeState.WaitingAtBarrier)
+                return false;
+
+            skippingToBarrier = true;
+            if (State == NarrativeRuntimeState.WaitingForPresentation)
+            {
+                currentPresentationOperation?.CompleteImmediately();
+                return true;
+            }
+            if (State == NarrativeRuntimeState.WaitingForInput)
+                CurrentLine = null;
+            waitTimeRemaining = 0f;
+            State = NarrativeRuntimeState.Playing;
+            Advance();
+            return true;
         }
 
         public bool SelectChoice(string choiceId)
@@ -149,6 +193,7 @@ namespace CryingSnow.StackCraft
                 return;
             runGeneration++;
             DetachCurrentOperation(cancel: true, reason);
+            DetachPresentationOperation(cancel: true, reason);
             Fail(reason);
         }
 
@@ -158,6 +203,19 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void AdvanceTime(float unscaledDeltaSeconds)
         {
+            if (State == NarrativeRuntimeState.WaitingForTime)
+            {
+                if (unscaledDeltaSeconds <= 0f)
+                    return;
+                waitTimeRemaining -= unscaledDeltaSeconds;
+                if (waitTimeRemaining > 0f)
+                    return;
+                waitTimeRemaining = 0f;
+                State = NarrativeRuntimeState.Playing;
+                Advance();
+                return;
+            }
+
             if (State != NarrativeRuntimeState.WaitingForInteraction ||
                 currentOperation == null ||
                 interactionTimeoutRemaining <= 0f ||
@@ -205,14 +263,38 @@ namespace CryingSnow.StackCraft
                 if (command == null)
                     continue;
 
+                NarrativeBarrierType barrier = GetBarrier(command);
+                if (skippingToBarrier && barrier != NarrativeBarrierType.None)
+                {
+                    skippingToBarrier = false;
+                    if (barrier is NarrativeBarrierType.SceneTransition or
+                        NarrativeBarrierType.IrreversibleConfirmation or
+                        NarrativeBarrierType.Checkpoint)
+                    {
+                        State = NarrativeRuntimeState.WaitingAtBarrier;
+                        return;
+                    }
+                }
+
                 switch (command.Type)
                 {
                     case NarrativeCommandType.ShowNarration:
                     case NarrativeCommandType.ShowDialogue:
+                        if (skippingToBarrier)
+                            break;
                         PresentLine(command.DialogueParameters);
                         return;
                     case NarrativeCommandType.ShowChoice:
                         PresentChoices(command.DialogueParameters);
+                        return;
+                    case NarrativeCommandType.Wait:
+                        if (skippingToBarrier)
+                            break;
+                        waitTimeRemaining = command.TimingParameters?.Duration ??
+                            0f;
+                        if (waitTimeRemaining <= 0f)
+                            break;
+                        State = NarrativeRuntimeState.WaitingForTime;
                         return;
                     case NarrativeCommandType.Jump:
                         if (!MoveToNode(
@@ -227,15 +309,48 @@ namespace CryingSnow.StackCraft
                         if (!ApplyWorldEffect(command))
                             return;
                         break;
+                    case NarrativeCommandType.ApplyDamage:
+                        if (!ApplyDamage(command))
+                            return;
+                        break;
                     case NarrativeCommandType.ExecuteInteraction:
+                        skippingToBarrier = false;
                         if (!ExecuteInteraction(command))
                             return;
                         if (State == NarrativeRuntimeState.WaitingForInteraction)
                             return;
                         break;
                     case NarrativeCommandType.EndNarrative:
+                        skippingToBarrier = false;
                         Complete();
                         return;
+                    case NarrativeCommandType.Checkpoint:
+                    case NarrativeCommandType.SceneTransition:
+                    case NarrativeCommandType.IrreversibleConfirmation:
+                        State = NarrativeRuntimeState.WaitingAtBarrier;
+                        return;
+                    case NarrativeCommandType.AcquireActorControl:
+                    case NarrativeCommandType.ReleaseActorControl:
+                    case NarrativeCommandType.MoveToActor:
+                    case NarrativeCommandType.MoveToMarker:
+                    case NarrativeCommandType.FaceActor:
+                    case NarrativeCommandType.ReturnToOrigin:
+                    case NarrativeCommandType.ShowSpeechBubble:
+                    case NarrativeCommandType.ShowEmote:
+                    case NarrativeCommandType.SpawnActor:
+                    case NarrativeCommandType.DespawnActor:
+                    case NarrativeCommandType.PlayCinematicAttack:
+                    case NarrativeCommandType.EnterVisualNovelMode:
+                    case NarrativeCommandType.ExitVisualNovelMode:
+                    case NarrativeCommandType.ShowFullscreenImage:
+                    case NarrativeCommandType.HideFullscreenImage:
+                    case NarrativeCommandType.FocusActor:
+                    case NarrativeCommandType.ShakeCamera:
+                        if (!ExecutePresentation(command))
+                            return;
+                        if (State == NarrativeRuntimeState.WaitingForPresentation)
+                            return;
+                        break;
                     default:
                         if (!HandleUnsupportedCommand(command))
                             return;
@@ -244,6 +359,86 @@ namespace CryingSnow.StackCraft
             }
 
             Fail("Narrative exceeded the synchronous command limit.");
+        }
+
+        private static NarrativeBarrierType GetBarrier(
+            NarrativeCommandDefinition command)
+        {
+            if (command == null)
+                return NarrativeBarrierType.None;
+            if (command.BarrierType != NarrativeBarrierType.None)
+                return command.BarrierType;
+            return command.Type switch
+            {
+                NarrativeCommandType.ShowChoice =>
+                    NarrativeBarrierType.ImportantChoice,
+                NarrativeCommandType.ExecuteInteraction =>
+                    NarrativeBarrierType.GameplayInteraction,
+                NarrativeCommandType.SceneTransition =>
+                    NarrativeBarrierType.SceneTransition,
+                NarrativeCommandType.IrreversibleConfirmation =>
+                    NarrativeBarrierType.IrreversibleConfirmation,
+                NarrativeCommandType.Checkpoint =>
+                    NarrativeBarrierType.Checkpoint,
+                NarrativeCommandType.EndNarrative =>
+                    NarrativeBarrierType.NarrativeEnd,
+                _ => NarrativeBarrierType.None
+            };
+        }
+
+        private bool ExecutePresentation(NarrativeCommandDefinition command)
+        {
+            if (commandExecutor == null)
+                return HandleFailure(command,
+                    "Narrative presentation executor is unavailable.");
+            INarrativeCommandOperation operation;
+            try
+            {
+                operation = commandExecutor.Execute(
+                    command, skippingToBarrier);
+            }
+            catch (Exception exception)
+            {
+                return HandleFailure(command,
+                    $"NarrativePresentationException:{exception.Message}");
+            }
+            if (operation == null)
+                return HandleFailure(command,
+                    "Narrative presentation operation was not created.");
+            if (operation.IsCompleted)
+                return operation.Result.Success ||
+                    HandleFailure(command, operation.Result.Error);
+
+            currentPresentationOperation = operation;
+            int expectedGeneration = runGeneration;
+            presentationCompleted = result =>
+            {
+                if (expectedGeneration != runGeneration ||
+                    !ReferenceEquals(currentPresentationOperation, operation) ||
+                    State != NarrativeRuntimeState.WaitingForPresentation)
+                    return;
+                DetachPresentationOperation(false, string.Empty);
+                State = NarrativeRuntimeState.Playing;
+                if (result.Success || HandleFailure(command, result.Error))
+                    Advance();
+            };
+            State = NarrativeRuntimeState.WaitingForPresentation;
+            operation.Completed += presentationCompleted;
+            return true;
+        }
+
+        private void DetachPresentationOperation(bool cancel, string reason)
+        {
+            INarrativeCommandOperation operation = currentPresentationOperation;
+            Action<NarrativeCommandResult> callback = presentationCompleted;
+            currentPresentationOperation = null;
+            presentationCompleted = null;
+            if (operation == null)
+                return;
+            if (callback != null)
+                operation.Completed -= callback;
+            if (cancel && !operation.IsCompleted)
+                operation.Cancel(reason ?? string.Empty);
         }
 
         private void PresentLine(NarrativeDialogueParameters parameters)
@@ -291,6 +486,32 @@ namespace CryingSnow.StackCraft
                     effect.StringValue,
                     effect.IntValue,
                     effect.BoolValue));
+            return result.Success || HandleFailure(command, result.Error);
+        }
+
+        private bool ApplyDamage(NarrativeCommandDefinition command)
+        {
+            NarrativeActorActionParameters actorParameters =
+                command.ActorActionParameters;
+            NarrativeEffectParameters effect = command.EffectParameters;
+            if (actorParameters == null || effect == null ||
+                actorHandles == null ||
+                !actorHandles.TryGetValue(
+                    actorParameters.ActorRole,
+                    out NarrativeActorHandle actor) ||
+                actor?.Card == null)
+            {
+                return HandleFailure(command, "DamageActorMissing");
+            }
+
+            WorldEffectResult result = worldEffects.ApplyDamage(
+                definition.Id,
+                definition.Version,
+                runId,
+                currentNode.Id,
+                effect.ResultId,
+                actor.Card,
+                effect.IntValue);
             return result.Success || HandleFailure(command, result.Error);
         }
 
@@ -541,17 +762,23 @@ namespace CryingSnow.StackCraft
 
         private void Complete()
         {
+            DetachPresentationOperation(false, string.Empty);
             CurrentLine = null;
             currentChoices.Clear();
             CurrentChoiceTitle = string.Empty;
+            waitTimeRemaining = 0f;
+            skippingToBarrier = false;
             State = NarrativeRuntimeState.Completed;
         }
 
         private void Fail(string reason)
         {
+            DetachPresentationOperation(true, reason);
             CurrentLine = null;
             currentChoices.Clear();
             CurrentChoiceTitle = string.Empty;
+            waitTimeRemaining = 0f;
+            skippingToBarrier = false;
             FailureReason = reason ?? string.Empty;
             State = NarrativeRuntimeState.Failed;
         }

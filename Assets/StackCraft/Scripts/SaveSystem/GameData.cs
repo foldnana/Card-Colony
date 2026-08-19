@@ -433,7 +433,8 @@ namespace CryingSnow.StackCraft
             foreach (var stack in stacks)
             {
                 var stackData = new StackData(stack);
-                SavedStacks.Add(stackData);
+                if (stackData.Cards.Count > 0)
+                    SavedStacks.Add(stackData);
             }
         }
 
@@ -494,6 +495,8 @@ namespace CryingSnow.StackCraft
 
             foreach (var card in stack.Cards)
             {
+                if (card == null || card.IsNarrativeTemporary)
+                    continue;
                 var cardData = new CardData(card);
                 Cards.Add(cardData);
             }

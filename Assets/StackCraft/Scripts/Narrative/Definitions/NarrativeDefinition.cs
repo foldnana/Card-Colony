@@ -14,7 +14,40 @@ namespace CryingSnow.StackCraft
         SetWorldFact = 4,
         StartQuest = 5,
         ExecuteInteraction = 6,
-        EndNarrative = 7
+        EndNarrative = 7,
+        Wait = 8,
+        AcquireActorControl = 9,
+        ReleaseActorControl = 10,
+        MoveToActor = 11,
+        MoveToMarker = 12,
+        FaceActor = 13,
+        ReturnToOrigin = 14,
+        ShowSpeechBubble = 15,
+        ShowEmote = 16,
+        SpawnActor = 17,
+        DespawnActor = 18,
+        PlayCinematicAttack = 19,
+        EnterVisualNovelMode = 20,
+        ExitVisualNovelMode = 21,
+        ShowFullscreenImage = 22,
+        HideFullscreenImage = 23,
+        FocusActor = 24,
+        ShakeCamera = 25,
+        Checkpoint = 26,
+        SceneTransition = 27,
+        IrreversibleConfirmation = 28,
+        ApplyDamage = 29
+    }
+
+    public enum NarrativeBarrierType
+    {
+        None = 0,
+        ImportantChoice = 1,
+        GameplayInteraction = 2,
+        SceneTransition = 3,
+        IrreversibleConfirmation = 4,
+        Checkpoint = 5,
+        NarrativeEnd = 6
     }
 
     public enum NarrativeActorResolveMode
@@ -22,7 +55,8 @@ namespace CryingSnow.StackCraft
         PersistentId = 0,
         PartyLeader = 1,
         CardDefinitionId = 2,
-        PresentationOnly = 3
+        PresentationOnly = 3,
+        SpawnTemporary = 4
     }
 
     public enum NarrativeFailurePolicy
@@ -39,7 +73,8 @@ namespace CryingSnow.StackCraft
         SetWorldFactString = 2,
         IncrementWorldFactInt = 3,
         StartQuest = 4,
-        ReportQuestEvent = 5
+        ReportQuestEvent = 5,
+        ApplyDamage = 6
     }
 
     [Serializable]
@@ -91,10 +126,28 @@ namespace CryingSnow.StackCraft
         [SerializeField] private string actorRole;
         [SerializeField] private string targetRole;
         [SerializeField, Min(0f)] private float speed = 1f;
+        [SerializeField, Min(0f)] private float duration = 0.5f;
+        [SerializeField] private Vector3 markerPosition;
+        [SerializeField] private Vector3 offset;
+        [SerializeField, TextArea] private string message;
+        [SerializeField] private string emoteId;
 
         public string ActorRole => actorRole;
         public string TargetRole => targetRole;
         public float Speed => Mathf.Max(0f, speed);
+        public float Duration => Mathf.Max(0f, duration);
+        public Vector3 MarkerPosition => markerPosition;
+        public Vector3 Offset => offset;
+        public string Message => message;
+        public string EmoteId => emoteId;
+    }
+
+    [Serializable]
+    public sealed class NarrativeTimingParameters
+    {
+        [SerializeField, Min(0f)] private float duration;
+
+        public float Duration => Mathf.Max(0f, duration);
     }
 
     [Serializable]
@@ -102,9 +155,11 @@ namespace CryingSnow.StackCraft
     {
         [SerializeField] private UnityEngine.Object assetReference;
         [SerializeField] private bool waitForCompletion;
+        [SerializeField, Min(0f)] private float duration = 0.35f;
 
         public UnityEngine.Object AssetReference => assetReference;
         public bool WaitForCompletion => waitForCompletion;
+        public float Duration => Mathf.Max(0f, duration);
     }
 
     [Serializable]
@@ -190,6 +245,8 @@ namespace CryingSnow.StackCraft
             dialogueParameters = new();
         [SerializeField] private NarrativeActorActionParameters
             actorActionParameters = new();
+        [SerializeField] private NarrativeTimingParameters timingParameters =
+            new();
         [SerializeField] private NarrativeMediaParameters mediaParameters =
             new();
         [SerializeField] private NarrativeInteractionParameters
@@ -198,6 +255,7 @@ namespace CryingSnow.StackCraft
             new();
         [SerializeField] private NarrativeFailurePolicy failurePolicy;
         [SerializeField] private string failureNodeId;
+        [SerializeField] private NarrativeBarrierType barrierType;
 
         public string CommandId => commandId;
         public NarrativeCommandType Type => type;
@@ -206,12 +264,14 @@ namespace CryingSnow.StackCraft
             dialogueParameters;
         public NarrativeActorActionParameters ActorActionParameters =>
             actorActionParameters;
+        public NarrativeTimingParameters TimingParameters => timingParameters;
         public NarrativeMediaParameters MediaParameters => mediaParameters;
         public NarrativeInteractionParameters InteractionParameters =>
             interactionParameters;
         public NarrativeEffectParameters EffectParameters => effectParameters;
         public NarrativeFailurePolicy FailurePolicy => failurePolicy;
         public string FailureNodeId => failureNodeId;
+        public NarrativeBarrierType BarrierType => barrierType;
     }
 
     [Serializable]
