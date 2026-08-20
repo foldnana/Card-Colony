@@ -23,6 +23,8 @@ namespace CryingSnow.StackCraft
             new(0.14f, 0.95f, 0.36f, 1f);
         private static readonly Color SocialInteractionTint =
             new(0.35f, 0.72f, 1f, 1f);
+        private static readonly Color ConflictInteractionTint =
+            new(1f, 0.18f, 0.16f, 1f);
 
         public static NpcInteractionManager Instance { get; private set; }
         public static event Action<NpcInteractionManager> SessionChanged;
@@ -46,6 +48,7 @@ namespace CryingSnow.StackCraft
         private bool endingInteraction;
         private bool initialized;
         private bool autonomous;
+        private bool conflict;
         private float autonomousConversationRemaining;
 
         public bool IsActive =>
@@ -65,6 +68,7 @@ namespace CryingSnow.StackCraft
         public CardInstance Npc => npc;
         public bool IsPlayerInvolved => player != null;
         public bool IsAutonomous => autonomous;
+        public bool IsConflict => conflict;
         public CombatRect InteractionRect => interactionRect;
         public bool HasActiveParticipantAnimation =>
             initiatorFloatTween != null &&
@@ -129,7 +133,7 @@ namespace CryingSnow.StackCraft
                 }
             }
 
-            if (autonomous &&
+            if (autonomous && !conflict &&
                 State == NpcInteractionState.Dialogue)
             {
                 autonomousConversationRemaining -=
@@ -232,6 +236,19 @@ namespace CryingSnow.StackCraft
                 IsAvailableParticipant(second);
         }
 
+        public static bool CanStartConflictInteraction(
+            CardInstance first,
+            CardInstance second)
+        {
+            return first != null &&
+                second != null &&
+                first != second &&
+                first.Combatant != null &&
+                second.Combatant != null &&
+                IsAvailableParticipant(first) &&
+                IsAvailableParticipant(second);
+        }
+
         public bool TryStartInteractionFromDrop(
             CardInstance droppedCard,
             float searchRadius)
@@ -284,7 +301,9 @@ namespace CryingSnow.StackCraft
                 nextPlayer,
                 nextNpc,
                 isAutonomous: false,
-                conversationDuration: 0f);
+                conversationDuration: 0f,
+                isConflict: false,
+                animateApproach: true);
         }
 
         public bool TryStartSocialInteraction(
@@ -305,14 +324,37 @@ namespace CryingSnow.StackCraft
                 socialTarget,
                 isAutonomous: true,
                 conversationDuration:
-                    Mathf.Max(0.5f, conversationDuration));
+                    Mathf.Max(0.5f, conversationDuration),
+                isConflict: false,
+                animateApproach: true);
+        }
+
+        public bool TryStartConflictInteraction(
+            CardInstance conflictInitiator,
+            CardInstance conflictTarget)
+        {
+            if (IsActive || !CanStartConflictInteraction(
+                    conflictInitiator, conflictTarget))
+            {
+                return false;
+            }
+
+            return StartSession(
+                conflictInitiator,
+                conflictTarget,
+                isAutonomous: true,
+                conversationDuration: 0f,
+                isConflict: true,
+                animateApproach: false);
         }
 
         private bool StartSession(
             CardInstance nextInitiator,
             CardInstance nextTarget,
             bool isAutonomous,
-            float conversationDuration)
+            float conversationDuration,
+            bool isConflict,
+            bool animateApproach)
         {
             if (CombatManager.Instance == null)
                 return false;
@@ -320,6 +362,7 @@ namespace CryingSnow.StackCraft
             initiator = nextInitiator;
             target = nextTarget;
             autonomous = isAutonomous;
+            conflict = isConflict;
             autonomousConversationRemaining = conversationDuration;
             player = isAutonomous ? null : nextInitiator;
             npc = nextTarget;
@@ -333,7 +376,8 @@ namespace CryingSnow.StackCraft
                 CombatManager.Instance.CreateAnchoredInteractionRect(
                     new[] { initiator },
                     new[] { target },
-                    targetReturnPosition);
+                    targetReturnPosition,
+                    animateApproach);
             if (interactionRect == null)
             {
                 RestoreParticipant(
@@ -347,7 +391,9 @@ namespace CryingSnow.StackCraft
             }
 
             interactionRect.ConfigureInteractionTint(
-                autonomous
+                conflict
+                    ? ConflictInteractionTint
+                    : autonomous
                     ? SocialInteractionTint
                     : PlayerInteractionTint);
             SetActivityPaused(initiator, true);
@@ -362,7 +408,9 @@ namespace CryingSnow.StackCraft
                     ?.SelectForInteraction();
             }
 
-            SetState(NpcInteractionState.Approaching);
+            SetState(animateApproach
+                ? NpcInteractionState.Approaching
+                : NpcInteractionState.Dialogue);
             if (!autonomous)
                 SessionChanged?.Invoke(this);
             return true;
@@ -476,6 +524,59 @@ namespace CryingSnow.StackCraft
             endingInteraction = false;
             if (!endedAutonomousSession)
                 SessionChanged?.Invoke(null);
+        }
+
+        public void EndInteractionForCombatTransition(
+            IEnumerable<CardInstance> retainedParticipants,
+            float duration = 0.22f)
+        {
+            if (!HasSessionArtifacts || endingInteraction)
+                return;
+
+            var retained = new HashSet<CardInstance>(
+                retainedParticipants?.Where(card => card != null) ??
+                Enumerable.Empty<CardInstance>());
+            endingInteraction = true;
+            bool endedAutonomousSession = autonomous;
+            DialogueManager.Instance?.EndDialogueForInteractionEnd();
+            InputManager.Instance?.RemoveLock(this);
+            SetActivityPaused(initiator, false);
+            SetActivityPaused(target, false);
+            StopParticipantAnimations();
+
+            interactionRect?.CloseAnimated(duration);
+            interactionRect = null;
+            if (!retained.Contains(initiator))
+                RestoreParticipant(initiator, initiatorReturnPosition);
+            if (!retained.Contains(target))
+                RestoreParticipant(target, targetReturnPosition);
+
+            ClearParticipants();
+            SetState(NpcInteractionState.None);
+            endingInteraction = false;
+            if (!endedAutonomousSession)
+                SessionChanged?.Invoke(null);
+        }
+
+        public bool TryGetReturnPosition(
+            CardInstance participant,
+            out Vector3 position)
+        {
+            if (HasSessionArtifacts && participant != null)
+            {
+                if (participant == initiator)
+                {
+                    position = initiatorReturnPosition;
+                    return true;
+                }
+                if (participant == target)
+                {
+                    position = targetReturnPosition;
+                    return true;
+                }
+            }
+            position = default;
+            return false;
         }
 
         public bool IsCardInInteraction(CardInstance card)
@@ -671,6 +772,7 @@ namespace CryingSnow.StackCraft
             player = null;
             npc = null;
             autonomous = false;
+            conflict = false;
             autonomousConversationRemaining = 0f;
         }
     }

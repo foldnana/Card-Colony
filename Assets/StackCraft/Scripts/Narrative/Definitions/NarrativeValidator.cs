@@ -259,6 +259,9 @@ namespace CryingSnow.StackCraft
                 case NarrativeCommandType.ExecuteInteraction:
                     ValidateInteraction(command, nodeIds, report);
                     break;
+                case NarrativeCommandType.BeginBackgroundCombat:
+                    ValidateInteraction(command, nodeIds, report);
+                    break;
                 case NarrativeCommandType.BranchByInteractionOutcome:
                     ValidateInteractionBranches(command, nodeIds, report);
                     break;
@@ -277,6 +280,7 @@ namespace CryingSnow.StackCraft
                 case NarrativeCommandType.MoveToActor:
                 case NarrativeCommandType.FaceActor:
                 case NarrativeCommandType.PlayCinematicAttack:
+                case NarrativeCommandType.BeginConflictInteraction:
                     ValidateActorAction(
                         command, actorRoles, requiresTarget: true, report);
                     break;

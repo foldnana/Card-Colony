@@ -411,8 +411,30 @@ namespace CryingSnow.StackCraft
         public List<string> SelectedChoiceIds = new();
         public List<string> CommittedResultIds = new();
         public NarrativeWaitingInteractionData WaitingInteraction;
+        public List<NarrativeBackgroundCombatData> BackgroundCombats = new();
         public NarrativeResumePolicy ResumePolicy =
             NarrativeResumePolicy.ResumeFromCheckpoint;
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeBackgroundCombatData
+    {
+        public string OriginalSessionId;
+        public string FinalSessionId;
+        public string CommandId;
+        public string ContextId;
+        public List<string> InitiatorActorIds = new();
+        public List<string> TargetActorIds = new();
+        public List<NarrativeBackgroundActorData> Actors = new();
+    }
+
+    [System.Serializable]
+    public sealed class NarrativeBackgroundActorData
+    {
+        public string RoleId;
+        public string PersistentId;
+        public float[] OriginPosition;
+        public float[] OriginRotation;
     }
 
     [System.Serializable]
@@ -665,13 +687,17 @@ namespace CryingSnow.StackCraft
     [System.Serializable]
     public class CombatData
     {
-        public int Version = 2;
+        public int Version = 3;
         public string SessionId;
         public uint RandomState;
         public long CreatedSequence;
         public List<CardData> Attackers = new();
         public List<CardData> Defenders = new();
+        public List<CardData> PreservedDefeated = new();
         public bool PlayerIsAttacker;
+        public CombatDefeatRule FriendlyDefeatRule;
+        public CombatDefeatRule EnemyDefeatRule;
+        public List<CombatantDefeatRuleData> DefeatRules = new();
         public float[] RectPosition;
         public List<CombatantRuntimeData> RuntimeStates = new();
         public List<CombatCommand> QueuedCommands = new();
@@ -681,11 +707,13 @@ namespace CryingSnow.StackCraft
 
         public CombatData(CombatTask task)
         {
-            Version = 2;
+            Version = 3;
             SessionId = task.SessionId;
             RandomState = task.RandomState;
             CreatedSequence = task.CreatedSequence;
             PlayerIsAttacker = task.PlayerIsAttacker;
+            FriendlyDefeatRule = task.FriendlyDefeatRule;
+            EnemyDefeatRule = task.EnemyDefeatRule;
 
             foreach (var card in task.Attackers)
             {
@@ -695,6 +723,21 @@ namespace CryingSnow.StackCraft
             foreach (var card in task.Defenders)
             {
                 Defenders.Add(new CardData(card));
+            }
+            foreach (CardInstance card in task.PreservedDefeated)
+                PreservedDefeated.Add(new CardData(card));
+
+            foreach (CardInstance card in task.Attackers
+                         .Concat(task.Defenders)
+                         .Concat(task.PreservedDefeated)
+                         .Where(card => card != null)
+                         .Distinct())
+            {
+                DefeatRules.Add(new CombatantDefeatRuleData
+                {
+                    PersistentId = card.PersistentId,
+                    Rule = task.GetConfiguredDefeatRule(card)
+                });
             }
 
             if (task.Rect != null)
@@ -733,28 +776,40 @@ namespace CryingSnow.StackCraft
         {
             Attackers ??= new List<CardData>();
             Defenders ??= new List<CardData>();
+            PreservedDefeated ??= new List<CardData>();
             RuntimeStates ??= new List<CombatantRuntimeData>();
             QueuedCommands ??= new List<CombatCommand>();
             ResolvedDefeatIds ??= new List<string>();
+            DefeatRules ??= new List<CombatantDefeatRuleData>();
 
-            if (Version >= 2)
+            if (Version >= 3)
                 return;
 
-            Version = 2;
             SessionId = string.IsNullOrWhiteSpace(SessionId)
                 ? System.Guid.NewGuid().ToString("N")
                 : SessionId;
-            int index = 0;
-            foreach (CardData card in Attackers.Concat(Defenders))
+            if (Version < 2)
             {
-                RuntimeStates.Add(new CombatantRuntimeData
+                int index = 0;
+                foreach (CardData card in Attackers.Concat(Defenders))
                 {
-                    PersistentId = card?.PersistentId,
-                    ActionProgress = Mathf.Min(90f, index++ * 10f),
-                    JoinSequence = index
-                });
+                    RuntimeStates.Add(new CombatantRuntimeData
+                    {
+                        PersistentId = card?.PersistentId,
+                        ActionProgress = Mathf.Min(90f, index++ * 10f),
+                        JoinSequence = index
+                    });
+                }
             }
+            Version = 3;
         }
+    }
+
+    [System.Serializable]
+    public sealed class CombatantDefeatRuleData
+    {
+        public string PersistentId;
+        public CombatDefeatRule Rule;
     }
 
     [System.Serializable]

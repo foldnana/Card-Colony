@@ -38,6 +38,7 @@ namespace CryingSnow.StackCraft
             NarrativeRuntimeState.Idle;
         private NarrativeRunStateData pendingResumeRun;
         private bool resumeAttempted;
+        private string pendingBackgroundBranch;
 
         public static NarrativeDirector Instance { get; private set; }
         public NarrativeDirectorState State { get; private set; } =
@@ -82,6 +83,8 @@ namespace CryingSnow.StackCraft
                 new CombatGameplayInteractionHandler());
             interactionRegistry.Register(
                 new InvestigationGameplayInteractionHandler());
+            interactionRegistry.Register(
+                new NpcStockLossGameplayInteractionHandler());
             SceneManager.sceneLoaded += HandleSceneLoaded;
         }
 
@@ -94,6 +97,17 @@ namespace CryingSnow.StackCraft
             }
             if (State != NarrativeDirectorState.Playing || runtime == null)
                 return;
+
+            if (!string.IsNullOrWhiteSpace(pendingBackgroundBranch))
+            {
+                string branch = pendingBackgroundBranch;
+                pendingBackgroundBranch = null;
+                if (runtime.TryBranchExternally(branch))
+                {
+                    PresentRuntimeState();
+                    return;
+                }
+            }
 
             runtime.AdvanceTime(Time.unscaledDeltaTime);
             if (runtime.State != lastPresentedRuntimeState)
@@ -159,6 +173,7 @@ namespace CryingSnow.StackCraft
 
             State = NarrativeDirectorState.Preparing;
             FailureReason = string.Empty;
+            pendingBackgroundBranch = null;
             activeDefinition = definition;
             cleanupScope = new NarrativeCleanupScope();
             try
@@ -200,14 +215,20 @@ namespace CryingSnow.StackCraft
                     FindObjectOfType<NarrativePresentationView>(true);
                 var presentation = new NarrativePresentationService(
                     presentationView,
-                    FindObjectOfType<CameraController>(true));
+                    FindObjectOfType<CameraController>(true),
+                    restoreCameraOnDispose: !definition.AllowCameraInput);
                 presentationView?.BindSkip(() => SkipToNextBarrier());
                 cleanupScope.Push(() => presentationView?.BindSkip(null));
                 actorControls = new NarrativeActorControlService();
-                commandExecutor = new NarrativeWorldActionExecutor(
+                var worldExecutor = new NarrativeWorldActionExecutor(
                     resolvedActors,
                     actorControls,
                     presentation);
+                worldExecutor.BackgroundBranchRequested +=
+                    QueueBackgroundBranch;
+                cleanupScope.Push(() => worldExecutor
+                    .BackgroundBranchRequested -= QueueBackgroundBranch);
+                commandExecutor = worldExecutor;
                 cleanupScope.Push(() => commandExecutor?.Dispose());
                 runtime = new NarrativeRuntime(
                     effects,
@@ -217,6 +238,12 @@ namespace CryingSnow.StackCraft
                 State = NarrativeDirectorState.Playing;
                 NarrativeRunStateData resume = pendingResumeRun;
                 pendingResumeRun = null;
+                if (resume != null)
+                {
+                    worldExecutor.RestoreBackgroundCombats(
+                        resume.BackgroundCombats,
+                        definition);
+                }
                 bool started = resume != null
                     ? runtime.Resume(definition, resume)
                     : runtime.Start(definition, runId);
@@ -435,15 +462,20 @@ namespace CryingSnow.StackCraft
                 return;
             NarrativeActorHandle actor = ResolveActor(
                 runtime.CurrentLine.ActorRole);
-            dialoguePanel.ShowNarrative(
+            dialoguePanel.ShowNarrativeLine(
                 actor?.DisplayName ?? string.Empty,
                 actor?.Portrait,
                 runtime.CurrentLine.FallbackText,
-                string.Empty,
-                new[]
-                {
-                    new DialogueChoiceOption("继续", Continue)
-                });
+                Continue);
+        }
+
+        private void QueueBackgroundBranch(string targetNodeId)
+        {
+            if (State == NarrativeDirectorState.Playing &&
+                !string.IsNullOrWhiteSpace(targetNodeId))
+            {
+                pendingBackgroundBranch = targetNodeId;
+            }
         }
 
         private void ShowChoices()
@@ -528,6 +560,7 @@ namespace CryingSnow.StackCraft
 
         private void Finish(bool saveResult)
         {
+            pendingBackgroundBranch = null;
             if (saveResult)
             {
                 GameData data = GameDirector.Instance?.GameData;

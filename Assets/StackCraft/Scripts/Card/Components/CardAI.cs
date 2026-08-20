@@ -95,7 +95,8 @@ namespace CryingSnow.StackCraft
 
         private bool CanMove()
         {
-            return !_card.IsBeingDragged
+            return !_card.IsNarrativeTemporary
+                && !_card.IsBeingDragged
                 && !(_card.Stack != null && _card.Stack.IsCrafting)
                 && !_combatant.IsInCombat;
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace CryingSnow.StackCraft
@@ -19,7 +20,7 @@ namespace CryingSnow.StackCraft
     }
 
     [DisallowMultipleComponent]
-    public sealed class DialoguePanelView : MonoBehaviour
+    public sealed class DialoguePanelView : MonoBehaviour, IPointerClickHandler
     {
         [SerializeField] private RawImage portraitBackground;
         [SerializeField] private RawImage portrait;
@@ -38,6 +39,7 @@ namespace CryingSnow.StackCraft
         private TMP_Text goodbyeButtonLabel;
         private string defaultGoodbyeLabel;
         private Action responseGoodbyeCallback;
+        private Action narrativeAdvanceCallback;
 
         public TMP_Text SpeakerNameLabel => speakerNameLabel;
         public TMP_Text DialogueTextLabel => dialogueTextLabel;
@@ -62,6 +64,7 @@ namespace CryingSnow.StackCraft
             if (speaker == null)
                 return;
 
+            narrativeAdvanceCallback = null;
             ShowSpeaker(speaker, speaker.DialogueOpeningText);
             responseGoodbyeCallback = onGoodbye;
             if (inlineActions != null)
@@ -95,6 +98,7 @@ namespace CryingSnow.StackCraft
             if (speaker == null)
                 return;
 
+            narrativeAdvanceCallback = null;
             bool hasPrimary = !string.IsNullOrWhiteSpace(primaryLabel) &&
                               onPrimary != null;
             bool hasSecondary = !string.IsNullOrWhiteSpace(secondaryLabel) &&
@@ -117,6 +121,7 @@ namespace CryingSnow.StackCraft
             if (speaker == null)
                 return;
 
+            narrativeAdvanceCallback = null;
             ShowSpeaker(speaker, dialogue);
             if (inlineActions != null)
                 inlineActions.SetActive(false);
@@ -131,6 +136,7 @@ namespace CryingSnow.StackCraft
             IReadOnlyList<DialogueChoiceOption> options)
         {
             gameObject.SetActive(true);
+            narrativeAdvanceCallback = null;
             responseGoodbyeCallback = null;
             if (portraitBackground != null)
                 portraitBackground.gameObject.SetActive(false);
@@ -148,8 +154,56 @@ namespace CryingSnow.StackCraft
             BuildChoiceTray(title, options);
         }
 
+        /// <summary>
+        /// Shows a linear narrative line. The player advances by clicking the
+        /// dialogue panel itself instead of choosing a fake "continue" option.
+        /// </summary>
+        public void ShowNarrativeLine(
+            string speakerName,
+            Texture speakerPortrait,
+            string dialogue,
+            Action onAdvance)
+        {
+            gameObject.SetActive(true);
+            responseGoodbyeCallback = null;
+            narrativeAdvanceCallback = onAdvance;
+            if (portraitBackground != null)
+                portraitBackground.gameObject.SetActive(false);
+            if (portrait != null)
+            {
+                portrait.texture = speakerPortrait;
+                portrait.gameObject.SetActive(speakerPortrait != null);
+            }
+            if (speakerNameLabel != null)
+                speakerNameLabel.text = speakerName ?? string.Empty;
+            if (dialogueTextLabel != null)
+                dialogueTextLabel.text = dialogue ?? string.Empty;
+            if (inlineActions != null)
+                inlineActions.SetActive(false);
+            HideChoiceTray();
+        }
+
+        public void AdvanceNarrative()
+        {
+            Action callback = narrativeAdvanceCallback;
+            if (callback == null)
+                return;
+            narrativeAdvanceCallback = null;
+            callback.Invoke();
+        }
+
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData == null ||
+                eventData.button == PointerEventData.InputButton.Left)
+            {
+                AdvanceNarrative();
+            }
+        }
+
         public void ShowResponse(string response)
         {
+            narrativeAdvanceCallback = null;
             HideChoiceTray();
             if (inlineActions != null)
                 inlineActions.SetActive(false);
@@ -173,6 +227,7 @@ namespace CryingSnow.StackCraft
             replyButton?.onClick.RemoveAllListeners();
             goodbyeButton?.onClick.RemoveAllListeners();
             responseGoodbyeCallback = null;
+            narrativeAdvanceCallback = null;
             HideChoiceTray();
             gameObject.SetActive(false);
         }

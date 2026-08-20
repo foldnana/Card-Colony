@@ -93,6 +93,18 @@ namespace CryingSnow.StackCraft
             return false;
         }
 
+        public bool OverrideOrigin(
+            string roleId,
+            Vector3 position,
+            Quaternion rotation)
+        {
+            if (string.IsNullOrWhiteSpace(roleId) ||
+                !controls.TryGetValue(roleId, out ControlEntry entry))
+                return false;
+            entry.Origin = new NarrativeActorOrigin(position, rotation);
+            return true;
+        }
+
         public void Dispose()
         {
             if (disposed)

@@ -333,8 +333,7 @@ namespace CryingSnow.StackCraft
                 {
                     skippingToBarrier = false;
                     if (barrier is NarrativeBarrierType.SceneTransition or
-                        NarrativeBarrierType.IrreversibleConfirmation or
-                        NarrativeBarrierType.Checkpoint)
+                        NarrativeBarrierType.IrreversibleConfirmation)
                     {
                         State = NarrativeRuntimeState.WaitingAtBarrier;
                         return;
@@ -399,8 +398,9 @@ namespace CryingSnow.StackCraft
                             commandIndex,
                             null,
                             null);
-                        State = NarrativeRuntimeState.WaitingAtBarrier;
-                        return;
+                        // A checkpoint is a technical save boundary, not a
+                        // decision the player needs to acknowledge.
+                        break;
                     case NarrativeCommandType.SceneTransition:
                     case NarrativeCommandType.IrreversibleConfirmation:
                         State = NarrativeRuntimeState.WaitingAtBarrier;
@@ -416,6 +416,9 @@ namespace CryingSnow.StackCraft
                     case NarrativeCommandType.SpawnActor:
                     case NarrativeCommandType.DespawnActor:
                     case NarrativeCommandType.PlayCinematicAttack:
+                    case NarrativeCommandType.BeginConflictInteraction:
+                    case NarrativeCommandType.EndConflictInteraction:
+                    case NarrativeCommandType.BeginBackgroundCombat:
                     case NarrativeCommandType.EnterVisualNovelMode:
                     case NarrativeCommandType.ExitVisualNovelMode:
                     case NarrativeCommandType.ShowFullscreenImage:
@@ -442,6 +445,11 @@ namespace CryingSnow.StackCraft
         {
             if (command == null)
                 return NarrativeBarrierType.None;
+            if (command.Type == NarrativeCommandType.Checkpoint ||
+                command.BarrierType == NarrativeBarrierType.Checkpoint)
+            {
+                return NarrativeBarrierType.None;
+            }
             if (command.BarrierType != NarrativeBarrierType.None)
                 return command.BarrierType;
             return command.Type switch
@@ -454,8 +462,6 @@ namespace CryingSnow.StackCraft
                     NarrativeBarrierType.SceneTransition,
                 NarrativeCommandType.IrreversibleConfirmation =>
                     NarrativeBarrierType.IrreversibleConfirmation,
-                NarrativeCommandType.Checkpoint =>
-                    NarrativeBarrierType.Checkpoint,
                 NarrativeCommandType.EndNarrative =>
                     NarrativeBarrierType.NarrativeEnd,
                 _ => NarrativeBarrierType.None
@@ -482,8 +488,16 @@ namespace CryingSnow.StackCraft
                 return HandleFailure(command,
                     "Narrative presentation operation was not created.");
             if (operation.IsCompleted)
-                return operation.Result.Success ||
+            {
+                bool succeeded = operation.Result.Success ||
                     HandleFailure(command, operation.Result.Error);
+                if (succeeded && command.Type ==
+                    NarrativeCommandType.BeginBackgroundCombat)
+                {
+                    SaveCheckpoint(currentNode.Id, commandIndex, null, null);
+                }
+                return succeeded;
+            }
 
             currentPresentationOperation = operation;
             int expectedGeneration = runGeneration;
@@ -501,6 +515,44 @@ namespace CryingSnow.StackCraft
             State = NarrativeRuntimeState.WaitingForPresentation;
             operation.Completed += presentationCompleted;
             return true;
+        }
+
+        public bool TryBranchExternally(string targetNodeId)
+        {
+            if (State is NarrativeRuntimeState.Idle or
+                NarrativeRuntimeState.Completed or
+                NarrativeRuntimeState.Failed ||
+                string.IsNullOrWhiteSpace(targetNodeId))
+            {
+                return false;
+            }
+
+            if (State == NarrativeRuntimeState.WaitingForInteraction &&
+                string.Equals(
+                    currentInteractionCommand?.InteractionParameters?.ActionId,
+                    CombatGameplayInteractionHandler.CombatActionId,
+                    StringComparison.Ordinal))
+            {
+                // Once the player has joined the same combat, the blocking
+                // combat interaction owns the branch and must not race the
+                // earlier background observer.
+                return false;
+            }
+
+            runGeneration++;
+            DetachCurrentOperation(true, "ExternalNarrativeBranch");
+            DetachPresentationOperation(true, "ExternalNarrativeBranch");
+            CurrentLine = null;
+            currentChoices.Clear();
+            CurrentChoiceTitle = string.Empty;
+            waitTimeRemaining = 0f;
+            skippingToBarrier = false;
+            State = NarrativeRuntimeState.Playing;
+            if (!MoveToNode(targetNodeId))
+                return false;
+            SaveCheckpoint(currentNode.Id, 0, null, null);
+            Advance();
+            return State != NarrativeRuntimeState.Failed;
         }
 
         private void DetachPresentationOperation(bool cancel, string reason)
@@ -587,7 +639,8 @@ namespace CryingSnow.StackCraft
                 currentNode.Id,
                 effect.ResultId,
                 actor.Card,
-                effect.IntValue);
+                effect.IntValue,
+                effect.BoolValue);
             return result.Success || HandleFailure(command, result.Error);
         }
 
@@ -602,6 +655,14 @@ namespace CryingSnow.StackCraft
             {
                 return HandleFailure(command,
                     "Interaction action identifier is missing.");
+            }
+            if (string.Equals(parameters.ActionId,
+                    CombatGameplayInteractionHandler.CombatActionId,
+                    StringComparison.Ordinal) &&
+                commandExecutor is NarrativeWorldActionExecutor executor)
+            {
+                executor.SuppressBackgroundBranchForContext(
+                    parameters.ContextId);
             }
 
             string operationId = string.Join(":",
@@ -878,6 +939,10 @@ namespace CryingSnow.StackCraft
             saved.ResumePolicy = waitingRequest == null
                 ? NarrativeResumePolicy.ResumeFromCheckpoint
                 : NarrativeResumePolicy.AbortIfInteractionMissing;
+            saved.BackgroundCombats = commandExecutor is
+                NarrativeWorldActionExecutor executor
+                    ? executor.CaptureBackgroundCombats()
+                    : new List<NarrativeBackgroundCombatData>();
         }
 
         private static NarrativeWaitingInteractionData

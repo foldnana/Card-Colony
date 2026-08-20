@@ -142,6 +142,27 @@ namespace CryingSnow.StackCraft
             CardInstance target,
             int damage)
         {
+            return ApplyDamage(
+                narrativeId,
+                narrativeVersion,
+                runId,
+                nodeId,
+                resultId,
+                target,
+                damage,
+                nonLethal: false);
+        }
+
+        public WorldEffectResult ApplyDamage(
+            string narrativeId,
+            int narrativeVersion,
+            string runId,
+            string nodeId,
+            string resultId,
+            CardInstance target,
+            int damage,
+            bool nonLethal)
+        {
             if (target == null)
                 return WorldEffectResult.Failed("Damage target is missing.");
             if (damage <= 0)
@@ -156,7 +177,12 @@ namespace CryingSnow.StackCraft
                 resultId,
                 _ =>
                 {
-                    target.TakeDamage(damage);
+                    int appliedDamage = nonLethal
+                        ? Mathf.Min(damage,
+                            Mathf.Max(0, target.CurrentHealth - 1))
+                        : damage;
+                    if (appliedDamage > 0)
+                        target.TakeDamage(appliedDamage);
                     if (target != null && target.CurrentHealth <= 0)
                         target.Kill();
                     return WorldEffectResult.AppliedNow();

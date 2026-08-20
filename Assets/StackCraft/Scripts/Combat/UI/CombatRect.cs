@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -30,6 +31,21 @@ namespace CryingSnow.StackCraft
         /// <param name="defenders">The list of CardInstances that will occupy the defending row.</param>
         public void Initialize(List<CardInstance> attackers, List<CardInstance> defenders)
         {
+            InitializeCore(attackers, defenders, animateCards: false);
+        }
+
+        public void InitializeAnimated(
+            List<CardInstance> attackers,
+            List<CardInstance> defenders)
+        {
+            InitializeCore(attackers, defenders, animateCards: true);
+        }
+
+        private void InitializeCore(
+            List<CardInstance> attackers,
+            List<CardInstance> defenders,
+            bool animateCards)
+        {
             useElevatedCardPresentation = true;
             _attackers = attackers;
             _defenders = defenders;
@@ -49,13 +65,15 @@ namespace CryingSnow.StackCraft
             transform.position = Board.Instance.ClampRectTransformToBoard(Rect);
             CardManager.Instance.ResolveOverlaps(this);
 
-            ArrangeCards();
+            ArrangeCardsInternal(animateAttackers: animateCards,
+                animateDefenders: animateCards);
         }
 
         public void InitializeAnchored(
             List<CardInstance> initiators,
             List<CardInstance> targets,
-            Vector3 targetAnchor)
+            Vector3 targetAnchor,
+            bool animateInitiators = true)
         {
             useElevatedCardPresentation = false;
             _attackers = initiators;
@@ -76,7 +94,7 @@ namespace CryingSnow.StackCraft
             transform.position =
                 targetAnchor.Flatten() -
                 Rect.TransformVector(targetLocalSlot);
-            ArrangeCards(animateAttackers: true);
+            ArrangeCards(animateAttackers: animateInitiators);
         }
 
         public bool ConfigureInteractionTint(Color color)
@@ -156,6 +174,15 @@ namespace CryingSnow.StackCraft
 
         private void ArrangeCards(bool animateAttackers = false)
         {
+            ArrangeCardsInternal(
+                animateAttackers,
+                animateDefenders: false);
+        }
+
+        private void ArrangeCardsInternal(
+            bool animateAttackers,
+            bool animateDefenders)
+        {
             _cardPositions.Clear();
             float presentationHeight = useElevatedCardPresentation
                 ? ResolveCombatPresentationHeight()
@@ -174,8 +201,50 @@ namespace CryingSnow.StackCraft
             ArrangeRow(
                 _defenders,
                 +cellSize.y * 0.5f,
-                animate: false,
+                animate: animateDefenders,
                 presentationHeight);
+        }
+
+        public void PlayTransitionIn(float duration = 0.25f)
+        {
+            float transitionDuration = Mathf.Max(0.01f, duration);
+            CanvasGroup group = GetOrAddCanvasGroup();
+            group.DOKill();
+            transform.DOKill();
+            group.alpha = 0f;
+            Vector3 finalScale = transform.localScale;
+            transform.localScale = finalScale * 0.96f;
+            group.DOFade(1f, transitionDuration)
+                .SetEase(Ease.OutSine)
+                .SetUpdate(true);
+            transform.DOScale(finalScale, transitionDuration)
+                .SetEase(Ease.OutCubic)
+                .SetUpdate(true);
+        }
+
+        public void CloseAnimated(float duration = 0.2f)
+        {
+            if (!Application.isPlaying)
+            {
+                Close();
+                return;
+            }
+            float transitionDuration = Mathf.Max(0.01f, duration);
+            CanvasGroup group = GetOrAddCanvasGroup();
+            group.DOKill();
+            transform.DOKill();
+            group.DOFade(0f, transitionDuration)
+                .SetEase(Ease.InSine)
+                .SetUpdate(true)
+                .OnComplete(() =>
+                {
+                    if (this != null)
+                        Destroy(gameObject);
+                });
+            transform.DOScale(transform.localScale * 0.97f,
+                    transitionDuration)
+                .SetEase(Ease.InCubic)
+                .SetUpdate(true);
         }
 
         private void ArrangeRow(
@@ -287,10 +356,22 @@ namespace CryingSnow.StackCraft
         /// </summary>
         public void Close()
         {
+            transform.DOKill();
+            CanvasGroup group = GetComponent<CanvasGroup>();
+            if (group != null)
+                group.DOKill();
             if (Application.isPlaying)
                 Destroy(gameObject);
             else
                 DestroyImmediate(gameObject);
+        }
+
+        private CanvasGroup GetOrAddCanvasGroup()
+        {
+            CanvasGroup group = GetComponent<CanvasGroup>();
+            return group != null
+                ? group
+                : gameObject.AddComponent<CanvasGroup>();
         }
     }
 }

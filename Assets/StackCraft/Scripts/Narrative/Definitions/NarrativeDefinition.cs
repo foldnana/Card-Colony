@@ -37,7 +37,10 @@ namespace CryingSnow.StackCraft
         SceneTransition = 27,
         IrreversibleConfirmation = 28,
         ApplyDamage = 29,
-        BranchByInteractionOutcome = 30
+        BranchByInteractionOutcome = 30,
+        BeginConflictInteraction = 31,
+        EndConflictInteraction = 32,
+        BeginBackgroundCombat = 33
     }
 
     public enum NarrativeBarrierType

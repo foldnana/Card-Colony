@@ -23,6 +23,8 @@ namespace CryingSnow.StackCraft
         public long CreatedSequence { get; private set; }
         public IEnumerable<CombatCommand> QueuedCommands => commands.Commands;
         public IReadOnlyCollection<string> ResolvedDefeatIds => resolvedDefeatIds;
+        internal IReadOnlyCollection<CardInstance> PreservedDefeated =>
+            preservedDefeated;
         public IEnumerable<CardInstance> PlayerCombatants => combatants.Where(
             card => card?.Definition?.Faction == CardFaction.Player &&
                 card.CurrentHealth > 0);
@@ -41,6 +43,9 @@ namespace CryingSnow.StackCraft
             new(StringComparer.Ordinal);
         private readonly HashSet<string> retreatedPlayerIds =
             new(StringComparer.Ordinal);
+        private readonly HashSet<CardInstance> preservedDefeated = new();
+        private readonly Dictionary<CardInstance, CombatDefeatRule>
+            combatantDefeatRules = new();
         private readonly Dictionary<CardInstance, long> joinSequences = new();
         private readonly CombatCommandQueue commands = new();
         private readonly CombatActionScheduler scheduler = new();
@@ -60,6 +65,12 @@ namespace CryingSnow.StackCraft
         private CardInstance pendingTarget;
         private float presentationElapsed;
         private bool impactApplied;
+        private CombatDefeatRule friendlyDefeatRule =
+            CombatDefeatRule.Lethal;
+        private CombatDefeatRule enemyDefeatRule = CombatDefeatRule.Lethal;
+
+        public CombatDefeatRule FriendlyDefeatRule => friendlyDefeatRule;
+        public CombatDefeatRule EnemyDefeatRule => enemyDefeatRule;
 
         public CombatTask(
             List<CardInstance> attackers,
@@ -120,6 +131,37 @@ namespace CryingSnow.StackCraft
                 ? CombatEventType.CombatRestored
                 : CombatEventType.CombatStarted);
         }
+
+        public void ConfigureDefeatRules(
+            CombatDefeatRule friendlyRule,
+            CombatDefeatRule enemyRule)
+        {
+            friendlyDefeatRule = friendlyRule;
+            enemyDefeatRule = enemyRule;
+            foreach (CardInstance card in Attackers.Where(card => card != null))
+            {
+                combatantDefeatRules[card] = PlayerIsAttacker
+                    ? friendlyRule
+                    : enemyRule;
+            }
+            foreach (CardInstance card in Defenders.Where(card => card != null))
+            {
+                combatantDefeatRules[card] = PlayerIsAttacker
+                    ? enemyRule
+                    : friendlyRule;
+            }
+        }
+
+        internal void ConfigureDefeatRule(
+            CardInstance card,
+            CombatDefeatRule rule)
+        {
+            if (card != null)
+                combatantDefeatRules[card] = rule;
+        }
+
+        internal CombatDefeatRule GetConfiguredDefeatRule(CardInstance card) =>
+            GetDefeatRule(card);
 
         private static uint CreateSeed(long createdSequence)
         {
@@ -609,14 +651,19 @@ namespace CryingSnow.StackCraft
             }
             else
             {
-                target.TakeDamage(result.Damage);
+                CombatDefeatRule defeatRule = GetDefeatRule(target);
+                int appliedDamage = CombatDefeatRules.ResolveDamage(
+                    target.CurrentHealth,
+                    result.Damage,
+                    defeatRule);
+                target.TakeDamage(appliedDamage);
                 if (result.IsCritical)
                 {
                     Publish(
                         CombatEventType.CriticalHit,
                         actor,
                         target,
-                        result.Damage,
+                        appliedDamage,
                         hitType: result.Type,
                         advantage: result.Advantage);
                 }
@@ -624,16 +671,37 @@ namespace CryingSnow.StackCraft
                     CombatEventType.DamageApplied,
                     actor,
                     target,
-                    result.Damage,
+                    appliedDamage,
                     hitType: result.Type,
                     advantage: result.Advantage);
             }
 
-            if (target.CurrentHealth <= 0)
-                ResolveDefeat(target);
+            CombatDefeatRule targetRule = GetDefeatRule(target);
+            if (result.IsHit && CombatDefeatRules.ShouldResolveDefeat(
+                    target.CurrentHealth, targetRule))
+            {
+                ResolveDefeat(
+                    target,
+                    CombatDefeatRules.PreservesCard(targetRule));
+            }
         }
 
-        private void ResolveDefeat(CardInstance defeated)
+        private CombatDefeatRule GetDefeatRule(CardInstance card)
+        {
+            if (card != null && combatantDefeatRules.TryGetValue(
+                    card, out CombatDefeatRule configured))
+                return configured;
+            bool belongsToFriendlySide = PlayerIsAttacker
+                ? Attackers.Contains(card)
+                : Defenders.Contains(card);
+            return belongsToFriendlySide
+                ? friendlyDefeatRule
+                : enemyDefeatRule;
+        }
+
+        private void ResolveDefeat(
+            CardInstance defeated,
+            bool preserveCard = false)
         {
             if (defeated == null)
                 return;
@@ -659,6 +727,12 @@ namespace CryingSnow.StackCraft
             }
 
             Publish(CombatEventType.CombatantDefeated, target: defeated);
+            if (preserveCard)
+            {
+                preservedDefeated.Add(defeated);
+                Rect?.UpdateLayout();
+                return;
+            }
             CombatRewardResult reward = rewardService.ResolveDefeat(
                 defeated,
                 participants);
@@ -849,6 +923,7 @@ namespace CryingSnow.StackCraft
                 Rect = null;
             }
             foreach (CardInstance card in Attackers.Concat(Defenders)
+                         .Concat(preservedDefeated)
                          .Where(card => card != null).Distinct().ToList())
             {
                 card.Combatant.LeaveCombat();
@@ -872,12 +947,16 @@ namespace CryingSnow.StackCraft
 
         private CombatOutcomeResult DetermineOutcome()
         {
-            bool playerAlive = combatants.Any(card =>
-                card != null && card.Definition?.Faction == CardFaction.Player &&
-                card.CurrentHealth > 0 && !card.IsDowned);
-            bool mobAlive = combatants.Any(card =>
-                card != null && card.Definition?.Faction == CardFaction.Mob &&
-                card.CurrentHealth > 0 && !card.IsDowned);
+            IEnumerable<CardInstance> friendlySide = PlayerIsAttacker
+                ? Attackers
+                : Defenders;
+            IEnumerable<CardInstance> enemySide = PlayerIsAttacker
+                ? Defenders
+                : Attackers;
+            bool playerAlive = friendlySide.Any(card =>
+                card != null && card.CurrentHealth > 0 && !card.IsDowned);
+            bool mobAlive = enemySide.Any(card =>
+                card != null && card.CurrentHealth > 0 && !card.IsDowned);
             return CombatOutcomeRules.Resolve(
                 playerAlive,
                 mobAlive,
@@ -885,7 +964,9 @@ namespace CryingSnow.StackCraft
                 forceAbort: false);
         }
 
-        public void CleanUpForMerge()
+        public void CleanUpForMerge() => CleanUpForMerge(animateRect: false);
+
+        internal void CleanUpForMerge(bool animateRect)
         {
             if (Phase == CombatPhase.Finished)
                 return;
@@ -894,7 +975,10 @@ namespace CryingSnow.StackCraft
             actionCoroutine = null;
             if (Rect != null)
             {
-                Rect.Close();
+                if (animateRect)
+                    Rect.CloseAnimated();
+                else
+                    Rect.Close();
                 Rect = null;
             }
             Phase = CombatPhase.Finished;
@@ -930,6 +1014,15 @@ namespace CryingSnow.StackCraft
         {
             if (data == null)
                 return;
+            friendlyDefeatRule = data.FriendlyDefeatRule;
+            enemyDefeatRule = data.EnemyDefeatRule;
+            foreach (CombatantDefeatRuleData rule in
+                     data.DefeatRules ?? new())
+            {
+                CardInstance card = FindParticipant(rule.PersistentId);
+                if (card != null)
+                    combatantDefeatRules[card] = rule.Rule;
+            }
             foreach (CombatantRuntimeData runtime in data.RuntimeStates ?? new())
             {
                 CardInstance card = FindCombatant(runtime.PersistentId);
@@ -1055,6 +1148,19 @@ namespace CryingSnow.StackCraft
                 resolvedDefeatIds.Add(key);
             defeatedActorIds.UnionWith(source.defeatedActorIds);
             retreatedPlayerIds.UnionWith(source.retreatedPlayerIds);
+            foreach (CardInstance card in source.participants)
+            {
+                if (card != null)
+                    combatantDefeatRules[card] =
+                        source.GetConfiguredDefeatRule(card);
+            }
+            foreach (CardInstance card in source.preservedDefeated)
+            {
+                if (card == null)
+                    continue;
+                participants.Add(card);
+                preservedDefeated.Add(card);
+            }
 
             BackpackData backpack = BackpackService.Current;
             if (backpack?.Entries != null && source.SessionId != SessionId)
@@ -1077,6 +1183,26 @@ namespace CryingSnow.StackCraft
                 : combatants.FirstOrDefault(card => card?.PersistentId == persistentId);
         }
 
+        internal CardInstance FindParticipant(string persistentId) =>
+            string.IsNullOrWhiteSpace(persistentId)
+                ? null
+                : participants.FirstOrDefault(card =>
+                    card?.PersistentId == persistentId);
+
+        internal void RestorePreservedDefeated(
+            IEnumerable<CardInstance> cards)
+        {
+            foreach (CardInstance card in cards ??
+                     Enumerable.Empty<CardInstance>())
+            {
+                if (card == null)
+                    continue;
+                participants.Add(card);
+                preservedDefeated.Add(card);
+                if (!string.IsNullOrWhiteSpace(card.PersistentId))
+                    defeatedActorIds.Add(card.PersistentId);
+            }
+        }
         internal bool ContainsCombatant(string persistentId) =>
             FindCombatant(persistentId) != null;
 

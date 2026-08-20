@@ -783,7 +783,9 @@ namespace CardColony.Tests
                 .ToArray();
             Assert.That(commandNames, Does.Contain("SpawnActor"));
             Assert.That(commandNames, Does.Contain("MoveToActor"));
-            Assert.That(commandNames, Does.Contain("PlayCinematicAttack"));
+            Assert.That(commandNames, Does.Contain("BeginBackgroundCombat"));
+            Assert.That(commandNames, Does.Not.Contain("PlayCinematicAttack"),
+                "杂货商遇袭应使用持续的真实战斗，而不是单次假攻击。 ");
             Assert.That(commandNames, Does.Contain("ShowChoice"));
             Assert.That(commandNames, Does.Contain("DespawnActor"));
             if (narrativeId == "npc_event.riverbend-grocer")

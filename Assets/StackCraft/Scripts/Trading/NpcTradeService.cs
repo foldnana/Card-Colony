@@ -7,6 +7,74 @@ namespace CryingSnow.StackCraft
 {
     public static class NpcTradeService
     {
+        public static int ApplyRobberyLoss(
+            NpcTrader trader,
+            float lossFraction)
+        {
+            float fraction = Mathf.Clamp01(lossFraction);
+            if (trader?.Profile == null || fraction <= 0f)
+                return 0;
+
+            int stolen = 0;
+            if (TryGetRegionalMarket(trader, out ResourcesMarketCatalog catalog,
+                    out MarketService service))
+            {
+                MarketStateData state = service.GetOrCreateState(
+                    trader.Profile.MarketProfile.Id);
+                MigrateLegacyRiverbendState(trader, state);
+                var merchantCommodityIds = new HashSet<string>(
+                    trader.SellOffers
+                        .Select(offer => catalog.FindCommodity(
+                            offer.ProductDefinition)?.Id)
+                        .Where(id => !string.IsNullOrWhiteSpace(id)),
+                    StringComparer.Ordinal);
+                if (merchantCommodityIds.Count == 0)
+                    return 0;
+                foreach (MarketCommodityStateData commodity in
+                         state?.Commodities ??
+                         Enumerable.Empty<MarketCommodityStateData>())
+                {
+                    if (commodity == null || commodity.Stock <= 0)
+                        continue;
+                    if (!merchantCommodityIds.Contains(commodity.CommodityId))
+                    {
+                        continue;
+                    }
+                    int removed = Mathf.Clamp(
+                        Mathf.CeilToInt(commodity.Stock * fraction),
+                        1,
+                        commodity.Stock);
+                    commodity.Stock -= removed;
+                    stolen += removed;
+                }
+                if (stolen > 0)
+                    state.StateRevision++;
+                CardManager.Instance?.NotifyStatsChanged();
+                return stolen;
+            }
+
+            if (!TryGetContext(trader, out SceneData sceneData, out int day))
+                return 0;
+            foreach (LocationMarketOffer offer in trader.SellOffers)
+            {
+                MarketStockData stock = MarketStockLedger.GetOrRefreshNpc(
+                    sceneData,
+                    GetNpcId(trader),
+                    offer.StockId,
+                    day,
+                    offer.MinimumDailyStock,
+                    offer.MaximumDailyStock);
+                int removed = Mathf.Clamp(
+                    Mathf.CeilToInt(stock.Remaining * fraction),
+                    0,
+                    stock.Remaining);
+                stock.Remaining -= removed;
+                stolen += removed;
+            }
+            CardManager.Instance?.NotifyStatsChanged();
+            return stolen;
+        }
+
         public static void EnsureState(NpcTrader trader)
         {
             if (TryGetRegionalMarket(

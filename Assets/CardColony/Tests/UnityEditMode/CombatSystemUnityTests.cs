@@ -239,7 +239,7 @@ namespace CardColony.Tests
         }
 
         [Test]
-        public void CombatData_V2ContainsDeterministicRuntimeAndQueuedCommands()
+        public void CombatData_V3ContainsDeterministicRuntimeAndQueuedCommands()
         {
             Type combatDataType = FindType("CryingSnow.StackCraft.CombatData");
             foreach (string field in new[]
@@ -253,7 +253,9 @@ namespace CardColony.Tests
             }
 
             object data = Activator.CreateInstance(combatDataType);
-            Assert.That(combatDataType.GetField("Version").GetValue(data), Is.EqualTo(2));
+            Assert.That(combatDataType.GetField("Version").GetValue(data), Is.EqualTo(3));
+            Assert.That(combatDataType.GetField("DefeatRules"), Is.Not.Null);
+            Assert.That(combatDataType.GetField("PreservedDefeated"), Is.Not.Null);
             Assert.That(combatDataType.GetMethod("NormalizeAndMigrate"), Is.Not.Null);
         }
 

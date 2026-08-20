@@ -214,7 +214,8 @@ namespace CardColony.Tests
                 Assert.That(Invoke(first, "Start", definition, "run-1"),
                     Is.True);
                 Assert.That(GetProperty<object>(first, "State").ToString(),
-                    Is.EqualTo("WaitingAtBarrier"));
+                    Is.EqualTo("Completed"),
+                    "Checkpoint 只负责保存恢复点，不应打断连续剧情。 ");
 
                 object history = dataType.GetField("Narrative").GetValue(data);
                 object saved = history.GetType().GetField("ActiveRun")
@@ -403,7 +404,8 @@ namespace CardColony.Tests
                 .Select(value => GetProperty<string>(value, "ActionId"))
                 .ToArray();
             Assert.That(actions, Does.Contain("core.combat"));
-            Assert.That(actions, Does.Contain("exploration.investigate"));
+            Assert.That(actions, Does.Contain("economy.rob_npc_stock"),
+                "杂货商真实战败后必须结算被抢走的库存。 ");
         }
 
         private static Type RequireType(string name)

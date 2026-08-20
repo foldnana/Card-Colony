@@ -28,11 +28,11 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             var serialized = new SerializedObject(definition);
             serialized.FindProperty("id").stringValue =
                 "npc_event.riverbend-grocer-ambush";
-            serialized.FindProperty("version").intValue = 2;
+            serialized.FindProperty("version").intValue = 4;
             serialized.FindProperty("displayName").stringValue =
                 "河湾村杂货商遇袭";
             serialized.FindProperty("canSkip").boolValue = true;
-            serialized.FindProperty("allowCameraInput").boolValue = false;
+            serialized.FindProperty("allowCameraInput").boolValue = true;
             serialized.FindProperty("entryNodeId").stringValue = "begin";
 
             SerializedProperty actors = serialized.FindProperty(
@@ -49,7 +49,7 @@ namespace CryingSnow.StackCraft.NarrativeEditor
                 "f6cac76a302245f3912997c679ee3b17", "哥布林");
 
             SerializedProperty nodes = serialized.FindProperty("nodes");
-            nodes.arraySize = 8;
+            nodes.arraySize = 10;
             ConfigureBegin(nodes.GetArrayElementAtIndex(0));
             ConfigureConfront(nodes.GetArrayElementAtIndex(1));
             ConfigureObserve(nodes.GetArrayElementAtIndex(2));
@@ -57,7 +57,9 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             ConfigureDefeat(nodes.GetArrayElementAtIndex(4));
             ConfigureInterrupted(nodes.GetArrayElementAtIndex(5));
             ConfigureObserved(nodes.GetArrayElementAtIndex(6));
-            ConfigureCleanup(nodes.GetArrayElementAtIndex(7));
+            ConfigureMerchantRobbed(nodes.GetArrayElementAtIndex(7));
+            ConfigureMerchantSelfDefense(nodes.GetArrayElementAtIndex(8));
+            ConfigureCleanup(nodes.GetArrayElementAtIndex(9));
 
             serialized.ApplyModifiedPropertiesWithoutUndo();
             EditorUtility.SetDirty(definition);
@@ -79,7 +81,7 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             SetNodeId(node, "begin");
             SerializedProperty commands = node.FindPropertyRelative(
                 "commands");
-            commands.arraySize = 13;
+            commands.arraySize = 11;
             SetActorCommand(commands.GetArrayElementAtIndex(0),
                 "control_merchant", NarrativeCommandType.AcquireActorControl,
                 "Merchant");
@@ -105,16 +107,21 @@ namespace CryingSnow.StackCraft.NarrativeEditor
                 "merchant_question", "Merchant", "你们想干什么？");
             SetDialogue(commands.GetArrayElementAtIndex(8),
                 "threat_demand", "Threat", "把值钱的货物都交出来！");
-            SetActorCommand(commands.GetArrayElementAtIndex(9),
-                "threatening_swing", NarrativeCommandType.PlayCinematicAttack,
-                "Threat", "Merchant", duration: 0.7f);
-            SetDamage(commands.GetArrayElementAtIndex(10),
-                "merchant_ambush_damage", "Merchant", 3);
-            SetActorCommand(commands.GetArrayElementAtIndex(11),
-                "merchant_shock", NarrativeCommandType.ShowEmote,
-                "Merchant", message: "惊", duration: 0.65f);
+            SetBackgroundCombat(commands.GetArrayElementAtIndex(9),
+                "merchant_goblin_fight",
+                new[] { "Merchant" },
+                new[] { "Threat" },
+                "riverbend.market.ambush",
+                CombatDefeatRule.PreserveAtOne,
+                CombatDefeatRule.Lethal,
+                new[]
+                {
+                    ("victory", "merchant_self_defense"),
+                    ("defeat", "merchant_robbed"),
+                    ("aborted", "interrupted")
+                });
 
-            SerializedProperty choice = commands.GetArrayElementAtIndex(12);
+            SerializedProperty choice = commands.GetArrayElementAtIndex(10);
             SetCommand(choice, "player_decision",
                 NarrativeCommandType.ShowChoice);
             SerializedProperty dialogue = choice.FindPropertyRelative(
@@ -135,30 +142,22 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             SetNodeId(node, "confront");
             SerializedProperty commands = node.FindPropertyRelative(
                 "commands");
-            commands.arraySize = 7;
+            commands.arraySize = 4;
             SetActorCommand(commands.GetArrayElementAtIndex(0),
                 "control_player", NarrativeCommandType.AcquireActorControl,
                 "Player");
-            SetActorCommand(commands.GetArrayElementAtIndex(1),
-                "player_steps_in", NarrativeCommandType.MoveToActor,
-                "Player", "Threat", new Vector3(-1.05f, 0f, 0f), 0.55f);
-            SetActorCommand(commands.GetArrayElementAtIndex(2),
-                "player_faces_threat", NarrativeCommandType.FaceActor,
-                "Player", "Threat", duration: 0.2f);
-            SetDialogue(commands.GetArrayElementAtIndex(3),
-                "player_warning", "Player", "到此为止。离开这里。");
-            SetCommand(commands.GetArrayElementAtIndex(4),
+            SetCommand(commands.GetArrayElementAtIndex(1),
                 "before_combat", NarrativeCommandType.Checkpoint);
-            SetInteraction(commands.GetArrayElementAtIndex(5),
+            SetInteraction(commands.GetArrayElementAtIndex(2),
                 "fight_goblin", "core.combat",
-                new[] { "Player" }, new[] { "Threat" },
+                new[] { "Player", "Merchant" }, new[] { "Threat" },
                 "riverbend.market.ambush");
-            SerializedProperty execute = commands.GetArrayElementAtIndex(5);
+            SerializedProperty execute = commands.GetArrayElementAtIndex(2);
             execute.FindPropertyRelative("failurePolicy").enumValueIndex =
                 (int)NarrativeFailurePolicy.JumpToFailureNode;
             execute.FindPropertyRelative("failureNodeId").stringValue =
                 "interrupted";
-            SetOutcomeBranch(commands.GetArrayElementAtIndex(6),
+            SetOutcomeBranch(commands.GetArrayElementAtIndex(3),
                 "branch_combat", new[]
                 {
                     ("victory", "victory"),
@@ -176,11 +175,11 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             commands.arraySize = 2;
             SetNarration(commands.GetArrayElementAtIndex(0),
                 "observe_line", "你退到货架后观察，试图弄清哥布林为何而来。");
-            SetInteraction(commands.GetArrayElementAtIndex(1),
-                "investigate_raid", "exploration.investigate",
-                new[] { "Player" }, new[] { "Merchant" },
-                "riverbend.market.ambush-clue",
-                new[] { ("clue_found", "observed") });
+            SetCommand(commands.GetArrayElementAtIndex(1),
+                "watch_fight", NarrativeCommandType.Wait);
+            commands.GetArrayElementAtIndex(1)
+                .FindPropertyRelative("timingParameters")
+                .FindPropertyRelative("duration").floatValue = 3600f;
         }
 
         private static void ConfigureVictory(SerializedProperty node)
@@ -217,13 +216,20 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             SetNodeId(node, "defeat");
             SerializedProperty commands = node.FindPropertyRelative(
                 "commands");
-            commands.arraySize = 2;
+            commands.arraySize = 3;
             SetEffect(commands.GetArrayElementAtIndex(0),
                 "ambush_failed", NarrativeCommandType.SetWorldFact,
                 NarrativeEffectType.SetWorldFactBool,
                 "merchant_ambush_failed", "riverbend.merchant_ambush_failed",
                 boolValue: true);
-            SetNarration(commands.GetArrayElementAtIndex(1),
+            SetInteraction(commands.GetArrayElementAtIndex(1),
+                "goblins_take_goods_after_party_defeat",
+                NpcStockLossGameplayInteractionHandler.StockLossActionId,
+                new[] { "Threat" }, new[] { "Merchant" },
+                "riverbend.market.ambush");
+            SetFloatArgument(commands.GetArrayElementAtIndex(1),
+                "lossFraction", 0.5f);
+            SetNarration(commands.GetArrayElementAtIndex(2),
                 "defeat_result", "你没能阻止袭击，只能先保住性命。" );
             node.FindPropertyRelative("nextNodeId").stringValue = "cleanup";
         }
@@ -270,25 +276,28 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             SetNodeId(node, "cleanup");
             SerializedProperty commands = node.FindPropertyRelative(
                 "commands");
-            commands.arraySize = 7;
+            commands.arraySize = 8;
             SetActorCommand(commands.GetArrayElementAtIndex(0),
+                "end_conflict", NarrativeCommandType.EndConflictInteraction,
+                "Merchant", "Threat", duration: 0f);
+            SetActorCommand(commands.GetArrayElementAtIndex(1),
                 "merchant_returns", NarrativeCommandType.ReturnToOrigin,
                 "Merchant", duration: 0.35f);
-            SetActorCommand(commands.GetArrayElementAtIndex(1),
+            SetActorCommand(commands.GetArrayElementAtIndex(2),
                 "release_threat", NarrativeCommandType.ReleaseActorControl,
                 "Threat");
-            SetActorCommand(commands.GetArrayElementAtIndex(2),
+            SetActorCommand(commands.GetArrayElementAtIndex(3),
                 "despawn_threat", NarrativeCommandType.DespawnActor,
                 "Threat");
-            SetActorCommand(commands.GetArrayElementAtIndex(3),
+            SetActorCommand(commands.GetArrayElementAtIndex(4),
                 "release_merchant", NarrativeCommandType.ReleaseActorControl,
                 "Merchant");
-            SetActorCommand(commands.GetArrayElementAtIndex(4),
+            SetActorCommand(commands.GetArrayElementAtIndex(5),
                 "release_player", NarrativeCommandType.ReleaseActorControl,
                 "Player");
-            SetNarration(commands.GetArrayElementAtIndex(5),
+            SetNarration(commands.GetArrayElementAtIndex(6),
                 "ambush_ended", "这场突发事件暂时告一段落。");
-            SetCommand(commands.GetArrayElementAtIndex(6), "end",
+            SetCommand(commands.GetArrayElementAtIndex(7), "end",
                 NarrativeCommandType.EndNarrative);
         }
 
@@ -296,7 +305,8 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             SerializedProperty command,
             string resultId,
             string actorRole,
-            int damage)
+            int damage,
+            bool nonLethal = false)
         {
             SetCommand(command, resultId, NarrativeCommandType.ApplyDamage);
             command.FindPropertyRelative("actorActionParameters")
@@ -307,6 +317,50 @@ namespace CryingSnow.StackCraft.NarrativeEditor
                 (int)NarrativeEffectType.ApplyDamage;
             effect.FindPropertyRelative("resultId").stringValue = resultId;
             effect.FindPropertyRelative("intValue").intValue = damage;
+            effect.FindPropertyRelative("boolValue").boolValue = nonLethal;
+        }
+
+        private static void ConfigureMerchantRobbed(SerializedProperty node)
+        {
+            SetNodeId(node, "merchant_robbed");
+            SerializedProperty commands = node.FindPropertyRelative(
+                "commands");
+            commands.arraySize = 3;
+            SetInteraction(commands.GetArrayElementAtIndex(0),
+                "goblins_take_merchant_goods",
+                NpcStockLossGameplayInteractionHandler.StockLossActionId,
+                new[] { "Threat" }, new[] { "Merchant" },
+                "riverbend.market.ambush");
+            SetFloatArgument(commands.GetArrayElementAtIndex(0),
+                "lossFraction", 0.5f);
+            SetEffect(commands.GetArrayElementAtIndex(1),
+                "merchant_was_robbed", NarrativeCommandType.SetWorldFact,
+                NarrativeEffectType.SetWorldFactBool,
+                "merchant_was_robbed_fact",
+                "riverbend.merchant_was_robbed", boolValue: true);
+            SetNarration(commands.GetArrayElementAtIndex(2),
+                "merchant_robbed_result",
+                "杂货商支撑不住倒在一旁，哥布林趁机抢走了大约一半货物。" );
+            node.FindPropertyRelative("nextNodeId").stringValue = "cleanup";
+        }
+
+        private static void ConfigureMerchantSelfDefense(
+            SerializedProperty node)
+        {
+            SetNodeId(node, "merchant_self_defense");
+            SerializedProperty commands = node.FindPropertyRelative(
+                "commands");
+            commands.arraySize = 2;
+            SetEffect(commands.GetArrayElementAtIndex(0),
+                "merchant_defended_himself",
+                NarrativeCommandType.SetWorldFact,
+                NarrativeEffectType.SetWorldFactBool,
+                "merchant_defended_himself_fact",
+                "riverbend.merchant_defended_himself", boolValue: true);
+            SetNarration(commands.GetArrayElementAtIndex(1),
+                "merchant_self_defense_result",
+                "杂货商拼尽全力击退了哥布林，但他记住了你选择旁观。" );
+            node.FindPropertyRelative("nextNodeId").stringValue = "cleanup";
         }
 
         private static void SetEffect(
@@ -432,12 +486,151 @@ namespace CryingSnow.StackCraft.NarrativeEditor
             string id,
             NarrativeCommandType type)
         {
+            ResetCommandPayload(command);
             command.FindPropertyRelative("commandId").stringValue = id;
             command.FindPropertyRelative("type").enumValueIndex = (int)type;
             command.FindPropertyRelative("failurePolicy").enumValueIndex =
                 (int)NarrativeFailurePolicy.FailNarrative;
             command.FindPropertyRelative("failureNodeId").stringValue =
                 string.Empty;
+        }
+
+        private static void SetBackgroundCombat(
+            SerializedProperty command,
+            string commandId,
+            string[] friendlyRoles,
+            string[] enemyRoles,
+            string contextId,
+            CombatDefeatRule friendlyRule,
+            CombatDefeatRule enemyRule,
+            (string outcome, string target)[] branches)
+        {
+            SetCommand(command, commandId,
+                NarrativeCommandType.BeginBackgroundCombat);
+            SerializedProperty interaction = command.FindPropertyRelative(
+                "interactionParameters");
+            interaction.FindPropertyRelative("actionId").stringValue =
+                "narrative.background_combat";
+            interaction.FindPropertyRelative("contextId").stringValue =
+                contextId;
+            SetStrings(interaction.FindPropertyRelative("initiatorRoles"),
+                friendlyRoles);
+            SetStrings(interaction.FindPropertyRelative("targetRoles"),
+                enemyRoles);
+            SerializedProperty arguments = interaction.FindPropertyRelative(
+                "arguments");
+            arguments.arraySize = 2;
+            SetStringArgument(arguments.GetArrayElementAtIndex(0),
+                "friendlyDefeatRule", friendlyRule.ToString());
+            SetStringArgument(arguments.GetArrayElementAtIndex(1),
+                "enemyDefeatRule", enemyRule.ToString());
+            SerializedProperty outcomes = interaction.FindPropertyRelative(
+                "outcomeBranches");
+            outcomes.arraySize = branches?.Length ?? 0;
+            for (int index = 0; index < outcomes.arraySize; index++)
+            {
+                outcomes.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("outcomeId").stringValue =
+                    branches[index].outcome;
+                outcomes.GetArrayElementAtIndex(index)
+                    .FindPropertyRelative("targetNodeId").stringValue =
+                    branches[index].target;
+            }
+        }
+
+        private static void SetStringArgument(
+            SerializedProperty argument,
+            string key,
+            string value)
+        {
+            argument.FindPropertyRelative("key").stringValue = key;
+            argument.FindPropertyRelative("valueType").enumValueIndex =
+                (int)InteractionValueType.String;
+            argument.FindPropertyRelative("stringValue").stringValue = value;
+        }
+
+        private static void SetFloatArgument(
+            SerializedProperty command,
+            string key,
+            float value)
+        {
+            SerializedProperty arguments = command.FindPropertyRelative(
+                    "interactionParameters")
+                .FindPropertyRelative("arguments");
+            arguments.arraySize = 1;
+            SerializedProperty argument = arguments.GetArrayElementAtIndex(0);
+            argument.FindPropertyRelative("key").stringValue = key;
+            argument.FindPropertyRelative("valueType").enumValueIndex =
+                (int)InteractionValueType.Float;
+            argument.FindPropertyRelative("floatValue").floatValue = value;
+        }
+
+        private static void ResetCommandPayload(SerializedProperty command)
+        {
+            command.FindPropertyRelative("flowParameters")
+                .FindPropertyRelative("targetNodeId").stringValue =
+                string.Empty;
+
+            SerializedProperty dialogue = command.FindPropertyRelative(
+                "dialogueParameters");
+            dialogue.FindPropertyRelative("actorRole").stringValue =
+                string.Empty;
+            dialogue.FindPropertyRelative("textKey").stringValue =
+                string.Empty;
+            dialogue.FindPropertyRelative("fallbackText").stringValue =
+                string.Empty;
+            dialogue.FindPropertyRelative("choiceTitleKey").stringValue =
+                string.Empty;
+            dialogue.FindPropertyRelative("choiceTitleFallback").stringValue =
+                string.Empty;
+            dialogue.FindPropertyRelative("choices").arraySize = 0;
+
+            SerializedProperty actor = command.FindPropertyRelative(
+                "actorActionParameters");
+            actor.FindPropertyRelative("actorRole").stringValue = string.Empty;
+            actor.FindPropertyRelative("targetRole").stringValue = string.Empty;
+            actor.FindPropertyRelative("speed").floatValue = 0f;
+            actor.FindPropertyRelative("duration").floatValue = 0f;
+            actor.FindPropertyRelative("markerPosition").vector3Value =
+                Vector3.zero;
+            actor.FindPropertyRelative("offset").vector3Value = Vector3.zero;
+            actor.FindPropertyRelative("message").stringValue = string.Empty;
+            actor.FindPropertyRelative("emoteId").stringValue = string.Empty;
+
+            command.FindPropertyRelative("timingParameters")
+                .FindPropertyRelative("duration").floatValue = 0f;
+            SerializedProperty media = command.FindPropertyRelative(
+                "mediaParameters");
+            media.FindPropertyRelative("assetReference").objectReferenceValue =
+                null;
+            media.FindPropertyRelative("waitForCompletion").boolValue = false;
+            media.FindPropertyRelative("duration").floatValue = 0f;
+
+            SerializedProperty interaction = command.FindPropertyRelative(
+                "interactionParameters");
+            interaction.FindPropertyRelative("actionId").stringValue =
+                string.Empty;
+            interaction.FindPropertyRelative("initiatorRoles").arraySize = 0;
+            interaction.FindPropertyRelative("targetRoles").arraySize = 0;
+            interaction.FindPropertyRelative("contextId").stringValue =
+                string.Empty;
+            interaction.FindPropertyRelative("arguments").arraySize = 0;
+            interaction.FindPropertyRelative("outcomeBranches").arraySize = 0;
+            interaction.FindPropertyRelative("timeoutSeconds").floatValue = 0f;
+
+            SerializedProperty effect = command.FindPropertyRelative(
+                "effectParameters");
+            effect.FindPropertyRelative("effectType").enumValueIndex = 0;
+            effect.FindPropertyRelative("resultId").stringValue = string.Empty;
+            effect.FindPropertyRelative("targetId").stringValue = string.Empty;
+            effect.FindPropertyRelative("secondaryTargetId").stringValue =
+                string.Empty;
+            effect.FindPropertyRelative("stringValue").stringValue =
+                string.Empty;
+            effect.FindPropertyRelative("intValue").intValue = 0;
+            effect.FindPropertyRelative("boolValue").boolValue = false;
+            command.FindPropertyRelative("barrierType").enumValueIndex =
+                (int)NarrativeBarrierType.None;
         }
 
         private static void SetActorCommand(

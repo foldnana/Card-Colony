@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DG.Tweening;
 using UnityEngine;
 
@@ -15,7 +16,15 @@ namespace CryingSnow.StackCraft
         private readonly HashSet<string> temporaryActorRoles =
             new(StringComparer.Ordinal);
         private readonly List<INarrativeCommandOperation> operations = new();
+        private readonly Dictionary<string, NarrativeCommandDefinition>
+            backgroundCombats = new(StringComparer.Ordinal);
+        private readonly HashSet<string> suppressedBackgroundBranches =
+            new(StringComparer.Ordinal);
+        private CardInstance conflictInitiator;
+        private CardInstance conflictTarget;
         private bool disposed;
+
+        public event Action<string> BackgroundBranchRequested;
 
         public NarrativeWorldActionExecutor(
             IReadOnlyDictionary<string, NarrativeActorHandle> actors,
@@ -64,6 +73,13 @@ namespace CryingSnow.StackCraft
                 NarrativeCommandType.DespawnActor => DespawnActor(actor),
                 NarrativeCommandType.PlayCinematicAttack => CinematicAttack(
                     actor, Resolve(parameters.TargetRole), parameters),
+                NarrativeCommandType.BeginConflictInteraction =>
+                    BeginConflictInteraction(
+                        actor, Resolve(parameters.TargetRole)),
+                NarrativeCommandType.EndConflictInteraction =>
+                    EndConflictInteraction(),
+                NarrativeCommandType.BeginBackgroundCombat =>
+                    BeginBackgroundCombat(command),
                 NarrativeCommandType.ShowSpeechBubble or
                     NarrativeCommandType.ShowEmote or
                     NarrativeCommandType.EnterVisualNovelMode or
@@ -88,10 +104,30 @@ namespace CryingSnow.StackCraft
             if (disposed)
                 return;
             disposed = true;
+            string[] activeBackgroundSessions = backgroundCombats.Keys
+                .Select(sessionId => CombatManager.Instance?
+                    .ResolveFinalSessionId(sessionId) ?? sessionId)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
             foreach (INarrativeCommandOperation operation in operations)
                 if (!operation.IsCompleted)
                     operation.Cancel("NarrativeFinished");
             operations.Clear();
+            if (CombatManager.Instance != null)
+                CombatManager.Instance.OutcomePublished -=
+                    HandleBackgroundCombatOutcome;
+            backgroundCombats.Clear();
+            suppressedBackgroundBranches.Clear();
+            foreach (CombatTask task in CombatManager.Instance?.ActiveCombats
+                         ?.Where(task => task != null && task.IsOngoing &&
+                             activeBackgroundSessions.Contains(
+                                 task.SessionId,
+                                 StringComparer.Ordinal))
+                         .ToArray() ?? Array.Empty<CombatTask>())
+            {
+                task.EndImmediately();
+            }
+            EndConflictInteraction();
             foreach (string role in new List<string>(temporaryActorRoles))
                 DespawnActor(Resolve(role));
             temporaryActorRoles.Clear();
@@ -174,28 +210,373 @@ namespace CryingSnow.StackCraft
         {
             if (actor?.Card == null || target?.Card == null)
                 return Failure("ActorMissing");
-            Vector3 delta = (target.Card.transform.position -
-                actor.Card.transform.position).Flatten();
-            if (delta.sqrMagnitude <= 0.0001f)
-                return Success();
-            float yaw = Mathf.Atan2(delta.x, delta.z) * Mathf.Rad2Deg;
-            Vector3 euler = actor.Card.transform.eulerAngles;
-            Quaternion rotation = Quaternion.Euler(euler.x, yaw, euler.z);
-            if (duration <= 0f)
+
+            // World cards are flat presentation objects rather than upright
+            // character models. Rotating their transform toward another card
+            // makes them turn edge-on to the camera and corrupts the rotation
+            // later restored by ReturnToOrigin. Facing remains a semantic
+            // staging command until a separate character visual layer exists.
+            return Success();
+        }
+
+        private INarrativeCommandOperation BeginConflictInteraction(
+            NarrativeActorHandle initiator,
+            NarrativeActorHandle target)
+        {
+            if (initiator?.Card == null || target?.Card == null)
+                return Failure("ActorMissing");
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance ??
+                NpcInteractionManager.Ensure(
+                    CombatManager.Instance?.gameObject);
+            if (interaction == null)
+                return Failure("ConflictInteractionUnavailable");
+
+            if (interaction.IsActive)
             {
-                actor.Card.transform.rotation = rotation;
-                return Success();
+                bool isOwnedConflict = interaction.IsConflict &&
+                    interaction.Participants.Contains(initiator.Card) &&
+                    interaction.Participants.Contains(target.Card);
+                if (isOwnedConflict)
+                    return Success();
+                interaction.EndInteraction();
             }
-            Tween tween = actor.Card.transform
-                .DORotateQuaternion(rotation, duration)
-                .SetUpdate(true);
-            return new TweenNarrativeCommandOperation(
-                tween,
-                () =>
+
+            if (!interaction.TryStartConflictInteraction(
+                    initiator.Card, target.Card))
+            {
+                return Failure("ConflictInteractionCouldNotStart");
+            }
+            conflictInitiator = initiator.Card;
+            conflictTarget = target.Card;
+            return Success();
+        }
+
+        private INarrativeCommandOperation EndConflictInteraction()
+        {
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            if (interaction != null && interaction.IsConflict &&
+                (conflictInitiator == null ||
+                 interaction.Participants.Contains(conflictInitiator)) &&
+                (conflictTarget == null ||
+                 interaction.Participants.Contains(conflictTarget)))
+            {
+                interaction.EndInteraction();
+            }
+            conflictInitiator = null;
+            conflictTarget = null;
+            return Success();
+        }
+
+        private INarrativeCommandOperation BeginBackgroundCombat(
+            NarrativeCommandDefinition command)
+        {
+            CombatManager manager = CombatManager.Instance;
+            NarrativeInteractionParameters parameters =
+                command?.InteractionParameters;
+            List<CardInstance> friendly = ResolveCards(
+                parameters?.InitiatorRoles);
+            List<CardInstance> enemies = ResolveCards(
+                parameters?.TargetRoles);
+            if (manager == null || friendly.Count == 0 || enemies.Count == 0 ||
+                friendly.Any(card => card.Combatant == null) ||
+                enemies.Any(card => card.Combatant == null))
+            {
+                return Failure("BackgroundCombatActorsUnavailable");
+            }
+
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            if (interaction?.IsActive == true &&
+                interaction.Participants.Any(friendly.Contains))
+            {
+                foreach (string roleId in parameters.InitiatorRoles ??
+                         Array.Empty<string>())
                 {
-                    if (actor.Card != null)
-                        actor.Card.transform.rotation = rotation;
-                });
+                    NarrativeActorHandle handle = Resolve(roleId);
+                    if (handle?.Card != null && interaction.TryGetReturnPosition(
+                            handle.Card, out Vector3 returnPosition))
+                    {
+                        controls.OverrideOrigin(
+                            roleId,
+                            returnPosition,
+                            handle.Card.transform.rotation);
+                    }
+                }
+                interaction.EndInteractionForCombatTransition(
+                    friendly.Concat(enemies));
+            }
+
+            string originalSessionId =
+                $"narrative-background:{command.CommandId}:" +
+                Guid.NewGuid().ToString("N");
+            CombatTask task = manager.StartCombat(
+                friendly,
+                enemies,
+                playerIsAttacker: true,
+                originalSessionId);
+            if (task == null)
+                return Failure("BackgroundCombatCouldNotStart");
+
+            task.ConfigureDefeatRules(
+                ParseDefeatRule(parameters, "friendlyDefeatRule"),
+                ParseDefeatRule(parameters, "enemyDefeatRule"));
+            if (backgroundCombats.Count == 0)
+                manager.OutcomePublished += HandleBackgroundCombatOutcome;
+            backgroundCombats[originalSessionId] = command;
+            return Success();
+        }
+
+        public List<NarrativeBackgroundCombatData>
+            CaptureBackgroundCombats()
+        {
+            CombatManager manager = CombatManager.Instance;
+            return backgroundCombats.Select(pair =>
+                new NarrativeBackgroundCombatData
+                {
+                    OriginalSessionId = pair.Key,
+                    FinalSessionId = manager?.ResolveFinalSessionId(pair.Key) ??
+                        pair.Key,
+                    CommandId = pair.Value?.CommandId ?? string.Empty,
+                    ContextId = pair.Value?.InteractionParameters?.ContextId ??
+                        string.Empty,
+                    InitiatorActorIds = ResolveCards(pair.Value?
+                            .InteractionParameters?.InitiatorRoles)
+                        .Select(card => card.PersistentId).ToList(),
+                    TargetActorIds = ResolveCards(pair.Value?
+                            .InteractionParameters?.TargetRoles)
+                        .Select(card => card.PersistentId).ToList(),
+                    Actors = CaptureBackgroundActors(pair.Value)
+                }).ToList();
+        }
+
+        private List<NarrativeBackgroundActorData> CaptureBackgroundActors(
+            NarrativeCommandDefinition command)
+        {
+            IEnumerable<string> roles = (command?.InteractionParameters?
+                    .InitiatorRoles ?? Array.Empty<string>())
+                .Concat(command?.InteractionParameters?.TargetRoles ??
+                    Array.Empty<string>())
+                .Distinct(StringComparer.Ordinal);
+            var saved = new List<NarrativeBackgroundActorData>();
+            foreach (string roleId in roles)
+            {
+                NarrativeActorHandle handle = Resolve(roleId);
+                if (handle?.Card == null)
+                    continue;
+                var actor = new NarrativeBackgroundActorData
+                {
+                    RoleId = roleId,
+                    PersistentId = handle.Card.PersistentId
+                };
+                if (controls.TryGetOrigin(roleId, out var origin))
+                {
+                    actor.OriginPosition = new[]
+                    {
+                        origin.Position.x,
+                        origin.Position.y,
+                        origin.Position.z
+                    };
+                    actor.OriginRotation = new[]
+                    {
+                        origin.Rotation.x,
+                        origin.Rotation.y,
+                        origin.Rotation.z,
+                        origin.Rotation.w
+                    };
+                }
+                saved.Add(actor);
+            }
+            return saved;
+        }
+
+        public void RestoreBackgroundCombats(
+            IEnumerable<NarrativeBackgroundCombatData> saved,
+            NarrativeDefinition definition)
+        {
+            CombatManager manager = CombatManager.Instance;
+            if (manager == null || definition == null)
+                return;
+            Dictionary<string, NarrativeCommandDefinition> commands =
+                definition.Nodes
+                    .SelectMany(node => node?.Commands ??
+                        Array.Empty<NarrativeCommandDefinition>())
+                    .Where(command => command != null &&
+                        !string.IsNullOrWhiteSpace(command.CommandId))
+                    .GroupBy(command => command.CommandId,
+                        StringComparer.Ordinal)
+                    .ToDictionary(group => group.Key, group => group.First(),
+                        StringComparer.Ordinal);
+            foreach (NarrativeBackgroundCombatData binding in saved ??
+                     Enumerable.Empty<NarrativeBackgroundCombatData>())
+            {
+                if (binding == null ||
+                    string.IsNullOrWhiteSpace(binding.OriginalSessionId) ||
+                    !commands.TryGetValue(binding.CommandId, out var command))
+                    continue;
+                string finalSessionId = string.IsNullOrWhiteSpace(
+                        binding.FinalSessionId)
+                    ? binding.OriginalSessionId
+                    : binding.FinalSessionId;
+                CombatTask active = manager.ActiveCombats.FirstOrDefault(
+                    task => task?.IsOngoing == true &&
+                        string.Equals(task.SessionId, finalSessionId,
+                            StringComparison.Ordinal));
+                active ??= manager.ActiveCombats.FirstOrDefault(task =>
+                    task?.IsOngoing == true &&
+                    (binding.InitiatorActorIds ?? new List<string>())
+                        .Concat(binding.TargetActorIds ?? new List<string>())
+                        .Where(id => !string.IsNullOrWhiteSpace(id))
+                        .All(task.ContainsCombatant));
+                if (active == null)
+                    continue;
+                AttachRestoredActors(
+                    command.InteractionParameters?.InitiatorRoles,
+                    binding.InitiatorActorIds,
+                    active);
+                AttachRestoredActors(
+                    command.InteractionParameters?.TargetRoles,
+                    binding.TargetActorIds,
+                    active);
+                RestoreActorControl(binding.Actors, active);
+                manager.RegisterSessionAlias(
+                    binding.OriginalSessionId, active.SessionId);
+                backgroundCombats[binding.OriginalSessionId] = command;
+            }
+            if (backgroundCombats.Count > 0)
+            {
+                manager.OutcomePublished -= HandleBackgroundCombatOutcome;
+                manager.OutcomePublished += HandleBackgroundCombatOutcome;
+            }
+        }
+
+        private void RestoreActorControl(
+            IEnumerable<NarrativeBackgroundActorData> savedActors,
+            CombatTask task)
+        {
+            foreach (NarrativeBackgroundActorData saved in savedActors ??
+                     Enumerable.Empty<NarrativeBackgroundActorData>())
+            {
+                if (saved == null || string.IsNullOrWhiteSpace(saved.RoleId))
+                    continue;
+                NarrativeActorHandle handle = Resolve(saved.RoleId);
+                CardInstance card = task.FindParticipant(saved.PersistentId);
+                if (handle == null || card == null)
+                    continue;
+                handle.AttachCard(card);
+                controls.Acquire(handle);
+                if (saved.OriginPosition?.Length == 3 &&
+                    saved.OriginRotation?.Length == 4)
+                {
+                    controls.OverrideOrigin(
+                        saved.RoleId,
+                        new Vector3(
+                            saved.OriginPosition[0],
+                            saved.OriginPosition[1],
+                            saved.OriginPosition[2]),
+                        new Quaternion(
+                            saved.OriginRotation[0],
+                            saved.OriginRotation[1],
+                            saved.OriginRotation[2],
+                            saved.OriginRotation[3]));
+                }
+            }
+        }
+
+        private void AttachRestoredActors(
+            IEnumerable<string> roles,
+            IReadOnlyList<string> persistentIds,
+            CombatTask task)
+        {
+            string[] roleArray = (roles ?? Array.Empty<string>()).ToArray();
+            for (int index = 0; index < roleArray.Length &&
+                 index < (persistentIds?.Count ?? 0); index++)
+            {
+                NarrativeActorHandle handle = Resolve(roleArray[index]);
+                CardInstance card = task.FindParticipant(
+                    persistentIds[index]);
+                if (handle != null && card != null)
+                    handle.AttachCard(card);
+            }
+        }
+
+        private List<CardInstance> ResolveCards(IEnumerable<string> roles)
+        {
+            return (roles ?? Array.Empty<string>())
+                .Select(Resolve)
+                .Where(handle => handle?.Card != null)
+                .Select(handle => handle.Card)
+                .Distinct()
+                .ToList();
+        }
+
+        private static CombatDefeatRule ParseDefeatRule(
+            NarrativeInteractionParameters parameters,
+            string key)
+        {
+            string value = parameters?.Arguments?
+                .FirstOrDefault(argument => argument != null &&
+                    string.Equals(argument.Key, key,
+                        StringComparison.OrdinalIgnoreCase))
+                ?.StringValue;
+            return Enum.TryParse(value, ignoreCase: true,
+                out CombatDefeatRule parsed)
+                ? parsed
+                : CombatDefeatRule.Lethal;
+        }
+
+        private void HandleBackgroundCombatOutcome(CombatOutcome outcome)
+        {
+            if (outcome == null ||
+                !backgroundCombats.Remove(
+                    outcome.OriginalSessionId,
+                    out NarrativeCommandDefinition command))
+            {
+                return;
+            }
+            if (backgroundCombats.Count == 0 && CombatManager.Instance != null)
+            {
+                CombatManager.Instance.OutcomePublished -=
+                    HandleBackgroundCombatOutcome;
+            }
+
+            bool suppressBranch = suppressedBackgroundBranches.Remove(
+                outcome.OriginalSessionId);
+            if (suppressBranch)
+                return;
+
+            string outcomeId = outcome.Result switch
+            {
+                CombatOutcomeResult.Victory => "victory",
+                CombatOutcomeResult.Defeat => "defeat",
+                CombatOutcomeResult.Retreated => "retreated",
+                _ => "aborted"
+            };
+            NarrativeInteractionOutcomeBranch branch =
+                command.InteractionParameters?.OutcomeBranches?
+                    .FirstOrDefault(candidate => candidate != null &&
+                        string.Equals(candidate.OutcomeId, outcomeId,
+                            StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(branch?.TargetNodeId))
+                BackgroundBranchRequested?.Invoke(branch.TargetNodeId);
+        }
+
+        public void SuppressBackgroundBranchForContext(string contextId)
+        {
+            if (string.IsNullOrWhiteSpace(contextId))
+                return;
+            foreach (KeyValuePair<string, NarrativeCommandDefinition> pair in
+                     backgroundCombats)
+            {
+                if (string.Equals(
+                        pair.Value?.InteractionParameters?.ContextId,
+                        contextId,
+                        StringComparison.Ordinal))
+                {
+                    suppressedBackgroundBranches.Add(pair.Key);
+                }
+            }
         }
 
         private INarrativeCommandOperation ReturnToOrigin(
@@ -256,11 +637,15 @@ namespace CryingSnow.StackCraft
         private INarrativeCommandOperation DespawnActor(
             NarrativeActorHandle actor)
         {
-            if (actor?.Card == null ||
+            if (actor == null ||
                 !temporaryActorRoles.Remove(actor.RoleId))
                 return Failure("TemporaryActorMissing");
             CardInstance card = actor.Card;
             actor.AttachCard(null);
+            // Formal combat may already have destroyed a temporary enemy.
+            // Removing the tracked role is still a successful, idempotent cleanup.
+            if (card == null)
+                return Success();
             if (card.Stack != null)
                 card.Stack.DestroyCard(card);
             else

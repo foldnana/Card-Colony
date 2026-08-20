@@ -4,6 +4,76 @@ using System.Linq;
 
 namespace CryingSnow.StackCraft
 {
+    public sealed class NpcStockLossGameplayInteractionHandler :
+        IGameplayInteractionHandler
+    {
+        public const string StockLossActionId = "economy.rob_npc_stock";
+
+        public string ActionId => StockLossActionId;
+        public InteractionParameterSchema Schema { get; } = new(
+            new[]
+            {
+                new InteractionParameterDefinition(
+                    "lossFraction", InteractionValueType.Float, false)
+            });
+
+        public InteractionValidationResult Validate(
+            GameplayInteractionRequest request,
+            GameplayInteractionContext context)
+        {
+            return request?.TargetActorIds?.Count > 0
+                ? InteractionValidationResult.Valid
+                : new InteractionValidationResult(false,
+                    "MerchantTargetRequired");
+        }
+
+        public IGameplayInteractionOperation Begin(
+            GameplayInteractionRequest request,
+            GameplayInteractionContext context)
+        {
+            string targetId = request.TargetActorIds.FirstOrDefault();
+            NpcTrader trader = CardManager.Instance?.AllCards
+                .FirstOrDefault(card => card != null &&
+                    string.Equals(card.PersistentId, targetId,
+                        StringComparison.Ordinal))
+                ?.GetComponent<NpcTrader>();
+            if (trader == null)
+            {
+                return new ImmediateGameplayInteractionOperation(
+                    new InteractionResult(
+                        request.OperationId,
+                        request.ActionId,
+                        GameplayInteractionState.Failed,
+                        string.Empty,
+                        "MerchantNotFound",
+                        request.ContextId));
+            }
+
+            float lossFraction = request.Arguments.FirstOrDefault(value =>
+                    value.Key == "lossFraction")?.Value is float value
+                ? value
+                : 0.5f;
+            int stolen = NpcTradeService.ApplyRobberyLoss(
+                trader, lossFraction);
+            return new ImmediateGameplayInteractionOperation(
+                new InteractionResult(
+                    request.OperationId,
+                    request.ActionId,
+                    GameplayInteractionState.Completed,
+                    "robbed",
+                    string.Empty,
+                    request.ContextId,
+                    stolen,
+                    request.InitiatorActorIds,
+                    request.TargetActorIds,
+                    new Dictionary<string, string>(StringComparer.Ordinal)
+                    {
+                        ["stolenUnits"] = stolen.ToString()
+                    },
+                    $"{request.OperationId}:Resolved:0"));
+        }
+    }
+
     public sealed class InvestigationGameplayInteractionHandler :
         IGameplayInteractionHandler,
         IGameplayInteractionRecoveryHandler
@@ -208,6 +278,7 @@ namespace CryingSnow.StackCraft
                 return;
             }
 
+            EndMatchingConflictPresentation();
             CombatTask task = manager.StartCombat(
                 initiators,
                 targets,
@@ -215,6 +286,19 @@ namespace CryingSnow.StackCraft
                 request.OperationId);
             if (task == null)
                 CompleteAborted("CombatCouldNotStart");
+        }
+
+        private void EndMatchingConflictPresentation()
+        {
+            NpcInteractionManager interaction =
+                NpcInteractionManager.Instance;
+            if (interaction?.IsConflict != true)
+                return;
+            var combatants = new HashSet<CardInstance>(
+                (initiators ?? new List<CardInstance>())
+                .Concat(targets ?? new List<CardInstance>()));
+            if (interaction.Participants.All(combatants.Contains))
+                interaction.EndInteraction();
         }
 
         public bool TryCancel(string reason) => false;

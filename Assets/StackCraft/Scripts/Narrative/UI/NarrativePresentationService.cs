@@ -12,6 +12,7 @@ namespace CryingSnow.StackCraft
         private readonly CameraController cameraController;
         private readonly Vector3 cameraOrigin;
         private readonly bool hasCameraOrigin;
+        private readonly bool restoreCameraOnDispose;
         private readonly List<GameObject> callouts = new();
         private readonly List<INarrativeCommandOperation> operations = new();
         private bool disposed;
@@ -19,9 +20,18 @@ namespace CryingSnow.StackCraft
         public NarrativePresentationService(
             NarrativePresentationView view,
             CameraController cameraController)
+            : this(view, cameraController, restoreCameraOnDispose: true)
+        {
+        }
+
+        public NarrativePresentationService(
+            NarrativePresentationView view,
+            CameraController cameraController,
+            bool restoreCameraOnDispose)
         {
             this.view = view;
             this.cameraController = cameraController;
+            this.restoreCameraOnDispose = restoreCameraOnDispose;
             if (cameraController != null)
             {
                 cameraOrigin = cameraController.GetRigPosition();
@@ -78,10 +88,22 @@ namespace CryingSnow.StackCraft
                 case NarrativeCommandType.FocusActor:
                     if (actor?.Card == null || cameraController == null)
                         return Failure("FocusActorUnavailable");
+                    object cameraFocusLock = new();
+                    InputManager.Instance?.AddLock(
+                        cameraFocusLock,
+                        allowCameraInput: false);
                     Tween focus = cameraController.FocusOn(
                         actor.Card.transform.position,
                         completeImmediately ? 0f : actorParameters.Duration);
-                    return Track(new PresentationTweenOperation(focus));
+                    if (focus == null)
+                    {
+                        InputManager.Instance?.RemoveLock(cameraFocusLock);
+                        return Success();
+                    }
+                    return Track(new PresentationTweenOperation(
+                        focus,
+                        cleanup: () => InputManager.Instance?.RemoveLock(
+                            cameraFocusLock)));
                 case NarrativeCommandType.ShakeCamera:
                     cameraController?.Shake(
                         completeImmediately ? 0f : actorParameters.Duration,
@@ -106,7 +128,8 @@ namespace CryingSnow.StackCraft
                 if (callout != null)
                     UnityEngine.Object.Destroy(callout);
             callouts.Clear();
-            if (hasCameraOrigin && cameraController != null)
+            if (restoreCameraOnDispose && hasCameraOrigin &&
+                cameraController != null)
                 cameraController.SetRigPositionInstant(cameraOrigin);
             view?.Restore();
         }
@@ -170,11 +193,16 @@ namespace CryingSnow.StackCraft
         {
             private Tween tween;
             private Action finish;
+            private Action cleanup;
 
-            public PresentationTweenOperation(Tween tween, Action finish = null)
+            public PresentationTweenOperation(
+                Tween tween,
+                Action finish = null,
+                Action cleanup = null)
             {
                 this.tween = tween;
                 this.finish = finish;
+                this.cleanup = cleanup;
                 if (tween == null)
                 {
                     Finish(true, string.Empty);
@@ -212,6 +240,8 @@ namespace CryingSnow.StackCraft
                 if (success)
                     finish?.Invoke();
                 finish = null;
+                cleanup?.Invoke();
+                cleanup = null;
                 IsCompleted = true;
                 Result = new NarrativeCommandResult(success, error);
                 Completed?.Invoke(Result);

@@ -95,7 +95,8 @@ namespace CryingSnow.StackCraft
                 return null;
 
             CombatRect rect = Instantiate(combatRectPrefab, WorldCanvas.Instance?.transform);
-            rect.Initialize(firstSide, secondSide);
+            rect.InitializeAnimated(firstSide, secondSide);
+            rect.PlayTransitionIn();
             return rect;
         }
 
@@ -111,7 +112,8 @@ namespace CryingSnow.StackCraft
         public CombatRect CreateAnchoredInteractionRect(
             IEnumerable<CardInstance> initiators,
             IEnumerable<CardInstance> targets,
-            Vector3 targetAnchor)
+            Vector3 targetAnchor,
+            bool animateInitiators = true)
         {
             if (combatRectPrefab == null)
                 return null;
@@ -131,7 +133,8 @@ namespace CryingSnow.StackCraft
             rect.InitializeAnchored(
                 first,
                 second,
-                targetAnchor);
+                targetAnchor,
+                animateInitiators);
             return rect;
         }
         #endregion
@@ -273,6 +276,8 @@ namespace CryingSnow.StackCraft
                 }
                 List<CardInstance> attackers = RestoreCardList(combatData.Attackers);
                 List<CardInstance> defenders = RestoreCardList(combatData.Defenders);
+                List<CardInstance> preserved = RestoreCardList(
+                    combatData.PreservedDefeated);
 
                 if (attackers.Count > 0 && defenders.Count > 0)
                 {
@@ -290,6 +295,8 @@ namespace CryingSnow.StackCraft
                         restored: true);
                     attackers.ForEach(card => card.Combatant.EnterCombat(task));
                     defenders.ForEach(card => card.Combatant.EnterCombat(task));
+                    task.RestorePreservedDefeated(preserved);
+                    preserved.ForEach(card => card.Combatant.EnterCombat(task));
                     task.RestoreRuntime(combatData);
                     _activeCombats.Add(task);
                     outcomeTracker.Register(task.SessionId, task.SessionId);
@@ -372,7 +379,10 @@ namespace CryingSnow.StackCraft
             if (tasksToMerge.Any())
             {
                 CombatTask merged = MergeCombats(
-                    attackers, defenders, tasksToMerge);
+                    attackers,
+                    defenders,
+                    playerIsAttacker,
+                    tasksToMerge);
                 if (merged != null &&
                     !string.IsNullOrWhiteSpace(originalSessionId))
                 {
@@ -446,7 +456,11 @@ namespace CryingSnow.StackCraft
                 allTasksToCleanUp.Add(sourceTask);
 
                 // The cards from our sourceTask act as the "initial" combatants.
-                MergeCombats(sourceTask.Attackers, sourceTask.Defenders, allTasksToCleanUp);
+                MergeCombats(
+                    sourceTask.Attackers,
+                    sourceTask.Defenders,
+                    sourceTask.PlayerIsAttacker,
+                    allTasksToCleanUp);
             }
         }
 
@@ -472,7 +486,11 @@ namespace CryingSnow.StackCraft
             return task;
         }
 
-        private CombatTask MergeCombats(List<CardInstance> initialAttackers, List<CardInstance> initialDefenders, List<CombatTask> tasksToMerge)
+        private CombatTask MergeCombats(
+            List<CardInstance> initialAttackers,
+            List<CardInstance> initialDefenders,
+            bool initialPlayerIsAttacker,
+            List<CombatTask> tasksToMerge)
         {
             foreach (CombatTask task in tasksToMerge
                          .Where(task => task?.Phase == CombatPhase.ResolvingAction)
@@ -488,31 +506,15 @@ namespace CryingSnow.StackCraft
                         card.CurrentHealth > 0 && !card.IsDowned).ToList(),
                     initialDefenders.Where(card => card != null &&
                         card.CurrentHealth > 0 && !card.IsDowned).ToList(),
-                    true);
+                    initialPlayerIsAttacker);
 
-            var allPlayerUnits = new List<CardInstance>();
-            var allMobUnits = new List<CardInstance>();
-
-            var allInitialCombatants = initialAttackers.Concat(initialDefenders);
-            var allExistingCombatants = tasksToMerge.SelectMany(t => t.Attackers.Concat(t.Defenders));
-
-            // Consolidate all units from all involved combats into two faction-based lists.
-            foreach (var card in allInitialCombatants.Concat(allExistingCombatants))
-            {
-                if (card == null || card.CurrentHealth <= 0 || card.IsDowned)
-                    continue;
-                // Avoid adding duplicates if a card somehow existed in multiple lists.
-                if (allPlayerUnits.Contains(card) || allMobUnits.Contains(card)) continue;
-
-                if (card.Definition.Faction == CardFaction.Player)
-                {
-                    allPlayerUnits.Add(card);
-                }
-                else if (card.Definition.Faction == CardFaction.Mob)
-                {
-                    allMobUnits.Add(card);
-                }
-            }
+            CollectMergedCombatants(
+                initialAttackers,
+                initialDefenders,
+                initialPlayerIsAttacker,
+                tasksToMerge,
+                out List<CardInstance> allPlayerUnits,
+                out List<CardInstance> allMobUnits);
 
             CombatTask oldest = tasksToMerge
                 .Where(task => task != null)
@@ -526,7 +528,7 @@ namespace CryingSnow.StackCraft
             // Clean up the old visuals after retaining their runtime state.
             foreach (var task in tasksToMerge)
             {
-                task.CleanUpForMerge();
+                task.CleanUpForMerge(animateRect: true);
                 _activeCombats.Remove(task);
             }
 
@@ -548,6 +550,8 @@ namespace CryingSnow.StackCraft
             merged.CompleteJoinOrderForMerge();
             allPlayerUnits.ForEach(card => card.Combatant.EnterCombat(merged));
             allMobUnits.ForEach(card => card.Combatant.EnterCombat(merged));
+            merged.PreservedDefeated.ToList().ForEach(card =>
+                card.Combatant?.EnterCombat(merged));
             _activeCombats.Add(merged);
             outcomeTracker.Register(merged.SessionId, merged.SessionId);
             foreach (string previousSessionId in mergedSessionIds)
@@ -559,6 +563,67 @@ namespace CryingSnow.StackCraft
             merged.PublishMerged();
             CardManager.Instance?.ResolveOverlaps(rect);
             return merged;
+        }
+
+        private static void CollectMergedCombatants(
+            IEnumerable<CardInstance> initialAttackers,
+            IEnumerable<CardInstance> initialDefenders,
+            bool initialPlayerIsAttacker,
+            IEnumerable<CombatTask> tasksToMerge,
+            out List<CardInstance> playerSide,
+            out List<CardInstance> enemySide)
+        {
+            playerSide = new List<CardInstance>();
+            enemySide = new List<CardInstance>();
+            AddMergedSide(
+                initialPlayerIsAttacker
+                    ? initialAttackers
+                    : initialDefenders,
+                playerSide,
+                enemySide);
+            AddMergedSide(
+                initialPlayerIsAttacker
+                    ? initialDefenders
+                    : initialAttackers,
+                enemySide,
+                playerSide);
+
+            foreach (CombatTask task in tasksToMerge ??
+                     Enumerable.Empty<CombatTask>())
+            {
+                if (task == null)
+                    continue;
+                AddMergedSide(
+                    task.PlayerIsAttacker
+                        ? task.Attackers
+                        : task.Defenders,
+                    playerSide,
+                    enemySide);
+                AddMergedSide(
+                    task.PlayerIsAttacker
+                        ? task.Defenders
+                        : task.Attackers,
+                    enemySide,
+                    playerSide);
+            }
+        }
+
+        private static void AddMergedSide(
+            IEnumerable<CardInstance> source,
+            List<CardInstance> destination,
+            List<CardInstance> opposite)
+        {
+            foreach (CardInstance card in source ??
+                     Enumerable.Empty<CardInstance>())
+            {
+                if (card == null || card.CurrentHealth <= 0 ||
+                    card.IsDowned || destination.Contains(card) ||
+                    opposite.Contains(card))
+                {
+                    continue;
+                }
+                destination.Add(card);
+            }
         }
 
         /// <summary>
